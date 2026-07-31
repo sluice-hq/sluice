@@ -38,3 +38,7 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+tasks.named('bootRun') {
+	systemProperty 'user.timezone', 'UTC'
+}
