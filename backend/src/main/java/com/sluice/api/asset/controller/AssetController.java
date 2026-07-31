@@ -34,7 +34,7 @@ public class AssetController {
         }
         
         if (file.getSize() > MAX_FILE_SIZE) {
-            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body("File size exceeds the 50MB limit.");
+            return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body("File size exceeds the 50MB limit.");
         }
 
         String contentType = file.getContentType();
