@@ -52,8 +52,13 @@ public class AssetService {
             );
         } catch (Exception e) {
             // Compensating action: delete the orphaned blob
-            storageService.deleteFile(fileUrl);
-            throw new RuntimeException("Failed to persist asset metadata. Orphaned blob was deleted.", e);
+            try {
+                storageService.deleteFile(fileUrl);
+            } catch (Exception cleanupException) {
+                // In a production app, we would log this failure to a DLQ or alerting system
+                System.err.println("Failed to delete orphaned blob during compensation: " + fileUrl);
+            }
+            throw new RuntimeException("Failed to persist asset metadata. Initiated blob cleanup.", e);
         }
     }
 }
