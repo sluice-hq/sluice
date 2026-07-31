@@ -1,4 +1,4 @@
-package com.sluice.api.asset.service;
+package com.sluice.api.storage;
 
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
@@ -51,9 +51,15 @@ public class AzureBlobStorageService implements StorageService {
 
     @Override
     public void deleteFile(String fileUrl) {
-        // Extract blob name from URL
-        String blobName = fileUrl.substring(fileUrl.lastIndexOf('/') + 1);
-        BlobClient blobClient = containerClient.getBlobClient(blobName);
-        blobClient.deleteIfExists();
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return;
+        }
+        try {
+            String blobName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+            BlobClient blobClient = containerClient.getBlobClient(blobName);
+            blobClient.deleteIfExists();
+        } catch (Exception e) {
+            System.err.println("Failed to delete blob from URL: " + fileUrl + " - " + e.getMessage());
+        }
     }
 }

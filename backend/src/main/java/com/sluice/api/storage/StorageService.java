@@ -1,4 +1,4 @@
-package com.sluice.api.asset.service;
+package com.sluice.api.storage;
 
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
