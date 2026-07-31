@@ -3,7 +3,6 @@ package com.sluice.api.storage;
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
-import com.azure.storage.blob.BlobServiceClientBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,11 +19,9 @@ public class AzureBlobStorageService implements StorageService {
     private BlobContainerClient containerClient;
 
     public AzureBlobStorageService(
-            @Value("${azure.storage.connection-string}") String connectionString,
+            BlobServiceClient blobServiceClient,
             @Value("${azure.storage.container-name:assets}") String containerName) {
-        this.blobServiceClient = new BlobServiceClientBuilder()
-                .connectionString(connectionString)
-                .buildClient();
+        this.blobServiceClient = blobServiceClient;
         this.containerName = containerName;
     }
 
