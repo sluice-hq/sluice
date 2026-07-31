@@ -17,8 +17,7 @@ public class AssetController {
 
     // Allowed content types for Milestone 1
     private static final List<String> ALLOWED_CONTENT_TYPES = List.of(
-            "image/jpeg", "image/png", "image/gif", "application/pdf", "video/mp4"
-    );
+            "image/jpeg", "image/png", "image/gif", "application/pdf", "video/mp4");
 
     // Max size 50MB
     private static final long MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -32,7 +31,7 @@ public class AssetController {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body("File must not be empty.");
         }
-        
+
         if (file.getSize() > MAX_FILE_SIZE) {
             return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body("File size exceeds the 50MB limit.");
         }
