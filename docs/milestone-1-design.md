@@ -91,10 +91,10 @@ com.sluice.api.exception
 
 ## 8. Definition of Done
 Milestone 1 is considered strictly complete only when the following conditions are met:
-*   [ ] `POST /api/v1/assets` successfully accepts multipart file uploads.
-*   [ ] Files are successfully stored in the local Azurite instance.
-*   [ ] Asset metadata is successfully persisted in PostgreSQL.
-*   [ ] Flyway automatically manages the database schema creation.
-*   [ ] An `AssetResponse` DTO is returned with an HTTP `201 Created` status code.
-*   [ ] The entire upload flow has been manually verified using Postman.
-*   [ ] The completed feature branch has been merged into `main`.
+*   [x] `POST /api/v1/assets` successfully accepts multipart file uploads.
+*   [x] Files are successfully stored in the local Azurite instance.
+*   [x] Asset metadata is successfully persisted in PostgreSQL.
+*   [x] Flyway automatically manages the database schema creation.
+*   [x] An `AssetResponse` DTO is returned with an HTTP `201 Created` status code.
+*   [x] The entire upload flow has been manually verified using Postman.
+*   [x] The completed feature branch has been merged into `main`.
