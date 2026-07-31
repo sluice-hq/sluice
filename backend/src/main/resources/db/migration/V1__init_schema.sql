@@ -1,0 +1,8 @@
+CREATE TABLE assets (
+    id UUID PRIMARY KEY,
+    filename VARCHAR(255) NOT NULL,
+    size BIGINT NOT NULL,
+    content_type VARCHAR(100) NOT NULL,
+    storage_url VARCHAR(1024) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
