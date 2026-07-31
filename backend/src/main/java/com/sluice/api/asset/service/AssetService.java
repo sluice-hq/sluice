@@ -3,6 +3,7 @@ package com.sluice.api.asset.service;
 import com.sluice.api.asset.domain.Asset;
 import com.sluice.api.asset.dto.AssetResponse;
 import com.sluice.api.asset.repository.AssetRepository;
+import com.sluice.api.storage.StorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
