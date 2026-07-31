@@ -13,7 +13,6 @@ Instead of building custom upload, queueing, storage, and processing logic for e
 
 ---
 
-<!--
 ## 🏗️ Architecture
 
 Sluice employs an event-driven, decoupled architecture to ensure horizontal scalability and resilience.
@@ -63,12 +62,12 @@ Designed as a modern, enterprise-grade system, Sluice leverages the following te
 
 To manage complexity and optimize for learning distributed systems fundamentals, Sluice is being built incrementally.
 
-### Phase 1: The Vertical Slice (Current)
+### Phase 1: The Vertical Slice (Completed)
 **Goal:** Establish the core ingestion API.
 **Scope:** Upload an asset synchronously via the Spring Boot API, persist the raw file directly to Azure Blob Storage, save metadata to PostgreSQL, and return the generated Asset ID.
 *Note: This phase intentionally omits queues to establish a solid baseline for asset storage.*
 
-### Phase 2: Asynchronous Workers
+### Phase 2: Asynchronous Workers (Current)
 **Goal:** Introduce the execution layer.
 **Scope:** Integrate RabbitMQ. The API publishes an event upon upload, and a distributed Worker consumes the message to execute basic processing tasks asynchronously.
 
@@ -88,9 +87,17 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 
 ## 💻 Getting Started
 
-*(Coming soon as Phase 1 is implemented)*
-
-1. Clone the repository
-2. Run `docker-compose up -d` to start local infrastructure (PostgreSQL, RabbitMQ, Azurite, Valkey).
-3. Start the Spring Boot API.
--->
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/sluice-hq/sluice.git
+   cd sluice
+   ```
+2. Start the local infrastructure (PostgreSQL, Azurite) using Docker Compose:
+   ```bash
+   docker-compose up -d
+   ```
+3. Navigate to the backend directory and run the Spring Boot API:
+   ```bash
+   cd backend
+   ./gradlew bootRun
+   ```
