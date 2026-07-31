@@ -1,8 +1,8 @@
 # Sluice
 
-**Sluice** is an open-source, cloud-native media infrastructure platform designed to handle complex media processing workflows at scale. 
+**Sluice** is an open-source project being developed into a cloud-native media infrastructure platform designed to handle complex media processing workflows at scale. 
 
-Instead of building custom upload, queueing, storage, and processing logic for every application, Sluice provides a robust, modular pipeline engine. Developers can simply define their processing steps, and Sluice handles the distributed execution.
+Instead of building custom upload, queueing, storage, and processing logic for every application, Sluice is being built to provide a robust, modular pipeline engine. Developers will be able to simply define their processing steps, and Sluice will handle the distributed execution.
 
 ## 🚀 Key Features
 
@@ -13,9 +13,11 @@ Instead of building custom upload, queueing, storage, and processing logic for e
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Target Architecture
 
-Sluice employs an event-driven, decoupled architecture to ensure horizontal scalability and resilience.
+The diagram below represents the long-term target architecture that future milestones will progressively implement. Once complete, Sluice will employ an event-driven, decoupled architecture to ensure horizontal scalability and resilience. 
+
+*Note: Phase 1 implements only the synchronous upload flow (Spring Boot API directly interacting with Azure Blob Storage and PostgreSQL). Advanced components like RabbitMQ, Workers, Pipelines, and asynchronous processing will be introduced in later phases.*
 
 ```mermaid
 graph TD
