@@ -17,7 +17,7 @@ Instead of building custom upload, queueing, storage, and processing logic for e
 
 The diagram below represents the long-term target architecture that future milestones will progressively implement. Once complete, Sluice will employ an event-driven, decoupled architecture to ensure horizontal scalability and resilience. 
 
-*Note: Phase 1 implements only the synchronous upload flow (Spring Boot API directly interacting with Azure Blob Storage and PostgreSQL). Advanced components like RabbitMQ, Workers, Pipelines, and asynchronous processing will be introduced in later phases.*
+*Note: The current implementation now includes synchronous asset ingestion, Azure Blob Storage, PostgreSQL, RabbitMQ, asynchronous job processing, and distributed workers. Pipeline Orchestration, advanced processors, and the remaining platform capabilities will be introduced in later phases.*
 
 ```mermaid
 graph TD
@@ -69,11 +69,17 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 **Scope:** Upload an asset synchronously via the Spring Boot API, persist the raw file directly to Azure Blob Storage, save metadata to PostgreSQL, and return the generated Asset ID.
 *Note: This phase intentionally omits queues to establish a solid baseline for asset storage.*
 
-### Phase 2: Asynchronous Workers (Current)
+### Phase 2: Asynchronous Workers (Completed)
 **Goal:** Introduce the execution layer.
-**Scope:** Integrate RabbitMQ. The API publishes an event upon upload, and a distributed Worker consumes the message to execute basic processing tasks asynchronously.
+**Scope:**
+- RabbitMQ integration
+- Job creation and persistence
+- Asynchronous background workers
+- Job lifecycle tracking
+- Job status API
+- Basic background processing
 
-### Phase 3: Pipeline Orchestration
+### Phase 3: Pipeline Orchestration (Current)
 **Goal:** Support multi-step processing workflows.
 **Scope:** Implement a Pipeline Engine capable of orchestrating complex jobs (e.g., chaining processors) and managing state transitions within the database.
 
@@ -84,6 +90,24 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 ### Phase 5: Real-time Updates & Direct Uploads
 **Goal:** Optimize client performance.
 **Scope:** Introduce SAS URLs for direct-to-storage client uploads (bypassing the API buffer) and Server-Sent Events (SSE) for real-time job status updates in the dashboard.
+
+---
+
+## 🔮 Future Vision
+
+Sluice aims to evolve beyond a media processing platform into an intelligent media orchestration platform.
+
+Future releases will support policy-driven and AI-assisted pipeline orchestration capable of automatically selecting appropriate processing workflows based on developer intent. Example future capabilities include:
+
+- Content moderation
+- NSFW detection
+- Face detection and anonymisation
+- OCR and document understanding
+- PII detection and redaction
+- AI-assisted pipeline planning
+- Intelligent media governance
+
+*(Note: These features are part of the long-term vision for the platform and are not yet implemented.)*
 
 ---
 

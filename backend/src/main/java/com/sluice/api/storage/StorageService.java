@@ -17,4 +17,11 @@ public interface StorageService {
      * @param fileUrl The URL or path of the file to delete.
      */
     void deleteFile(String fileUrl);
+
+    /**
+     * Downloads a file from the underlying storage mechanism.
+     * @param fileUrl The URL or path of the file to download.
+     * @return The file contents as a byte array.
+     */
+    byte[] downloadFile(String fileUrl);
 }

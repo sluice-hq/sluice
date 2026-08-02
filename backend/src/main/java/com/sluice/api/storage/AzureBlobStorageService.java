@@ -59,4 +59,14 @@ public class AzureBlobStorageService implements StorageService {
             System.err.println("Failed to delete blob from URL: " + fileUrl + " - " + e.getMessage());
         }
     }
+
+    @Override
+    public byte[] downloadFile(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            throw new IllegalArgumentException("File URL cannot be null or empty");
+        }
+        String blobName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+        BlobClient blobClient = containerClient.getBlobClient(blobName);
+        return blobClient.downloadContent().toBytes();
+    }
 }

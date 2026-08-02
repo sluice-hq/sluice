@@ -1,6 +1,6 @@
 package com.sluice.api.asset.controller;
 
-import com.sluice.api.asset.dto.AssetResponse;
+import com.sluice.api.asset.dto.UploadAssetResponse;
 import com.sluice.api.asset.service.AssetService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,7 +42,7 @@ public class AssetController {
                     .body("Unsupported content type. Allowed types: " + ALLOWED_CONTENT_TYPES);
         }
 
-        AssetResponse response = assetService.uploadAsset(file);
+        UploadAssetResponse response = assetService.uploadAsset(file);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

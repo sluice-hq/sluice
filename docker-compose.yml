@@ -28,6 +28,16 @@ services:
     volumes:
       - azurite_data:/workspace
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: sluice-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
 volumes:
   postgres_data:
   azurite_data:
+  rabbitmq_data:
