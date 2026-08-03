@@ -7,11 +7,13 @@ import com.sluice.api.job.domain.JobStatus;
 import com.sluice.api.job.service.JobService;
 import com.sluice.api.messaging.RabbitMqConfig;
 import com.sluice.api.messaging.dto.JobMessage;
+import com.sluice.api.pipeline.Pipeline;
+import com.sluice.api.pipeline.PipelineEngine;
+import com.sluice.api.pipeline.ProcessingContext;
 import com.sluice.api.storage.StorageService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-
-import java.security.MessageDigest;
 
 @Service
 public class JobWorker {
@@ -19,11 +21,19 @@ public class JobWorker {
     private final JobService jobService;
     private final AssetRepository assetRepository;
     private final StorageService storageService;
+    private final PipelineEngine pipelineEngine;
+    private final Pipeline pipeline;
 
-    public JobWorker(JobService jobService, AssetRepository assetRepository, StorageService storageService) {
+    public JobWorker(JobService jobService, 
+                     AssetRepository assetRepository, 
+                     StorageService storageService,
+                     PipelineEngine pipelineEngine,
+                     @Qualifier("defaultImagePipeline") Pipeline pipeline) {
         this.jobService = jobService;
         this.assetRepository = assetRepository;
         this.storageService = storageService;
+        this.pipelineEngine = pipelineEngine;
+        this.pipeline = pipeline;
     }
 
     @RabbitListener(queues = RabbitMqConfig.QUEUE_NAME)
@@ -36,25 +46,18 @@ public class JobWorker {
             Asset asset = assetRepository.findById(message.getAssetId())
                     .orElseThrow(() -> new RuntimeException("Asset not found"));
 
-            // Perform a genuine processing task: compute SHA-256 checksum
+            // Download file
             byte[] fileBytes = storageService.downloadFile(asset.getStorageUrl());
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashBytes = digest.digest(fileBytes);
             
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hashBytes) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            String checksum = hexString.toString();
-            
-            System.out.println("Computed SHA-256 Checksum for Job " + job.getId() + ": " + checksum);
+            // Create processing context and run pipeline
+            ProcessingContext context = new ProcessingContext(job, asset, fileBytes);
+            pipelineEngine.execute(pipeline, context);
 
             // Update status to COMPLETED
             jobService.updateJobStatus(job.getId(), JobStatus.COMPLETED);
         } catch (Exception e) {
             System.err.println("Job processing failed: " + e.getMessage());
+            e.printStackTrace();
             jobService.updateJobStatus(message.getJobId(), JobStatus.FAILED);
         }
     }

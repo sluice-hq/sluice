@@ -2,7 +2,7 @@
 
 **Sluice** is an open-source project being developed into a cloud-native media infrastructure platform designed to handle complex media processing workflows at scale. 
 
-Instead of building custom upload, queueing, storage, and processing logic for every application, Sluice is being built to provide a robust, modular pipeline engine. Developers will be able to simply define their processing steps, and Sluice will handle the distributed execution.
+Instead of building custom upload, queueing, storage, and media processing infrastructure for every application, Sluice provides a modular pipeline engine for orchestrating media workflows at scale. Developers will be able to simply define their processing steps, and Sluice will handle the distributed execution.
 
 ## 🚀 Key Features
 
@@ -17,7 +17,7 @@ Instead of building custom upload, queueing, storage, and processing logic for e
 
 The diagram below represents the long-term target architecture that future milestones will progressively implement. Once complete, Sluice will employ an event-driven, decoupled architecture to ensure horizontal scalability and resilience. 
 
-*Note: The current implementation now includes synchronous asset ingestion, Azure Blob Storage, PostgreSQL, RabbitMQ, asynchronous job processing, and distributed workers. Pipeline Orchestration, advanced processors, and the remaining platform capabilities will be introduced in later phases.*
+*Note: The current implementation now includes synchronous asset ingestion, Azure Blob Storage, PostgreSQL, RabbitMQ, asynchronous job processing, a modular Pipeline Engine, and pluggable processors. Advanced processors, reliability features, and intelligent orchestration remain future work.*
 
 ```mermaid
 graph TD
@@ -52,7 +52,7 @@ Designed as a modern, enterprise-grade system, Sluice leverages the following te
 |---|---|
 | **Backend Core** | Java 25, Spring Boot 4, Spring Framework 7, Gradle |
 | **Frontend Dashboard** | Next.js, React, TypeScript, Tailwind CSS, shadcn/ui |
-| **Database & Cache** | PostgreSQL, Valkey |
+| **Database & Cache** | PostgreSQL |
 | **Messaging & Storage** | RabbitMQ, Azure Blob Storage |
 | **Infrastructure** | Docker, Kubernetes, Terraform |
 | **Observability** | OpenTelemetry, Prometheus, Grafana, Loki |
@@ -79,11 +79,19 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 - Job status API
 - Basic background processing
 
-### Phase 3: Pipeline Orchestration (Current)
+### Phase 3: Pipeline Orchestration (Completed)
 **Goal:** Support multi-step processing workflows.
-**Scope:** Implement a Pipeline Engine capable of orchestrating complex jobs (e.g., chaining processors) and managing state transitions within the database.
+**Scope:** 
+- Pipeline Engine
+- Processor abstraction
+- ProcessingContext
+- Modular processing pipeline
+- MetadataProcessor
+- ChecksumProcessor
+- ThumbnailProcessor
+- Extensible processor architecture
 
-### Phase 4: Resiliency & Reliability
+### Phase 4: Resiliency & Reliability (Current)
 **Goal:** Handle distributed failures gracefully.
 **Scope:** Implement Dead Letter Queues (DLQs), exponential backoff retries, and idempotency guarantees across all workers.
 
@@ -95,17 +103,17 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 
 ## 🔮 Future Vision
 
-Sluice aims to evolve beyond a media processing platform into an intelligent media orchestration platform.
+Sluice aims to evolve beyond a media processing platform into an intelligent media orchestration and governance platform.
 
 Future releases will support policy-driven and AI-assisted pipeline orchestration capable of automatically selecting appropriate processing workflows based on developer intent. Example future capabilities include:
 
+- AI-assisted pipeline generation
+- Media governance
 - Content moderation
-- NSFW detection
-- Face detection and anonymisation
 - OCR and document understanding
+- Face detection and anonymisation
 - PII detection and redaction
-- AI-assisted pipeline planning
-- Intelligent media governance
+- Intelligent processor selection
 
 *(Note: These features are part of the long-term vision for the platform and are not yet implemented.)*
 
