@@ -2,11 +2,11 @@
 
 **Sluice** is an open-source project being developed into a cloud-native media infrastructure platform designed to handle complex media processing workflows at scale. 
 
-Instead of building custom upload, queueing, storage, and media processing infrastructure for every application, Sluice provides a modular pipeline engine for orchestrating media workflows at scale. Developers will be able to simply define their processing steps, and Sluice will handle the distributed execution.
+Instead of building custom upload, queueing, storage, and media processing infrastructure for every application, Sluice provides a modular pipeline engine for orchestrating media workflows at scale. Developers simply define their processing pipelines, and Sluice handles the distributed execution.
 
 ## 🚀 Key Features
 
-- **Extensible Pipelines:** Define ordered sequences of processing steps (e.g., Resize → Watermark → Upload).
+- **Pipeline Engine:** Execute ordered processing pipelines through a modular, extensible architecture.
 - **Asynchronous Execution:** Long-running jobs are executed asynchronously by distributed workers, ensuring the control API remains highly responsive.
 - **Pluggable Processors:** Easily add new processors for Image Optimization, Format Conversion, OCR, AI Captions, and Metadata Extraction.
 - **Cloud-Native by Design:** Built for Kubernetes, leveraging distributed messaging and storage.
@@ -80,7 +80,7 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 - Basic background processing
 
 ### Phase 3: Pipeline Orchestration (Completed)
-**Goal:** Support multi-step processing workflows.
+**Goal:** Introduce a modular processing architecture.
 **Scope:** 
 - Pipeline Engine
 - Processor abstraction
