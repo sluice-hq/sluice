@@ -24,4 +24,26 @@ public interface StorageService {
      * @return The file contents as a byte array.
      */
     byte[] downloadFile(String fileUrl);
+
+    /**
+     * Generates a direct upload URL (SAS) for a file.
+     * @param blobName The name of the blob to create.
+     * @param contentType The expected content type.
+     * @return The upload URL.
+     */
+    String generateUploadUrl(String blobName, String contentType);
+
+    /**
+     * Checks if a file exists.
+     * @param fileUrl The URL of the file.
+     * @return true if the file exists.
+     */
+    boolean fileExists(String fileUrl);
+
+    /**
+     * Gets the size of a file.
+     * @param fileUrl The URL of the file.
+     * @return The size in bytes.
+     */
+    long getFileSize(String fileUrl);
 }

@@ -69,4 +69,44 @@ public class AzureBlobStorageService implements StorageService {
         BlobClient blobClient = containerClient.getBlobClient(blobName);
         return blobClient.downloadContent().toBytes();
     }
+
+    @Override
+    public String generateUploadUrl(String blobName, String contentType) {
+        BlobClient blobClient = containerClient.getBlobClient(blobName);
+        
+        com.azure.storage.blob.sas.BlobSasPermission permission = new com.azure.storage.blob.sas.BlobSasPermission()
+                .setWritePermission(true)
+                .setCreatePermission(true);
+        
+        com.azure.storage.blob.sas.BlobServiceSasSignatureValues values = new com.azure.storage.blob.sas.BlobServiceSasSignatureValues(
+                java.time.OffsetDateTime.now().plusHours(1),
+                permission
+        ).setContentType(contentType);
+        
+        String sasToken = blobClient.generateSas(values);
+        return blobClient.getBlobUrl() + "?" + sasToken;
+    }
+
+    @Override
+    public boolean fileExists(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return false;
+        }
+        String blobName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+        BlobClient blobClient = containerClient.getBlobClient(blobName);
+        return blobClient.exists();
+    }
+
+    @Override
+    public long getFileSize(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            throw new IllegalArgumentException("File URL cannot be null or empty");
+        }
+        String blobName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+        BlobClient blobClient = containerClient.getBlobClient(blobName);
+        if (blobClient.exists()) {
+            return blobClient.getProperties().getBlobSize();
+        }
+        return -1;
+    }
 }

@@ -45,6 +45,7 @@ public class AssetService {
                     file.getSize(),
                     file.getContentType(),
                     fileUrl,
+                    Asset.UploadStatus.COMPLETED,
                     Instant.now()
             );
 
@@ -75,5 +76,69 @@ public class AssetService {
             }
             throw new RuntimeException("Failed to persist asset metadata or job. Initiated blob cleanup.", e);
         }
+    }
+
+    public com.sluice.api.asset.dto.UploadUrlResponse requestUploadUrl(String filename, String contentType, long size) {
+        String extension = "";
+        if (filename != null && filename.contains(".")) {
+            extension = filename.substring(filename.lastIndexOf("."));
+        }
+        String blobName = UUID.randomUUID().toString() + extension;
+        
+        String uploadUrl = storageService.generateUploadUrl(blobName, contentType);
+        
+        // Use a dummy storage URL initially, or the final blob URL without the SAS token.
+        // Assuming the base URL is everything before the '?'
+        String storageUrl = uploadUrl.substring(0, uploadUrl.indexOf("?"));
+        
+        Asset asset = new Asset(
+                UUID.randomUUID(),
+                filename,
+                size,
+                contentType,
+                storageUrl,
+                Asset.UploadStatus.PENDING,
+                Instant.now()
+        );
+        
+        assetRepository.save(asset);
+        
+        return new com.sluice.api.asset.dto.UploadUrlResponse(asset.getId(), uploadUrl, blobName);
+    }
+
+    public UploadAssetResponse completeUpload(UUID assetId) {
+        Asset asset = assetRepository.findById(assetId)
+                .orElseThrow(() -> new RuntimeException("Asset not found"));
+                
+        if (asset.getUploadStatus() == Asset.UploadStatus.COMPLETED) {
+            throw new RuntimeException("Upload already completed");
+        }
+        
+        if (!storageService.fileExists(asset.getStorageUrl())) {
+            throw new RuntimeException("File does not exist in storage");
+        }
+        
+        long actualSize = storageService.getFileSize(asset.getStorageUrl());
+        if (actualSize != asset.getSize()) {
+            throw new RuntimeException("Uploaded file size (" + actualSize + " bytes) does not match expected size (" + asset.getSize() + " bytes)");
+        }
+        
+        asset.setUploadStatus(Asset.UploadStatus.COMPLETED);
+        assetRepository.save(asset);
+        
+        Job job = jobService.createJob(asset.getId());
+        jobPublisher.publishJob(new JobMessage(job.getId(), asset.getId()));
+        
+        return new UploadAssetResponse(
+                asset.getId(),
+                asset.getFilename(),
+                asset.getSize(),
+                asset.getContentType(),
+                asset.getStorageUrl(),
+                asset.getCreatedAt(),
+                job.getId(),
+                job.getStatus().name(),
+                job.getCreatedAt()
+        );
     }
 }

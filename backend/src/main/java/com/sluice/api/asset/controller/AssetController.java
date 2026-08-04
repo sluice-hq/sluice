@@ -26,6 +26,10 @@ public class AssetController {
         this.assetService = assetService;
     }
 
+    /**
+     * @deprecated Legacy multipart upload endpoint. Use the SAS upload workflow (/upload-url and /complete) instead.
+     */
+    @Deprecated
     @PostMapping
     public ResponseEntity<?> uploadAsset(@RequestParam("file") MultipartFile file) {
         if (file.isEmpty()) {
@@ -44,5 +48,31 @@ public class AssetController {
 
         UploadAssetResponse response = assetService.uploadAsset(file);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/upload-url")
+    public ResponseEntity<?> requestUploadUrl(@RequestBody com.sluice.api.asset.dto.UploadUrlRequest request) {
+        if (request.getSize() > MAX_FILE_SIZE) {
+            return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body("File size exceeds the 50MB limit.");
+        }
+
+        if (request.getContentType() == null || !ALLOWED_CONTENT_TYPES.contains(request.getContentType())) {
+            return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                    .body("Unsupported content type. Allowed types: " + ALLOWED_CONTENT_TYPES);
+        }
+
+        com.sluice.api.asset.dto.UploadUrlResponse response = assetService.requestUploadUrl(
+                request.getFilename(), request.getContentType(), request.getSize());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{assetId}/complete")
+    public ResponseEntity<?> completeUpload(@PathVariable java.util.UUID assetId) {
+        try {
+            UploadAssetResponse response = assetService.completeUpload(assetId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }
