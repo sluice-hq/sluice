@@ -13,15 +13,19 @@ import java.util.UUID;
 public class JobService {
 
     private final JobRepository jobRepository;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
-    public JobService(JobRepository jobRepository) {
+    public JobService(JobRepository jobRepository, org.springframework.context.ApplicationEventPublisher eventPublisher) {
         this.jobRepository = jobRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     public Job createJob(UUID assetId) {
         Instant now = Instant.now();
         Job job = new Job(UUID.randomUUID(), assetId, JobStatus.QUEUED, now, now);
-        return jobRepository.save(job);
+        Job savedJob = jobRepository.save(job);
+        eventPublisher.publishEvent(new com.sluice.api.job.event.JobStatusChangedEvent(this, savedJob.getId(), savedJob.getStatus()));
+        return savedJob;
     }
 
     public Optional<Job> getJob(UUID id) {
@@ -32,6 +36,8 @@ public class JobService {
         Job job = jobRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Job not found: " + id));
         job.setStatus(newStatus);
-        return jobRepository.save(job);
+        Job savedJob = jobRepository.save(job);
+        eventPublisher.publishEvent(new com.sluice.api.job.event.JobStatusChangedEvent(this, savedJob.getId(), savedJob.getStatus()));
+        return savedJob;
     }
 }

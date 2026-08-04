@@ -2,7 +2,7 @@
 
 **Sluice** is an open-source project being developed into a cloud-native media infrastructure platform designed to handle complex media processing workflows at scale. 
 
-Instead of building custom upload, queueing, storage, and media processing infrastructure for every application, Sluice executes media processing through a modular Pipeline Engine, laying the foundation for configurable processing pipelines in future releases.
+Instead of building custom upload, queueing, storage, and media processing infrastructure for every application, Sluice provides a modular Pipeline Engine for executing media processing workflows, laying the foundation for configurable processing pipelines in future releases.
 
 ## 🚀 Key Features
 
@@ -17,7 +17,7 @@ Instead of building custom upload, queueing, storage, and media processing infra
 
 The diagram below represents the long-term target architecture that future milestones will progressively implement. Once complete, Sluice will employ an event-driven, decoupled architecture to ensure horizontal scalability and resilience. 
 
-*Note: The current implementation now includes synchronous asset ingestion, Azure Blob Storage, PostgreSQL, RabbitMQ, asynchronous job processing, a modular Pipeline Engine, pluggable processors, and reliable messaging (retries, idempotency, and dead-letter queues). Future work includes configurable pipeline definitions, media governance, intelligent orchestration, and AI-assisted pipeline generation.*
+*Note: The current implementation now includes direct client-to-storage ingestion via SAS URLs, real-time job updates via Server-Sent Events (SSE), Azure Blob Storage, PostgreSQL, RabbitMQ, asynchronous job processing, a modular Pipeline Engine, pluggable processors, and reliable messaging (retries, idempotency, and dead-letter queues). Future work includes configurable pipeline definitions, media governance, intelligent orchestration, and AI-assisted pipeline generation.*
 
 ```mermaid
 graph TD
@@ -98,9 +98,42 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 - Exponential backoff retries
 - Message idempotency guarantees
 
-### Phase 5: Real-time Updates & Direct Uploads (Current)
+### Phase 5: Real-time Updates & Direct Uploads (Completed)
 **Goal:** Optimize client performance.
-**Scope:** Introduce SAS URLs for direct-to-storage client uploads (bypassing the API buffer) and Server-Sent Events (SSE) for real-time job status updates in the dashboard.
+**Scope:** 
+- Direct-to-storage uploads using Azure SAS URLs
+- Real-time job status updates using Server-Sent Events (SSE)
+
+### Phase 6: Dashboard & User Experience (Current)
+**Goal:** Build the primary web interface for Sluice.
+**Scope:**
+- Asset management dashboard
+- Job management dashboard
+- Direct uploads using SAS URLs
+- Live job status updates via SSE
+- Modern Next.js user interface
+
+### Phase 7: Configurable Pipelines
+**Goal:** Allow developers to define custom processing workflows.
+**Scope:**
+- JSON pipeline definitions
+- Configurable processors
+- Pipeline validation
+- User-defined pipeline execution
+
+### Phase 8: Media Governance & AI
+**Goal:** Introduce intelligent media orchestration and governance.
+**Scope:**
+- AI-assisted pipeline generation
+- Media governance policies
+- Content moderation
+- OCR and document understanding
+- PII detection and redaction
+- Face detection and anonymisation
+
+### 🚧 More Phases Coming Soon
+
+The roadmap will continue to evolve as Sluice grows, with future milestones expanding the platform across areas such as scalability, observability, cloud-native deployment, AI, governance and developer experience.
 
 ---
 

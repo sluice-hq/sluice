@@ -15,9 +15,11 @@ import java.util.UUID;
 public class JobController {
 
     private final JobService jobService;
+    private final com.sluice.api.job.service.JobEventService jobEventService;
 
-    public JobController(JobService jobService) {
+    public JobController(JobService jobService, com.sluice.api.job.service.JobEventService jobEventService) {
         this.jobService = jobService;
+        this.jobEventService = jobEventService;
     }
 
     @GetMapping("/{id}")
@@ -32,5 +34,10 @@ public class JobController {
                 ))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping(value = "/{id}/events", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter subscribeToJobEvents(@PathVariable UUID id) {
+        return jobEventService.subscribeToJobEvents(id);
     }
 }
