@@ -2,7 +2,7 @@
 
 **Sluice** is an open-source project being developed into a cloud-native media infrastructure platform designed to handle complex media processing workflows at scale. 
 
-Instead of building custom upload, queueing, storage, and media processing infrastructure for every application, Sluice provides a modular pipeline engine for orchestrating media workflows at scale. Developers simply define their processing pipelines, and Sluice handles the distributed execution.
+Instead of building custom upload, queueing, storage, and media processing infrastructure for every application, Sluice executes media processing through a modular Pipeline Engine, laying the foundation for configurable processing pipelines in future releases.
 
 ## 🚀 Key Features
 
@@ -17,7 +17,7 @@ Instead of building custom upload, queueing, storage, and media processing infra
 
 The diagram below represents the long-term target architecture that future milestones will progressively implement. Once complete, Sluice will employ an event-driven, decoupled architecture to ensure horizontal scalability and resilience. 
 
-*Note: The current implementation now includes synchronous asset ingestion, Azure Blob Storage, PostgreSQL, RabbitMQ, asynchronous job processing, a modular Pipeline Engine, and pluggable processors. Advanced processors, reliability features, and intelligent orchestration remain future work.*
+*Note: The current implementation now includes synchronous asset ingestion, Azure Blob Storage, PostgreSQL, RabbitMQ, asynchronous job processing, a modular Pipeline Engine, pluggable processors, and reliable messaging (retries, idempotency, and dead-letter queues). Future work includes configurable pipeline definitions, media governance, intelligent orchestration, and AI-assisted pipeline generation.*
 
 ```mermaid
 graph TD
@@ -91,11 +91,14 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 - ThumbnailProcessor
 - Extensible processor architecture
 
-### Phase 4: Resiliency & Reliability (Current)
+### Phase 4: Resiliency & Reliability (Completed)
 **Goal:** Handle distributed failures gracefully.
-**Scope:** Implement Dead Letter Queues (DLQs), exponential backoff retries, and idempotency guarantees across all workers.
+**Scope:** 
+- Dead Letter Queues (DLQs)
+- Exponential backoff retries
+- Message idempotency guarantees
 
-### Phase 5: Real-time Updates & Direct Uploads
+### Phase 5: Real-time Updates & Direct Uploads (Current)
 **Goal:** Optimize client performance.
 **Scope:** Introduce SAS URLs for direct-to-storage client uploads (bypassing the API buffer) and Server-Sent Events (SSE) for real-time job status updates in the dashboard.
 
