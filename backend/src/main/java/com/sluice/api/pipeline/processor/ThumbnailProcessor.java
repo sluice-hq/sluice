@@ -17,7 +17,7 @@ public class ThumbnailProcessor implements Processor {
     private static final int MAX_HEIGHT = 200;
 
     @Override
-    public void process(ProcessingContext context) throws Exception {
+    public void process(ProcessingContext context) {
         try {
             BufferedImage originalImage = ImageIO.read(new ByteArrayInputStream(context.getFileBytes()));
             if (originalImage == null) {

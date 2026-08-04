@@ -37,28 +37,31 @@ public class JobWorker {
     }
 
     @RabbitListener(queues = RabbitMqConfig.QUEUE_NAME)
-    public void processJob(JobMessage message) {
-        try {
-            // Update status to RUNNING
-            Job job = jobService.updateJobStatus(message.getJobId(), JobStatus.RUNNING);
+    public void processJob(JobMessage message) throws Exception {
+        // Fetch current job state for idempotency check
+        Job job = jobService.getJob(message.getJobId())
+                .orElseThrow(() -> new RuntimeException("Job not found: " + message.getJobId()));
 
-            // Fetch the asset
-            Asset asset = assetRepository.findById(message.getAssetId())
-                    .orElseThrow(() -> new RuntimeException("Asset not found"));
-
-            // Download file
-            byte[] fileBytes = storageService.downloadFile(asset.getStorageUrl());
-            
-            // Create processing context and run pipeline
-            ProcessingContext context = new ProcessingContext(job, asset, fileBytes);
-            pipelineEngine.execute(pipeline, context);
-
-            // Update status to COMPLETED
-            jobService.updateJobStatus(job.getId(), JobStatus.COMPLETED);
-        } catch (Exception e) {
-            System.err.println("Job processing failed: " + e.getMessage());
-            e.printStackTrace();
-            jobService.updateJobStatus(message.getJobId(), JobStatus.FAILED);
+        if (job.getStatus() == JobStatus.COMPLETED || job.getStatus() == JobStatus.FAILED) {
+            System.out.println("Job " + job.getId() + " is already in terminal state " + job.getStatus() + ". Skipping duplicate delivery.");
+            return;
         }
+
+        // Update status to RUNNING
+        job = jobService.updateJobStatus(message.getJobId(), JobStatus.RUNNING);
+
+        // Fetch the asset
+        Asset asset = assetRepository.findById(message.getAssetId())
+                .orElseThrow(() -> new RuntimeException("Asset not found"));
+
+        // Download file
+        byte[] fileBytes = storageService.downloadFile(asset.getStorageUrl());
+        
+        // Create processing context and run pipeline
+        ProcessingContext context = new ProcessingContext(job, asset, fileBytes);
+        pipelineEngine.execute(pipeline, context);
+
+        // Update status to COMPLETED
+        jobService.updateJobStatus(job.getId(), JobStatus.COMPLETED);
     }
 }
