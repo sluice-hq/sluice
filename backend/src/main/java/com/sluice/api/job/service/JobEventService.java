@@ -1,6 +1,5 @@
 package com.sluice.api.job.service;
 
-import com.sluice.api.job.domain.Job;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 

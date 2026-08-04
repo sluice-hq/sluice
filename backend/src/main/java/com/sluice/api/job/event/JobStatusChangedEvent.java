@@ -1,6 +1,5 @@
 package com.sluice.api.job.event;
 
-import com.sluice.api.job.domain.Job;
 import org.springframework.context.ApplicationEvent;
 
 import java.util.UUID;
