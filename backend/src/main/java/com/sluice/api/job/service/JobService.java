@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 public class JobService {
@@ -18,6 +20,10 @@ public class JobService {
     public JobService(JobRepository jobRepository, org.springframework.context.ApplicationEventPublisher eventPublisher) {
         this.jobRepository = jobRepository;
         this.eventPublisher = eventPublisher;
+    }
+
+    public Page<Job> getJobs(Pageable pageable) {
+        return jobRepository.findAll(pageable);
     }
 
     public Job createJob(UUID assetId) {

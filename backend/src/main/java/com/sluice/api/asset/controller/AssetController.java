@@ -2,10 +2,13 @@ package com.sluice.api.asset.controller;
 
 import com.sluice.api.asset.dto.UploadAssetResponse;
 import com.sluice.api.asset.service.AssetService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import com.sluice.api.asset.dto.AssetResponse;
 
 import java.util.List;
 
@@ -24,6 +27,36 @@ public class AssetController {
 
     public AssetController(AssetService assetService) {
         this.assetService = assetService;
+    }
+
+    @GetMapping
+    public ResponseEntity<Page<AssetResponse>> getAssets(Pageable pageable) {
+        Page<AssetResponse> assets = assetService.getAssets(pageable).map(asset -> new AssetResponse(
+                asset.getId(),
+                asset.getFilename(),
+                asset.getSize(),
+                asset.getContentType(),
+                asset.getStorageUrl(),
+                asset.getUploadStatus().name(),
+                asset.getCreatedAt()
+        ));
+        return ResponseEntity.ok(assets);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<AssetResponse> getAsset(@PathVariable java.util.UUID id) {
+        return assetService.getAsset(id)
+                .map(asset -> new AssetResponse(
+                        asset.getId(),
+                        asset.getFilename(),
+                        asset.getSize(),
+                        asset.getContentType(),
+                        asset.getStorageUrl(),
+                        asset.getUploadStatus().name(),
+                        asset.getCreatedAt()
+                ))
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     /**
