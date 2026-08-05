@@ -13,7 +13,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 public class AssetService {
@@ -28,6 +31,14 @@ public class AssetService {
         this.assetRepository = assetRepository;
         this.jobService = jobService;
         this.jobPublisher = jobPublisher;
+    }
+
+    public Page<Asset> getAssets(Pageable pageable) {
+        return assetRepository.findAll(pageable);
+    }
+
+    public Optional<Asset> getAsset(UUID assetId) {
+        return assetRepository.findById(assetId);
     }
 
     public UploadAssetResponse uploadAsset(MultipartFile file) {
@@ -87,8 +98,7 @@ public class AssetService {
         
         String uploadUrl = storageService.generateUploadUrl(blobName, contentType);
         
-        // Use a dummy storage URL initially, or the final blob URL without the SAS token.
-        // Assuming the base URL is everything before the '?'
+        // Extract the permanent storage URL by stripping the SAS token (everything after the '?')
         String storageUrl = uploadUrl.substring(0, uploadUrl.indexOf("?"));
         
         Asset asset = new Asset(

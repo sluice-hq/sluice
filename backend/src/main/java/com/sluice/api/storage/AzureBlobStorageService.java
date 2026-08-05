@@ -31,6 +31,26 @@ public class AzureBlobStorageService implements StorageService {
         if (!containerClient.exists()) {
             containerClient.create();
         }
+        
+        com.azure.storage.blob.models.BlobServiceProperties properties = blobServiceClient.getProperties();
+        java.util.List<com.azure.storage.blob.models.BlobCorsRule> corsRules = properties.getCors();
+        if (corsRules == null) {
+            corsRules = new java.util.ArrayList<>();
+        }
+        
+        // Remove existing rule for localhost:3000 if it exists
+        corsRules.removeIf(rule -> rule.getAllowedOrigins().contains("http://localhost:3000"));
+        
+        com.azure.storage.blob.models.BlobCorsRule corsRule = new com.azure.storage.blob.models.BlobCorsRule()
+                .setAllowedOrigins("http://localhost:3000")
+                .setAllowedMethods("GET,PUT,OPTIONS,POST")
+                .setAllowedHeaders("*")
+                .setExposedHeaders("*")
+                .setMaxAgeInSeconds(3600);
+        
+        corsRules.add(corsRule);
+        properties.setCors(corsRules);
+        blobServiceClient.setProperties(properties);
     }
 
     @Override
@@ -52,7 +72,8 @@ public class AzureBlobStorageService implements StorageService {
             return;
         }
         try {
-            String blobName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+            String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+            String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
             BlobClient blobClient = containerClient.getBlobClient(blobName);
             blobClient.deleteIfExists();
         } catch (Exception e) {
@@ -65,7 +86,8 @@ public class AzureBlobStorageService implements StorageService {
         if (fileUrl == null || fileUrl.isBlank()) {
             throw new IllegalArgumentException("File URL cannot be null or empty");
         }
-        String blobName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+        String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+        String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
         BlobClient blobClient = containerClient.getBlobClient(blobName);
         return blobClient.downloadContent().toBytes();
     }
@@ -92,7 +114,8 @@ public class AzureBlobStorageService implements StorageService {
         if (fileUrl == null || fileUrl.isBlank()) {
             return false;
         }
-        String blobName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+        String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+        String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
         BlobClient blobClient = containerClient.getBlobClient(blobName);
         return blobClient.exists();
     }
@@ -102,7 +125,8 @@ public class AzureBlobStorageService implements StorageService {
         if (fileUrl == null || fileUrl.isBlank()) {
             throw new IllegalArgumentException("File URL cannot be null or empty");
         }
-        String blobName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+        String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+        String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
         BlobClient blobClient = containerClient.getBlobClient(blobName);
         if (blobClient.exists()) {
             return blobClient.getProperties().getBlobSize();

@@ -8,4 +8,5 @@ import java.util.UUID;
 
 @Repository
 public interface JobRepository extends JpaRepository<Job, UUID> {
+    long countByStatus(com.sluice.api.job.domain.JobStatus status);
 }

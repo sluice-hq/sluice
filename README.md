@@ -1,8 +1,8 @@
 # Sluice
 
-**Sluice** is an open-source project being developed into a cloud-native media infrastructure platform designed to handle complex media processing workflows at scale. 
+**Sluice** is an open-source, cloud-native media infrastructure platform designed to handle complex media processing workflows at scale. It provides a functional, end-to-end media pipeline—from secure, direct-to-storage uploads to distributed background processing and real-time dashboard updates.
 
-Instead of building custom upload, queueing, storage, and media processing infrastructure for every application, Sluice provides a modular Pipeline Engine for executing media processing workflows, laying the foundation for configurable processing pipelines in future releases.
+By offering a modular Pipeline Engine and pluggable architecture, Sluice executes media processing workflows asynchronously, keeping the control API highly responsive and paving the way for fully user-configurable pipelines in future releases.
 
 ## 🚀 Key Features
 
@@ -17,7 +17,7 @@ Instead of building custom upload, queueing, storage, and media processing infra
 
 The diagram below represents the long-term target architecture that future milestones will progressively implement. Once complete, Sluice will employ an event-driven, decoupled architecture to ensure horizontal scalability and resilience. 
 
-*Note: The current implementation now includes direct client-to-storage ingestion via SAS URLs, real-time job updates via Server-Sent Events (SSE), Azure Blob Storage, PostgreSQL, RabbitMQ, asynchronous job processing, a modular Pipeline Engine, pluggable processors, and reliable messaging (retries, idempotency, and dead-letter queues). Future work includes configurable pipeline definitions, media governance, intelligent orchestration, and AI-assisted pipeline generation.*
+*Note: The current implementation features a production-quality Next.js dashboard, direct client-to-storage ingestion via Azure SAS URLs, and real-time job updates via Server-Sent Events (SSE). On the backend, it leverages Azure Blob Storage, PostgreSQL, and RabbitMQ to drive asynchronous job processing through a modular Pipeline Engine with reliable messaging (retries, idempotency, and dead-letter queues). Future work includes configurable pipeline definitions, media governance, and cloud deployment.*
 
 ```mermaid
 graph TD
@@ -51,10 +51,10 @@ Designed as a modern, enterprise-grade system, Sluice leverages the following te
 | Domain | Technology |
 |---|---|
 | **Backend Core** | Java 25, Spring Boot 4, Spring Framework 7, Gradle |
-| **Frontend Dashboard** | Next.js, React, TypeScript, Tailwind CSS, shadcn/ui |
-| **Database & Cache** | PostgreSQL |
+| **Frontend Dashboard** | Next.js, React, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, Zod |
+| **Database & Migrations** | PostgreSQL, Flyway |
 | **Messaging & Storage** | RabbitMQ, Azure Blob Storage |
-| **Infrastructure** | Docker, Kubernetes, Terraform |
+| **Infrastructure** | Docker, Azure, Kubernetes (AKS), Terraform |
 | **Observability** | OpenTelemetry, Prometheus, Grafana, Loki |
 | **Testing** | JUnit, Mockito, Testcontainers |
 
@@ -104,16 +104,17 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 - Direct-to-storage uploads using Azure SAS URLs
 - Real-time job status updates using Server-Sent Events (SSE)
 
-### Phase 6: Dashboard & User Experience (Current)
+### Phase 6: Dashboard & User Experience (Completed)
 **Goal:** Build the primary web interface for Sluice.
 **Scope:**
+- Dashboard overview with live platform metrics
 - Asset management dashboard
 - Job management dashboard
-- Direct uploads using SAS URLs
-- Live job status updates via SSE
-- Modern Next.js user interface
+- Direct uploads using Azure SAS URLs
+- Live job status updates via Server-Sent Events (SSE)
+- Professional Next.js frontend architecture
 
-### Phase 7: Configurable Pipelines
+### Phase 7: Configurable Pipelines (Current)
 **Goal:** Allow developers to define custom processing workflows.
 **Scope:**
 - JSON pipeline definitions
@@ -131,9 +132,20 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 - PII detection and redaction
 - Face detection and anonymisation
 
+### Phase 9: Cloud Infrastructure & DevOps
+**Goal:** Deploy Sluice as a production-ready cloud platform.
+**Scope:**
+- Azure deployment
+- Azure Kubernetes Service (AKS)
+- Terraform infrastructure
+- GitHub Actions CI/CD
+- Container Registry
+- Production configuration
+- OpenTelemetry, Prometheus, and Grafana integration
+
 ### 🚧 More Phases Coming Soon
 
-The roadmap will continue to evolve as Sluice grows, with future milestones expanding the platform across areas such as scalability, observability, cloud-native deployment, AI, governance and developer experience.
+The roadmap will continue to evolve as Sluice grows, with future milestones expanding the platform across areas such as scalability, AI, governance, and developer experience.
 
 ---
 
@@ -162,12 +174,20 @@ Future releases will support policy-driven and AI-assisted pipeline orchestratio
    git clone https://github.com/sluice-hq/sluice.git
    cd sluice
    ```
-2. Start the local infrastructure (PostgreSQL, Azurite) using Docker Compose:
+2. Start the local infrastructure (PostgreSQL, RabbitMQ, Azurite) using Docker Compose:
    ```bash
    docker-compose up -d
    ```
-3. Navigate to the backend directory and run the Spring Boot API:
+3. Start the Spring Boot backend API:
    ```bash
    cd backend
    ./gradlew bootRun
    ```
+4. Start the Next.js frontend dashboard (in a new terminal):
+   ```bash
+   cd frontend
+   npm ci
+   npm run dev
+   ```
+5. Navigate to [http://localhost:3000](http://localhost:3000) to access the Sluice Dashboard.
+6. **Test the Platform:** Upload an asset through the dashboard to experience the complete direct-to-storage upload, asynchronous background processing, and real-time job tracking workflow.
