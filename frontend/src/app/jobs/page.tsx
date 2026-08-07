@@ -43,28 +43,28 @@ export default function JobsPage() {
           }
         />
       ) : (
-        <div className="border rounded-md bg-white overflow-hidden shadow-sm">
+        <div className="border border-white/5 rounded-xl bg-card/20 backdrop-blur-md overflow-hidden shadow-lg shadow-black/20">
           <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-500 uppercase bg-gray-50/50 border-b">
+            <thead className="text-xs text-muted-foreground uppercase bg-white/5 border-b border-white/5">
               <tr>
-                <th className="px-6 py-4 font-medium">Job ID</th>
-                <th className="px-6 py-4 font-medium">Asset ID</th>
-                <th className="px-6 py-4 font-medium">Created At</th>
-                <th className="px-6 py-4 font-medium">Updated At</th>
-                <th className="px-6 py-4 font-medium text-right">Status</th>
+                <th className="px-6 py-4 font-medium tracking-wider">Job ID</th>
+                <th className="px-6 py-4 font-medium tracking-wider">Asset ID</th>
+                <th className="px-6 py-4 font-medium tracking-wider">Created At</th>
+                <th className="px-6 py-4 font-medium tracking-wider">Updated At</th>
+                <th className="px-6 py-4 font-medium tracking-wider text-right">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-white/5">
               {pageData.content.map((job) => (
-                <tr key={job.id} className="hover:bg-gray-50/80 transition-colors">
-                  <td className="px-6 py-4 font-medium text-blue-600 font-mono text-xs">
+                <tr key={job.id} className="hover:bg-white/5 transition-colors group">
+                  <td className="px-6 py-4 font-medium text-primary font-mono text-xs group-hover:text-primary-foreground transition-colors">
                     <Link href={`/jobs/${job.id}`}>{job.id}</Link>
                   </td>
-                  <td className="px-6 py-4 text-gray-500 font-mono text-xs">
-                    <Link href={`/assets/${job.assetId}`} className="hover:underline">{job.assetId}</Link>
+                  <td className="px-6 py-4 text-muted-foreground font-mono text-xs group-hover:text-foreground/80 transition-colors">
+                    <Link href={`/assets/${job.assetId}`} className="hover:underline hover:text-primary transition-colors">{job.assetId}</Link>
                   </td>
-                  <td className="px-6 py-4 text-gray-500">{new Date(job.createdAt).toLocaleString()}</td>
-                  <td className="px-6 py-4 text-gray-500">{new Date(job.updatedAt).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-muted-foreground group-hover:text-foreground/80 transition-colors">{new Date(job.createdAt).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-muted-foreground group-hover:text-foreground/80 transition-colors">{new Date(job.updatedAt).toLocaleString()}</td>
                   <td className="px-6 py-4 text-right">
                     <StatusBadge status={job.status} />
                   </td>
@@ -72,11 +72,11 @@ export default function JobsPage() {
               ))}
             </tbody>
           </table>
-          <div className="px-6 py-4 border-t bg-gray-50/50 text-xs text-gray-500 flex justify-between items-center">
+          <div className="px-6 py-4 border-t border-white/5 bg-black/20 text-xs text-muted-foreground flex justify-between items-center">
             <span>Showing {pageData.numberOfElements} of {pageData.totalElements} jobs</span>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled>Previous</Button>
-              <Button variant="outline" size="sm" disabled>Next</Button>
+              <Button variant="outline" size="sm" disabled className="border-white/10 bg-white/5 text-muted-foreground">Previous</Button>
+              <Button variant="outline" size="sm" disabled className="border-white/10 bg-white/5 text-muted-foreground">Next</Button>
             </div>
           </div>
         </div>

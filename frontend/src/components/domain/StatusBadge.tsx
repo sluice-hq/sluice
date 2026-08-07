@@ -3,25 +3,33 @@ import { cn } from '@/lib/utils';
 import { CheckCircle2, Clock, XCircle, Loader2 } from 'lucide-react';
 
 interface StatusBadgeProps {
-  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'PENDING';
+  status: string;
   className?: string;
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
-  const config = {
-    QUEUED: { label: 'Queued', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: Clock },
-    PENDING: { label: 'Pending', color: 'bg-gray-100 text-gray-800 border-gray-200', icon: Clock },
-    RUNNING: { label: 'Running', color: 'bg-blue-100 text-blue-800 border-blue-200', icon: Loader2 },
-    COMPLETED: { label: 'Completed', color: 'bg-green-100 text-green-800 border-green-200', icon: CheckCircle2 },
-    FAILED: { label: 'Failed', color: 'bg-red-100 text-red-800 border-red-200', icon: XCircle },
+  const getBadgeConfig = (status: string) => {
+    switch (status) {
+      case 'PENDING':
+        return { color: 'bg-amber-500/10 text-amber-500 border-amber-500/20 shadow-[inset_0_0_8px_rgba(245,158,11,0.1)]', icon: Clock };
+      case 'PROCESSING':
+      case 'RUNNING':
+        return { color: 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[inset_0_0_8px_rgba(59,130,246,0.1)]', icon: Loader2 };
+      case 'COMPLETED':
+        return { color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[inset_0_0_8px_rgba(16,185,129,0.1)]', icon: CheckCircle2 };
+      case 'FAILED':
+        return { color: 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[inset_0_0_8px_rgba(239,68,68,0.1)]', icon: XCircle };
+      default:
+        return { color: 'bg-gray-500/10 text-gray-400 border-gray-500/20', icon: Clock };
+    }
   };
 
-  const { label, color, icon: Icon } = config[status] || config['QUEUED'];
+  const { color, icon: Icon } = getBadgeConfig(status);
 
   return (
-    <Badge variant="outline" className={cn('gap-1.5 px-2.5 py-0.5 font-medium', color, className)}>
-      <Icon className={cn('h-3.5 w-3.5', status === 'RUNNING' && 'animate-spin')} />
-      {label}
+    <Badge variant="outline" className={cn('gap-1.5 px-2.5 py-0.5 font-medium tracking-wide backdrop-blur-md rounded-md', color, className)}>
+      <Icon className={cn('h-3.5 w-3.5', (status === 'RUNNING' || status === 'PROCESSING') && 'animate-spin')} />
+      {status}
     </Badge>
   );
 }

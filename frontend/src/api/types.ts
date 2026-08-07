@@ -38,6 +38,29 @@ export interface DashboardOverview {
   failedJobs: number;
   recentAssets: Asset[];
   recentJobs: Job[];
+  metrics?: {
+    assetsSparkline: number[];
+    jobsSparkline: number[];
+    successRateSparkline: number[];
+    queueDepthSparkline: number[];
+    failedSparkline: number[];
+    throughput: {
+      timestamp: string;
+      completed: number;
+      running: number;
+      failed: number;
+    }[];
+    pipelineActivity: {
+      name: string;
+      assetsProcessed: number;
+      status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+    }[];
+    systemHealth: {
+      name: string;
+      latencyMs: number;
+      status: 'HEALTHY' | 'DEGRADED' | 'DOWN';
+    }[];
+  };
 }
 
 export interface UploadUrlRequest {
