@@ -42,13 +42,13 @@ export default function AssetDetailsPage({ params }: { params: Promise<{ id: str
       </Link>
 
       {isLoading ? (
-        <div className="h-64 bg-white border rounded-md animate-pulse"></div>
+        <div className="h-64 bg-card border border-border rounded-xl shadow-sm animate-pulse"></div>
       ) : asset ? (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-lg border shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-card p-6 rounded-xl border border-border shadow-sm">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                <FileVideo className="w-6 h-6 text-gray-500" />
+              <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2 text-white">
+                <FileVideo className="w-6 h-6 text-muted-foreground" />
                 {asset.filename}
               </h2>
               <p className="text-sm font-mono text-muted-foreground mt-2">{asset.id}</p>
@@ -57,27 +57,27 @@ export default function AssetDetailsPage({ params }: { params: Promise<{ id: str
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-lg border shadow-sm flex items-start gap-4">
-               <HardDrive className="w-5 h-5 text-gray-400 mt-0.5" />
+            <div className="bg-card p-6 rounded-xl border border-border shadow-sm flex items-start gap-4">
+               <HardDrive className="w-5 h-5 text-muted-foreground mt-0.5" />
                <div>
-                  <h3 className="text-sm font-medium text-gray-500">File Size</h3>
-                  <p className="text-lg font-semibold mt-1">{(asset.size / 1024 / 1024).toFixed(2)} MB</p>
+                  <h3 className="text-sm font-medium text-muted-foreground">File Size</h3>
+                  <p className="text-lg font-semibold mt-1 text-white">{(asset.size / 1024 / 1024).toFixed(2)} MB</p>
                </div>
             </div>
             
-            <div className="bg-white p-6 rounded-lg border shadow-sm flex items-start gap-4">
-               <FileVideo className="w-5 h-5 text-gray-400 mt-0.5" />
+            <div className="bg-card p-6 rounded-xl border border-border shadow-sm flex items-start gap-4">
+               <FileVideo className="w-5 h-5 text-muted-foreground mt-0.5" />
                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Content Type</h3>
-                  <p className="text-lg font-semibold mt-1">{asset.contentType}</p>
+                  <h3 className="text-sm font-medium text-muted-foreground">Content Type</h3>
+                  <p className="text-lg font-semibold mt-1 text-white">{asset.contentType}</p>
                </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border shadow-sm flex items-start gap-4">
-               <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
+            <div className="bg-card p-6 rounded-xl border border-border shadow-sm flex items-start gap-4">
+               <Calendar className="w-5 h-5 text-muted-foreground mt-0.5" />
                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Uploaded At</h3>
-                  <p className="text-lg font-semibold mt-1">{new Date(asset.createdAt).toLocaleString()}</p>
+                  <h3 className="text-sm font-medium text-muted-foreground">Uploaded At</h3>
+                  <p className="text-lg font-semibold mt-1 text-white">{new Date(asset.createdAt).toLocaleString()}</p>
                </div>
             </div>
           </div>
