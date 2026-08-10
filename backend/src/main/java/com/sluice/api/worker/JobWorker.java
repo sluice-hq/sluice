@@ -38,30 +38,74 @@ public class JobWorker {
 
     @RabbitListener(queues = RabbitMqConfig.QUEUE_NAME)
     public void processJob(JobMessage message) throws Exception {
-        // Fetch current job state for idempotency check
-        Job job = jobService.getJob(message.getJobId())
-                .orElseThrow(() -> new RuntimeException("Job not found: " + message.getJobId()));
+        try {
+            // Fetch current job state
+            Job job = jobService.getJob(message.getJobId())
+                    .orElseThrow(() -> new RuntimeException("Job not found: " + message.getJobId()));
 
-        if (job.getStatus() == JobStatus.COMPLETED || job.getStatus() == JobStatus.FAILED) {
-            System.out.println("Job " + job.getId() + " is already in terminal state " + job.getStatus() + ". Skipping duplicate delivery.");
-            return;
+            if (job.getStatus() != JobStatus.QUEUED) {
+                System.out.println("Job " + job.getId() + " is already in state " + job.getStatus() + ". Skipping duplicate delivery.");
+                return;
+            }
+
+            System.out.println("Processing Job: " + job.getId());
+
+            // Update status to RUNNING (this is atomic via JPA @Version)
+            job = jobService.updateJobStatus(message.getJobId(), JobStatus.RUNNING);
+
+            // Fetch the asset
+            Asset asset = assetRepository.findById(message.getAssetId())
+                    .orElseThrow(() -> new RuntimeException("Asset not found"));
+
+            // Download file as MediaResource
+            com.sluice.api.pipeline.MediaResource currentResource = storageService.downloadFile(asset.getStorageUrl());
+            
+            // Create processing context and run pipeline
+            ProcessingContext context = new ProcessingContext(job, asset, currentResource);
+            
+            try {
+                pipelineEngine.execute(pipeline, context);
+            } finally {
+                // PipelineEngine tracks and cleans resources in its finally block
+            }
+
+            // Save new derived assets if the pipeline created a new resource
+            if (context.getCurrentResource() != currentResource && context.getCurrentResource() instanceof com.sluice.api.pipeline.FileMediaResource fmr) {
+                // upload and create derived asset
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(fmr.getFile())) {
+                    String newUrl = storageService.uploadFile(
+                            fmr.getFile().getName(),
+                            fmr.getContentType(),
+                            fis,
+                            fmr.getSize()
+                    );
+                    
+                    Asset derived = new Asset(
+                            java.util.UUID.randomUUID(),
+                            fmr.getFile().getName(),
+                            fmr.getSize(),
+                            fmr.getContentType(),
+                            newUrl,
+                            Asset.UploadStatus.COMPLETED,
+                            java.time.Instant.now()
+                    );
+                    derived.setParentAsset(asset);
+                    assetRepository.save(derived);
+                    System.out.println("Created derived asset " + derived.getId() + " from job " + job.getId());
+                }
+            }
+
+            // Update status to COMPLETED
+            jobService.updateJobStatus(job.getId(), JobStatus.COMPLETED);
+        } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
+            System.out.println("Job " + message.getJobId() + " overridden by another process (Optimistic Lock). Aborting.");
+        } catch (Exception e) {
+            System.err.println("Job " + message.getJobId() + " failed: " + e.getMessage());
+            try {
+                jobService.updateJobStatus(message.getJobId(), JobStatus.FAILED);
+            } catch (Exception updateEx) {
+                System.err.println("Could not update job to FAILED: " + updateEx.getMessage());
+            }
         }
-
-        // Update status to RUNNING
-        job = jobService.updateJobStatus(message.getJobId(), JobStatus.RUNNING);
-
-        // Fetch the asset
-        Asset asset = assetRepository.findById(message.getAssetId())
-                .orElseThrow(() -> new RuntimeException("Asset not found"));
-
-        // Download file
-        byte[] fileBytes = storageService.downloadFile(asset.getStorageUrl());
-        
-        // Create processing context and run pipeline
-        ProcessingContext context = new ProcessingContext(job, asset, fileBytes);
-        pipelineEngine.execute(pipeline, context);
-
-        // Update status to COMPLETED
-        jobService.updateJobStatus(job.getId(), JobStatus.COMPLETED);
     }
 }

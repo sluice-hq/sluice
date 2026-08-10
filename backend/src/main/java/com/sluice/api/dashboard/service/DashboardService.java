@@ -25,9 +25,23 @@ public class DashboardService {
     public DashboardResponse getDashboardOverview() {
         long totalAssets = assetRepository.count();
         long totalJobs = jobRepository.count();
-        long runningJobs = jobRepository.countByStatus(JobStatus.RUNNING);
-        long completedJobs = jobRepository.countByStatus(JobStatus.COMPLETED);
-        long failedJobs = jobRepository.countByStatus(JobStatus.FAILED);
+        
+        long runningJobs = 0;
+        long completedJobs = 0;
+        long failedJobs = 0;
+        
+        List<Object[]> statusCounts = jobRepository.countJobsByStatus();
+        for (Object[] row : statusCounts) {
+            JobStatus status = (JobStatus) row[0];
+            long count = ((Number) row[1]).longValue();
+            switch (status) {
+                case RUNNING -> runningJobs = count;
+                case COMPLETED -> completedJobs = count;
+                case FAILED -> failedJobs = count;
+                case QUEUED -> {} // do nothing, not tracked in overview numbers yet
+                default -> {}
+            }
+        }
 
         List<AssetResponse> recentAssets = assetRepository.findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")))
                 .stream()

@@ -21,6 +21,10 @@ public class Asset {
     private UploadStatus uploadStatus;
     private Instant createdAt;
 
+    @jakarta.persistence.ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @jakarta.persistence.JoinColumn(name = "parent_asset_id")
+    private Asset parentAsset;
+
     public enum UploadStatus {
         PENDING,
         COMPLETED
@@ -60,4 +64,7 @@ public class Asset {
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
+    public Asset getParentAsset() { return parentAsset; }
+    public void setParentAsset(Asset parentAsset) { this.parentAsset = parentAsset; }
 }

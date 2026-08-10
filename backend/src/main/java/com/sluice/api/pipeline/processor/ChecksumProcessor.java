@@ -6,12 +6,25 @@ import org.springframework.stereotype.Component;
 
 import java.security.MessageDigest;
 
+import com.sluice.api.pipeline.ProcessorResult;
+import java.io.InputStream;
+import java.util.Map;
+
 @Component
 public class ChecksumProcessor implements Processor {
     @Override
-    public void process(ProcessingContext context) throws Exception {
+    public ProcessorResult process(ProcessingContext context) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        byte[] hashBytes = digest.digest(context.getFileBytes());
+        
+        try (InputStream is = context.getCurrentResource().getInputStream()) {
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = is.read(buffer)) != -1) {
+                digest.update(buffer, 0, bytesRead);
+            }
+        }
+        
+        byte[] hashBytes = digest.digest();
         
         StringBuilder hexString = new StringBuilder();
         for (byte b : hashBytes) {
@@ -21,7 +34,7 @@ public class ChecksumProcessor implements Processor {
         }
         String checksum = hexString.toString();
         
-        context.getAttributes().put("checksum", checksum);
         System.out.println("Computed SHA-256 Checksum for Job " + context.getJob().getId() + ": " + checksum);
+        return new ProcessorResult(null, Map.of("checksum", checksum));
     }
 }
