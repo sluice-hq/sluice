@@ -1,6 +1,6 @@
 # Sluice
 
-**Sluice** is an open-source, cloud-native media infrastructure platform designed to handle complex media processing workflows at scale. It provides a functional, end-to-end media pipeline—from secure, direct-to-storage uploads to distributed background processing and real-time dashboard updates.
+**Sluice** is an open-source, cloud-native media infrastructure platform designed to handle complex media processing workflows at scale. It provides a functional, end-to-end media pipeline - from secure, direct-to-storage uploads to distributed background processing and real-time dashboard updates.
 
 By offering a modular Pipeline Engine and pluggable architecture, Sluice executes media processing workflows asynchronously, keeping the control API highly responsive and paving the way for fully user-configurable pipelines in future releases.
 
@@ -113,6 +113,15 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 - Direct uploads using Azure SAS URLs
 - Live job status updates via Server-Sent Events (SSE)
 - Professional Next.js frontend architecture
+
+### Phase 6.5: Processing Engine Hardening & Media Foundation (Completed)
+**Goal:** Harden the backend engine and prepare for configurable workflows.
+**Scope:**
+- Transactional boundaries and concurrency safeguards
+- `@Version` optimistic locking for safe job transitions
+- Self-healing orphan and zombie job recovery services
+- `MediaResource` stream-based abstractions for safe file handling
+- Extensible `ProcessorResult` contract and core MIME/Resize/WebP processors
 
 ### Phase 7: Configurable Pipelines (Current)
 **Goal:** Allow developers to define custom processing workflows.

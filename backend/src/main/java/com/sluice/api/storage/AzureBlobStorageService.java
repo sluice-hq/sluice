@@ -55,14 +55,25 @@ public class AzureBlobStorageService implements StorageService {
 
     @Override
     public String uploadFile(MultipartFile file) throws IOException {
-        String originalFilename = file.getOriginalFilename();
+        return uploadFile(file.getOriginalFilename(), file.getContentType(), file.getInputStream(), file.getSize());
+    }
+
+    @Override
+    public String uploadFile(String filename, String contentType, java.io.InputStream inputStream, long size) throws IOException {
         String extension = "";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        if (filename != null && filename.contains(".")) {
+            extension = filename.substring(filename.lastIndexOf("."));
         }
         String blobName = UUID.randomUUID().toString() + extension;
         BlobClient blobClient = containerClient.getBlobClient(blobName);
-        blobClient.upload(file.getInputStream(), file.getSize(), true);
+        blobClient.upload(inputStream, size, true);
+        
+        com.azure.storage.blob.models.BlobHttpHeaders headers = new com.azure.storage.blob.models.BlobHttpHeaders();
+        if (contentType != null) {
+            headers.setContentType(contentType);
+            blobClient.setHttpHeaders(headers);
+        }
+        
         return blobClient.getBlobUrl();
     }
 
@@ -82,14 +93,18 @@ public class AzureBlobStorageService implements StorageService {
     }
 
     @Override
-    public byte[] downloadFile(String fileUrl) {
+    public com.sluice.api.pipeline.MediaResource downloadFile(String fileUrl) {
         if (fileUrl == null || fileUrl.isBlank()) {
             throw new IllegalArgumentException("File URL cannot be null or empty");
         }
         String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
         String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
         BlobClient blobClient = containerClient.getBlobClient(blobName);
-        return blobClient.downloadContent().toBytes();
+        
+        java.io.InputStream is = blobClient.openInputStream();
+        long size = blobClient.getProperties().getBlobSize();
+        
+        return new com.sluice.api.pipeline.StreamMediaResource(is, size);
     }
 
     @Override

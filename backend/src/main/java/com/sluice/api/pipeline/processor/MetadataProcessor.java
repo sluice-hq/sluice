@@ -5,29 +5,36 @@ import com.sluice.api.pipeline.Processor;
 import org.springframework.stereotype.Component;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
+
+import com.sluice.api.pipeline.ProcessorResult;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 @Component
 public class MetadataProcessor implements Processor {
     @Override
-    public void process(ProcessingContext context) throws Exception {
-        byte[] fileBytes = context.getFileBytes();
-        context.getAttributes().put("fileSize", fileBytes.length);
+    public ProcessorResult process(ProcessingContext context) throws Exception {
+        Map<String, Object> metadata = new HashMap<>();
+        long fileSize = context.getCurrentResource().getSize();
+        metadata.put("fileSize", fileSize);
         
-        try {
-            BufferedImage image = ImageIO.read(new ByteArrayInputStream(fileBytes));
+        try (InputStream is = context.getCurrentResource().getInputStream()) {
+            BufferedImage image = ImageIO.read(is);
             if (image != null) {
-                context.getAttributes().put("width", image.getWidth());
-                context.getAttributes().put("height", image.getHeight());
+                metadata.put("width", image.getWidth());
+                metadata.put("height", image.getHeight());
                 System.out.println("Extracted Metadata for Job " + context.getJob().getId() + 
-                                   ": Size=" + fileBytes.length + " bytes, Dimensions=" + 
+                                   ": Size=" + fileSize + " bytes, Dimensions=" + 
                                    image.getWidth() + "x" + image.getHeight());
             } else {
                 System.out.println("Extracted Metadata for Job " + context.getJob().getId() + 
-                                   ": Size=" + fileBytes.length + " bytes (Not an image)");
+                                   ": Size=" + fileSize + " bytes (Not an image)");
             }
         } catch (Exception e) {
             System.err.println("Could not parse image metadata: " + e.getMessage());
         }
+        
+        return new ProcessorResult(null, metadata);
     }
 }

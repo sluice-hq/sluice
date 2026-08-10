@@ -11,6 +11,10 @@ public class Job {
     @Id
     private UUID id;
 
+    @Version
+    @Column(nullable = false)
+    private Long version = 0L;
+
     @Column(name = "asset_id", nullable = false)
     private UUID assetId;
 
@@ -41,6 +45,14 @@ public class Job {
 
     public void setId(UUID id) {
         this.id = id;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 
     public UUID getAssetId() {
