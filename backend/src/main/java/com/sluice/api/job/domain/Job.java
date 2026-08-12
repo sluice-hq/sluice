@@ -28,6 +28,9 @@ public class Job {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "pipeline_version_id")
+    private UUID pipelineVersionId;
+
     public Job() {
     }
 
@@ -86,5 +89,13 @@ public class Job {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public UUID getPipelineVersionId() {
+        return pipelineVersionId;
+    }
+
+    public void setPipelineVersionId(UUID pipelineVersionId) {
+        this.pipelineVersionId = pipelineVersionId;
     }
 }

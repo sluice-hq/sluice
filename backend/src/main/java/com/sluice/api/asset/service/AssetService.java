@@ -9,9 +9,8 @@ import com.sluice.api.messaging.JobPublisher;
 import com.sluice.api.messaging.dto.JobMessage;
 import com.sluice.api.storage.StorageService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -41,15 +40,17 @@ public class AssetService {
         return assetRepository.findById(assetId);
     }
 
-    public UploadAssetResponse uploadAsset(MultipartFile file) {
+    @Transactional
+    public UploadAssetResponse uploadAsset(MultipartFile file, java.util.UUID pipelineId) {
         String fileUrl;
         try {
             fileUrl = storageService.uploadFile(file);
-        } catch (IOException e) {
+        } catch (java.io.IOException e) {
             throw new RuntimeException("Failed to upload file to storage", e);
         }
 
         try {
+            // Create asset record
             Asset asset = new Asset(
                     UUID.randomUUID(),
                     file.getOriginalFilename(),
@@ -63,7 +64,7 @@ public class AssetService {
             // The save operation is transactional by default in Spring Data JPA
             Asset savedAsset = assetRepository.save(asset);
             
-            Job job = jobService.createJob(savedAsset.getId());
+            Job job = jobService.createJob(savedAsset.getId(), pipelineId);
             jobPublisher.publishJob(new JobMessage(job.getId(), savedAsset.getId()));
             
             return new UploadAssetResponse(
@@ -116,14 +117,15 @@ public class AssetService {
         return new com.sluice.api.asset.dto.UploadUrlResponse(asset.getId(), uploadUrl, blobName);
     }
 
-    public UploadAssetResponse completeUpload(UUID assetId) {
+    @Transactional
+    public UploadAssetResponse completeUpload(UUID assetId, UUID pipelineId) {
         Asset asset = assetRepository.findById(assetId)
-                .orElseThrow(() -> new RuntimeException("Asset not found"));
-                
-        if (asset.getUploadStatus() == Asset.UploadStatus.COMPLETED) {
-            throw new RuntimeException("Upload already completed");
+                .orElseThrow(() -> new IllegalArgumentException("Asset not found"));
+
+        if (asset.getUploadStatus() != Asset.UploadStatus.PENDING) {
+            throw new IllegalStateException("Asset is not in PENDING state");
         }
-        
+
         if (!storageService.fileExists(asset.getStorageUrl())) {
             throw new RuntimeException("File does not exist in storage");
         }
@@ -134,10 +136,10 @@ public class AssetService {
         }
         
         asset.setUploadStatus(Asset.UploadStatus.COMPLETED);
-        assetRepository.save(asset);
+        Asset savedAsset = assetRepository.save(asset);
         
-        Job job = jobService.createJob(asset.getId());
-        jobPublisher.publishJob(new JobMessage(job.getId(), asset.getId()));
+        Job job = jobService.createJob(savedAsset.getId(), pipelineId);
+        jobPublisher.publishJob(new JobMessage(job.getId(), savedAsset.getId()));
         
         return new UploadAssetResponse(
                 asset.getId(),

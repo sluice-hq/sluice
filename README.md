@@ -17,7 +17,7 @@ By offering a modular Pipeline Engine and pluggable architecture, Sluice execute
 
 The diagram below represents the long-term target architecture that future milestones will progressively implement. Once complete, Sluice will employ an event-driven, decoupled architecture to ensure horizontal scalability and resilience. 
 
-*Note: The current implementation features a production-quality Next.js dashboard, direct client-to-storage ingestion via Azure SAS URLs, and real-time job updates via Server-Sent Events (SSE). On the backend, it leverages Azure Blob Storage, PostgreSQL, and RabbitMQ to drive asynchronous job processing through a modular Pipeline Engine with reliable messaging (retries, idempotency, and dead-letter queues). Future work includes configurable pipeline definitions, media governance, and cloud deployment.*
+*Note: The current implementation features a production-quality Next.js dashboard, direct client-to-storage ingestion via Azure SAS URLs, and real-time job updates via Server-Sent Events (SSE). On the backend, it leverages Azure Blob Storage, PostgreSQL, and RabbitMQ to drive asynchronous job processing through a dynamic, JSON-configured Pipeline Engine with reliable messaging (retries, idempotency, and dead-letter queues). Future work includes media governance, AI-assisted orchestration, and cloud deployment.*
 
 ```mermaid
 graph TD
@@ -36,10 +36,11 @@ graph TD
 
 ### Core Concepts
 - **Asset**: A file ingested into Sluice.
-- **Pipeline**: An ordered sequence of configured processing steps.
-- **Processor**: A reusable unit of compute (e.g., `ImageResizeProcessor`).
-- **Job**: A single execution instance of a Pipeline against an Asset.
-- **Worker**: A stateless service responsible for executing processors.
+- **Pipeline**: A generic workflow definition (e.g. "Thumbnail Generator").
+- **PipelineVersion**: An immutable, JSON-configured execution graph that strictly enforces MIME type compatibility.
+- **Processor**: A reusable unit of compute (e.g., `ResizeProcessor`) that advertises its `ProcessorMetadata`.
+- **Job**: A single execution instance of a specific `PipelineVersion` against an Asset.
+- **Worker**: A stateless service responsible for resolving and executing the pipeline.
 - **Queue**: Coordinates asynchronous task distribution.
 
 ---
@@ -123,7 +124,7 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 - `MediaResource` stream-based abstractions for safe file handling
 - Extensible `ProcessorResult` contract and core MIME/Resize/WebP processors
 
-### Phase 7: Configurable Pipelines (Current)
+### Phase 7: Dynamic Pipeline Versioning (Completed)
 **Goal:** Allow developers to define custom processing workflows.
 **Scope:**
 - JSON pipeline definitions
@@ -131,7 +132,7 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 - Pipeline validation
 - User-defined pipeline execution
 
-### Phase 8: Media Governance & AI
+### Phase 8: Media Governance & AI (Current)
 **Goal:** Introduce intelligent media orchestration and governance.
 **Scope:**
 - AI-assisted pipeline generation

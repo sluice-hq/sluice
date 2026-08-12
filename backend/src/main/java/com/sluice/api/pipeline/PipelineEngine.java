@@ -12,8 +12,8 @@ public class PipelineEngine {
         }
 
         try {
-            for (Processor processor : pipeline.getProcessors()) {
-                ProcessorResult result = processor.process(context);
+            for (ConfiguredStep step : pipeline.getSteps()) {
+                ProcessorResult result = step.getProcessor().process(context, step.getConfig());
                 
                 if (result != null) {
                     if (result.getMetadata() != null) {

@@ -1,5 +1,8 @@
 package com.sluice.api.pipeline;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 public interface Processor {
-    ProcessorResult process(ProcessingContext context) throws Exception;
+    ProcessorMetadata getMetadata();
+    ProcessorResult process(ProcessingContext context, JsonNode config) throws Exception;
 }

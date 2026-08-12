@@ -18,10 +18,12 @@ public class JobService {
 
     private final JobRepository jobRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final com.sluice.api.pipeline.service.PipelineService pipelineService;
 
-    public JobService(JobRepository jobRepository, ApplicationEventPublisher eventPublisher) {
+    public JobService(JobRepository jobRepository, ApplicationEventPublisher eventPublisher, com.sluice.api.pipeline.service.PipelineService pipelineService) {
         this.jobRepository = jobRepository;
         this.eventPublisher = eventPublisher;
+        this.pipelineService = pipelineService;
     }
 
     @Transactional(readOnly = true)
@@ -30,9 +32,15 @@ public class JobService {
     }
 
     @Transactional
-    public Job createJob(UUID assetId) {
+    public Job createJob(UUID assetId, UUID pipelineId) {
         Instant now = Instant.now();
         Job job = new Job(UUID.randomUUID(), assetId, JobStatus.QUEUED, now, now);
+        
+        com.sluice.api.pipeline.domain.PipelineVersion version = pipelineService.getLatestPublishedVersion(pipelineId)
+                .orElseThrow(() -> new IllegalArgumentException("No published version found for pipeline: " + pipelineId));
+        
+        job.setPipelineVersionId(version.getId());
+        
         Job savedJob = jobRepository.save(job);
         eventPublisher.publishEvent(new com.sluice.api.job.event.JobStatusChangedEvent(this, savedJob.getId(), savedJob.getStatus()));
         return savedJob;
