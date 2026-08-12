@@ -3,13 +3,13 @@ package com.sluice.api.pipeline;
 import java.util.List;
 
 public class Pipeline {
-    private final List<Processor> processors;
+    private final List<ConfiguredStep> steps;
 
-    public Pipeline(List<Processor> processors) {
-        this.processors = processors;
+    public Pipeline(List<ConfiguredStep> steps) {
+        this.steps = steps;
     }
 
-    public List<Processor> getProcessors() {
-        return processors;
+    public List<ConfiguredStep> getSteps() {
+        return steps;
     }
 }

@@ -13,10 +13,24 @@ import java.io.InputStream;
 import java.util.Map;
 import java.util.UUID;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.sluice.api.pipeline.ProcessorMetadata;
+import java.util.List;
+
 @Component
 public class WebpProcessor implements Processor {
+
     @Override
-    public ProcessorResult process(ProcessingContext context) throws Exception {
+    public ProcessorMetadata getMetadata() {
+        return new ProcessorMetadata(
+            "webp",
+            List.of("image/*"),
+            (inputMimeType, config) -> "image/webp"
+        );
+    }
+
+    @Override
+    public ProcessorResult process(ProcessingContext context, JsonNode config) throws Exception {
         try (InputStream is = context.getCurrentResource().getInputStream()) {
             BufferedImage originalImage = ImageIO.read(is);
             if (originalImage == null) {

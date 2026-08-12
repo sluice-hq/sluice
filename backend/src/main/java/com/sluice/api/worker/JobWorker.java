@@ -9,10 +9,12 @@ import com.sluice.api.messaging.RabbitMqConfig;
 import com.sluice.api.messaging.dto.JobMessage;
 import com.sluice.api.pipeline.Pipeline;
 import com.sluice.api.pipeline.PipelineEngine;
+import com.sluice.api.pipeline.PipelineResolver;
 import com.sluice.api.pipeline.ProcessingContext;
+import com.sluice.api.pipeline.domain.PipelineVersion;
+import com.sluice.api.pipeline.repository.PipelineVersionRepository;
 import com.sluice.api.storage.StorageService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -22,18 +24,21 @@ public class JobWorker {
     private final AssetRepository assetRepository;
     private final StorageService storageService;
     private final PipelineEngine pipelineEngine;
-    private final Pipeline pipeline;
+    private final PipelineVersionRepository pipelineVersionRepository;
+    private final PipelineResolver pipelineResolver;
 
     public JobWorker(JobService jobService, 
                      AssetRepository assetRepository, 
                      StorageService storageService,
                      PipelineEngine pipelineEngine,
-                     @Qualifier("defaultImagePipeline") Pipeline pipeline) {
+                     PipelineVersionRepository pipelineVersionRepository,
+                     PipelineResolver pipelineResolver) {
         this.jobService = jobService;
         this.assetRepository = assetRepository;
         this.storageService = storageService;
         this.pipelineEngine = pipelineEngine;
-        this.pipeline = pipeline;
+        this.pipelineVersionRepository = pipelineVersionRepository;
+        this.pipelineResolver = pipelineResolver;
     }
 
     @RabbitListener(queues = RabbitMqConfig.QUEUE_NAME)
@@ -60,6 +65,13 @@ public class JobWorker {
             // Download file as MediaResource
             com.sluice.api.pipeline.MediaResource currentResource = storageService.downloadFile(asset.getStorageUrl());
             
+            // Resolve pipeline version
+            java.util.UUID pipelineVersionId = job.getPipelineVersionId();
+            PipelineVersion pipelineVersion = pipelineVersionRepository.findById(pipelineVersionId)
+                    .orElseThrow(() -> new RuntimeException("PipelineVersion not found: " + pipelineVersionId));
+            
+            Pipeline pipeline = pipelineResolver.resolve(pipelineVersion.getDefinition());
+
             // Create processing context and run pipeline
             ProcessingContext context = new ProcessingContext(job, asset, currentResource);
             

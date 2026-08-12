@@ -11,10 +11,24 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.sluice.api.pipeline.ProcessorMetadata;
+import java.util.List;
+
 @Component
 public class MetadataProcessor implements Processor {
+
     @Override
-    public ProcessorResult process(ProcessingContext context) throws Exception {
+    public ProcessorMetadata getMetadata() {
+        return new ProcessorMetadata(
+            "metadata",
+            List.of("image/*"),
+            (inputMimeType, config) -> inputMimeType
+        );
+    }
+
+    @Override
+    public ProcessorResult process(ProcessingContext context, JsonNode config) throws Exception {
         Map<String, Object> metadata = new HashMap<>();
         long fileSize = context.getCurrentResource().getSize();
         metadata.put("fileSize", fileSize);

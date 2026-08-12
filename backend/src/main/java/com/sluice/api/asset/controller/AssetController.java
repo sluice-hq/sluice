@@ -64,7 +64,7 @@ public class AssetController {
      */
     @Deprecated
     @PostMapping
-    public ResponseEntity<?> uploadAsset(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> uploadAsset(@RequestParam("file") MultipartFile file, @RequestParam("pipelineId") java.util.UUID pipelineId) {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body("File must not be empty.");
         }
@@ -79,7 +79,7 @@ public class AssetController {
                     .body("Unsupported content type. Allowed types: " + ALLOWED_CONTENT_TYPES);
         }
 
-        UploadAssetResponse response = assetService.uploadAsset(file);
+        UploadAssetResponse response = assetService.uploadAsset(file, pipelineId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -100,9 +100,9 @@ public class AssetController {
     }
 
     @PostMapping("/{assetId}/complete")
-    public ResponseEntity<?> completeUpload(@PathVariable java.util.UUID assetId) {
+    public ResponseEntity<?> completeUpload(@PathVariable java.util.UUID assetId, @RequestParam("pipelineId") java.util.UUID pipelineId) {
         try {
-            UploadAssetResponse response = assetService.completeUpload(assetId);
+            UploadAssetResponse response = assetService.completeUpload(assetId, pipelineId);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());

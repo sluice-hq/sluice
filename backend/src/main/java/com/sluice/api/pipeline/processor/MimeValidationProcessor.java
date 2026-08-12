@@ -10,10 +10,33 @@ import java.net.URLConnection;
 import java.io.BufferedInputStream;
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.sluice.api.pipeline.ProcessorMetadata;
+import java.util.List;
+import java.util.ArrayList;
+
 @Component
 public class MimeValidationProcessor implements Processor {
+
     @Override
-    public ProcessorResult process(ProcessingContext context) throws Exception {
+    public ProcessorMetadata getMetadata() {
+        return new ProcessorMetadata(
+            "mime-validation",
+            List.of("*/*"),
+            (inputMimeType, config) -> inputMimeType
+        );
+    }
+
+    @Override
+    public ProcessorResult process(ProcessingContext context, JsonNode config) throws Exception {
+        
+        List<String> allowedTypes = new ArrayList<>();
+        if (config != null && config.has("allowedTypes")) {
+            config.get("allowedTypes").forEach(node -> allowedTypes.add(node.asText()));
+        } else {
+            allowedTypes.add("image/");
+        }
+
         try (InputStream is = context.getCurrentResource().getInputStream();
              BufferedInputStream bis = new BufferedInputStream(is)) {
             
@@ -24,9 +47,12 @@ public class MimeValidationProcessor implements Processor {
                 throw new Exception("Unknown MIME type");
             }
             
-            if (!mimeType.startsWith("image/")) {
+            boolean isValid = allowedTypes.stream()
+                .anyMatch(allowed -> mimeType.startsWith(allowed.replace("*", "")));
+
+            if (!isValid) {
                 System.err.println("Invalid MIME type: " + mimeType + " for Job " + context.getJob().getId());
-                throw new Exception("Invalid MIME type: " + mimeType + ". Only images are supported.");
+                throw new Exception("Invalid MIME type: " + mimeType + ". Allowed types: " + allowedTypes);
             }
             
             System.out.println("Validated MIME type for Job " + context.getJob().getId() + ": " + mimeType);

@@ -7,13 +7,26 @@ import org.springframework.stereotype.Component;
 import java.security.MessageDigest;
 
 import com.sluice.api.pipeline.ProcessorResult;
-import java.io.InputStream;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.sluice.api.pipeline.ProcessorMetadata;
+import java.util.List;
 import java.util.Map;
+import java.io.InputStream;
 
 @Component
 public class ChecksumProcessor implements Processor {
+
     @Override
-    public ProcessorResult process(ProcessingContext context) throws Exception {
+    public ProcessorMetadata getMetadata() {
+        return new ProcessorMetadata(
+            "checksum",
+            List.of("*/*"),
+            (inputMimeType, config) -> inputMimeType
+        );
+    }
+
+    @Override
+    public ProcessorResult process(ProcessingContext context, JsonNode config) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         
         try (InputStream is = context.getCurrentResource().getInputStream()) {
