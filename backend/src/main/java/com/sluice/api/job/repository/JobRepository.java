@@ -14,4 +14,7 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
     java.util.List<Object[]> countJobsByStatus();
 
     java.util.List<Job> findByStatusAndUpdatedAtBefore(com.sluice.api.job.domain.JobStatus status, java.time.Instant updatedAt);
+
+    java.util.Optional<Job> findByIdAndProjectId(UUID id, UUID projectId);
+    org.springframework.data.domain.Page<Job> findAllByProjectId(UUID projectId, org.springframework.data.domain.Pageable pageable);
 }

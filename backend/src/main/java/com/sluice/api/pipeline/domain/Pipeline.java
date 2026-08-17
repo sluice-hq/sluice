@@ -22,12 +22,16 @@ public class Pipeline {
     @Column(name = "updated_at", insertable = false, updatable = false)
     private Instant updatedAt;
 
+    @Column(name = "project_id", nullable = false)
+    private UUID projectId;
+
     protected Pipeline() {}
 
-    public Pipeline(UUID id, String name, String description) {
+    public Pipeline(UUID id, String name, String description, UUID projectId) {
         this.id = id;
         this.name = name;
         this.description = description;
+        this.projectId = projectId;
     }
 
     public UUID getId() { return id; }
@@ -35,6 +39,7 @@ public class Pipeline {
     public String getDescription() { return description; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public UUID getProjectId() { return projectId; }
 
     public void setName(String name) { this.name = name; }
     public void setDescription(String description) { this.description = description; }

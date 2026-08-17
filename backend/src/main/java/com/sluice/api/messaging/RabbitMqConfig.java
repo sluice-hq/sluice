@@ -71,7 +71,7 @@ public class RabbitMqConfig {
         return (message, cause) -> {
             try {
                 com.sluice.api.messaging.dto.JobMessage jobMsg = objectMapper.readValue(message.getBody(), com.sluice.api.messaging.dto.JobMessage.class);
-                jobService.updateJobStatus(jobMsg.getJobId(), com.sluice.api.job.domain.JobStatus.FAILED);
+                jobService.updateJobStatusSystem(jobMsg.getJobId(), com.sluice.api.job.domain.JobStatus.FAILED);
             } catch (Exception e) {
                 System.err.println("Failed to parse message in recoverer: " + e.getMessage());
             }

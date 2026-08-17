@@ -34,7 +34,7 @@ public class JobRecoveryService {
         
         for (Job job : zombies) {
             try {
-                jobService.updateJobStatus(job.getId(), JobStatus.QUEUED);
+                jobService.updateJobStatusSystem(job.getId(), JobStatus.QUEUED);
                 System.out.println("Recovered zombie job " + job.getId() + " to QUEUED status.");
             } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
                 // Ignore, another instance handled it or the worker just finished

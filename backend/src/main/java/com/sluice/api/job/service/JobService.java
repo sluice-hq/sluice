@@ -1,5 +1,6 @@
 package com.sluice.api.job.service;
 
+import com.sluice.api.auth.domain.ProjectContext;
 import com.sluice.api.job.domain.Job;
 import com.sluice.api.job.domain.JobStatus;
 import com.sluice.api.job.repository.JobRepository;
@@ -27,16 +28,16 @@ public class JobService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Job> getJobs(Pageable pageable) {
-        return jobRepository.findAll(pageable);
+    public Page<Job> getJobs(ProjectContext context, Pageable pageable) {
+        return jobRepository.findAllByProjectId(context.getProjectId(), pageable);
     }
 
     @Transactional
-    public Job createJob(UUID assetId, UUID pipelineId) {
+    public Job createJob(UUID assetId, UUID pipelineId, ProjectContext context) {
         Instant now = Instant.now();
-        Job job = new Job(UUID.randomUUID(), assetId, JobStatus.QUEUED, now, now);
+        Job job = new Job(UUID.randomUUID(), assetId, JobStatus.QUEUED, now, now, context.getProjectId());
         
-        com.sluice.api.pipeline.domain.PipelineVersion version = pipelineService.getLatestPublishedVersion(pipelineId)
+        com.sluice.api.pipeline.domain.PipelineVersion version = pipelineService.getLatestPublishedVersion(pipelineId, context)
                 .orElseThrow(() -> new IllegalArgumentException("No published version found for pipeline: " + pipelineId));
         
         job.setPipelineVersionId(version.getId());
@@ -47,12 +48,27 @@ public class JobService {
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public Optional<Job> getJob(UUID id) {
+    public Optional<Job> getJob(UUID id, ProjectContext context) {
+        return jobRepository.findByIdAndProjectId(id, context.getProjectId());
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public Optional<Job> getJobSystem(UUID id) {
         return jobRepository.findById(id);
     }
 
     @org.springframework.transaction.annotation.Transactional
-    public Job updateJobStatus(UUID id, JobStatus newStatus) {
+    public Job updateJobStatus(UUID id, JobStatus newStatus, ProjectContext context) {
+        Job job = jobRepository.findByIdAndProjectId(id, context.getProjectId())
+                .orElseThrow(() -> new RuntimeException("Job not found: " + id));
+        job.setStatus(newStatus);
+        Job savedJob = jobRepository.save(job);
+        eventPublisher.publishEvent(new com.sluice.api.job.event.JobStatusChangedEvent(this, savedJob.getId(), savedJob.getStatus()));
+        return savedJob;
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public Job updateJobStatusSystem(UUID id, JobStatus newStatus) {
         Job job = jobRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Job not found: " + id));
         job.setStatus(newStatus);

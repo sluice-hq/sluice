@@ -11,6 +11,7 @@ import com.sluice.api.storage.StorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import com.sluice.api.auth.domain.ProjectContext;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,16 +33,16 @@ public class AssetService {
         this.jobPublisher = jobPublisher;
     }
 
-    public Page<Asset> getAssets(Pageable pageable) {
-        return assetRepository.findAll(pageable);
+    public Page<Asset> getAssets(ProjectContext context, Pageable pageable) {
+        return assetRepository.findAllByProjectId(context.getProjectId(), pageable);
     }
 
-    public Optional<Asset> getAsset(UUID assetId) {
-        return assetRepository.findById(assetId);
+    public Optional<Asset> getAsset(UUID assetId, ProjectContext context) {
+        return assetRepository.findByIdAndProjectId(assetId, context.getProjectId());
     }
 
     @Transactional
-    public UploadAssetResponse uploadAsset(MultipartFile file, java.util.UUID pipelineId) {
+    public UploadAssetResponse uploadAsset(MultipartFile file, java.util.UUID pipelineId, ProjectContext context) {
         String fileUrl;
         try {
             fileUrl = storageService.uploadFile(file);
@@ -58,13 +59,14 @@ public class AssetService {
                     file.getContentType(),
                     fileUrl,
                     Asset.UploadStatus.COMPLETED,
-                    Instant.now()
+                    Instant.now(),
+                    context.getProjectId()
             );
 
             // The save operation is transactional by default in Spring Data JPA
             Asset savedAsset = assetRepository.save(asset);
             
-            Job job = jobService.createJob(savedAsset.getId(), pipelineId);
+            Job job = jobService.createJob(savedAsset.getId(), pipelineId, context);
             jobPublisher.publishJob(new JobMessage(job.getId(), savedAsset.getId()));
             
             return new UploadAssetResponse(
@@ -90,7 +92,7 @@ public class AssetService {
         }
     }
 
-    public com.sluice.api.asset.dto.UploadUrlResponse requestUploadUrl(String filename, String contentType, long size) {
+    public com.sluice.api.asset.dto.UploadUrlResponse requestUploadUrl(String filename, String contentType, long size, ProjectContext context) {
         String extension = "";
         if (filename != null && filename.contains(".")) {
             extension = filename.substring(filename.lastIndexOf("."));
@@ -109,7 +111,8 @@ public class AssetService {
                 contentType,
                 storageUrl,
                 Asset.UploadStatus.PENDING,
-                Instant.now()
+                Instant.now(),
+                context.getProjectId()
         );
         
         assetRepository.save(asset);
@@ -118,8 +121,8 @@ public class AssetService {
     }
 
     @Transactional
-    public UploadAssetResponse completeUpload(UUID assetId, UUID pipelineId) {
-        Asset asset = assetRepository.findById(assetId)
+    public UploadAssetResponse completeUpload(UUID assetId, UUID pipelineId, ProjectContext context) {
+        Asset asset = assetRepository.findByIdAndProjectId(assetId, context.getProjectId())
                 .orElseThrow(() -> new IllegalArgumentException("Asset not found"));
 
         if (asset.getUploadStatus() != Asset.UploadStatus.PENDING) {
@@ -138,7 +141,7 @@ public class AssetService {
         asset.setUploadStatus(Asset.UploadStatus.COMPLETED);
         Asset savedAsset = assetRepository.save(asset);
         
-        Job job = jobService.createJob(savedAsset.getId(), pipelineId);
+        Job job = jobService.createJob(savedAsset.getId(), pipelineId, context);
         jobPublisher.publishJob(new JobMessage(job.getId(), savedAsset.getId()));
         
         return new UploadAssetResponse(

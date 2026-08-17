@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.sluice.api.pipeline.domain.Pipeline;
 import com.sluice.api.pipeline.domain.PipelineVersion;
 import com.sluice.api.pipeline.service.PipelineService;
+import com.sluice.api.auth.domain.ProjectContext;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,26 +24,31 @@ public class PipelineController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Pipeline createPipeline(@RequestBody PipelineCreateRequest request) {
-        return pipelineService.createPipeline(request.name(), request.description());
+    public Pipeline createPipeline(
+            @RequestBody PipelineCreateRequest request,
+            @AuthenticationPrincipal ProjectContext context) {
+        return pipelineService.createPipeline(request.name(), request.description(), context);
     }
 
     @GetMapping
-    public List<Pipeline> getPipelines() {
-        return pipelineService.getAllPipelines();
+    public List<Pipeline> getPipelines(@AuthenticationPrincipal ProjectContext context) {
+        return pipelineService.getAllPipelines(context);
     }
 
     @PostMapping("/{pipelineId}/versions")
     @ResponseStatus(HttpStatus.CREATED)
     public PipelineVersion createVersion(
             @PathVariable UUID pipelineId,
-            @RequestBody VersionCreateRequest request) {
-        return pipelineService.createDraftVersion(pipelineId, request.expectedInputMimeType(), request.definition());
+            @RequestBody VersionCreateRequest request,
+            @AuthenticationPrincipal ProjectContext context) {
+        return pipelineService.createDraftVersion(pipelineId, request.expectedInputMimeType(), request.definition(), context);
     }
 
     @PostMapping("/versions/{versionId}/publish")
-    public PipelineVersion publishVersion(@PathVariable UUID versionId) {
-        return pipelineService.publishVersion(versionId);
+    public PipelineVersion publishVersion(
+            @PathVariable UUID versionId,
+            @AuthenticationPrincipal ProjectContext context) {
+        return pipelineService.publishVersion(versionId, context);
     }
 
     public record PipelineCreateRequest(String name, String description) {}
