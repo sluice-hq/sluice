@@ -30,17 +30,24 @@ public class Job {
 
     @Column(name = "pipeline_version_id")
     private UUID pipelineVersionId;
+    
+    @Column(name = "project_id", nullable = false)
+    private UUID projectId;
 
     public Job() {
     }
 
-    public Job(UUID id, UUID assetId, JobStatus status, Instant createdAt, Instant updatedAt) {
+    public Job(UUID id, UUID assetId, JobStatus status, Instant createdAt, Instant updatedAt, UUID projectId) {
         this.id = id;
         this.assetId = assetId;
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.projectId = projectId;
     }
+
+    public UUID getProjectId() { return projectId; }
+    public void setProjectId(UUID projectId) { this.projectId = projectId; }
 
     public UUID getId() {
         return id;

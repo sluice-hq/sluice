@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import com.sluice.api.auth.domain.ProjectContext;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import java.util.UUID;
 
@@ -25,8 +27,10 @@ public class JobController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<JobResponse>> getJobs(Pageable pageable) {
-        Page<JobResponse> jobs = jobService.getJobs(pageable).map(job -> new JobResponse(
+    public ResponseEntity<Page<JobResponse>> getJobs(
+            @AuthenticationPrincipal ProjectContext context,
+            Pageable pageable) {
+        Page<JobResponse> jobs = jobService.getJobs(context, pageable).map(job -> new JobResponse(
                 job.getId(),
                 job.getAssetId(),
                 job.getStatus().name(),
@@ -37,8 +41,10 @@ public class JobController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<JobResponse> getJobStatus(@PathVariable UUID id) {
-        return jobService.getJob(id)
+    public ResponseEntity<JobResponse> getJobStatus(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal ProjectContext context) {
+        return jobService.getJob(id, context)
                 .map(job -> new JobResponse(
                         job.getId(),
                         job.getAssetId(),

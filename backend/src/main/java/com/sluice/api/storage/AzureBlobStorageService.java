@@ -16,13 +16,19 @@ public class AzureBlobStorageService implements StorageService {
 
     private final BlobServiceClient blobServiceClient;
     private final String containerName;
+    private final long uploadSasExpiryHours;
+    private final long downloadSasExpiryHours;
     private BlobContainerClient containerClient;
 
     public AzureBlobStorageService(
             BlobServiceClient blobServiceClient,
-            @Value("${azure.storage.container-name:assets}") String containerName) {
+            @Value("${azure.storage.container-name:assets}") String containerName,
+            @Value("${azure.storage.sas.upload-expiry-hours:1}") long uploadSasExpiryHours,
+            @Value("${azure.storage.sas.download-expiry-hours:24}") long downloadSasExpiryHours) {
         this.blobServiceClient = blobServiceClient;
         this.containerName = containerName;
+        this.uploadSasExpiryHours = uploadSasExpiryHours;
+        this.downloadSasExpiryHours = downloadSasExpiryHours;
     }
 
     @PostConstruct
@@ -116,9 +122,30 @@ public class AzureBlobStorageService implements StorageService {
                 .setCreatePermission(true);
         
         com.azure.storage.blob.sas.BlobServiceSasSignatureValues values = new com.azure.storage.blob.sas.BlobServiceSasSignatureValues(
-                java.time.OffsetDateTime.now().plusHours(1),
+                java.time.OffsetDateTime.now().plusHours(uploadSasExpiryHours),
                 permission
         ).setContentType(contentType);
+        
+        String sasToken = blobClient.generateSas(values);
+        return blobClient.getBlobUrl() + "?" + sasToken;
+    }
+
+    @Override
+    public String generateDownloadUrl(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            throw new IllegalArgumentException("File URL cannot be null or empty");
+        }
+        String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+        String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
+        BlobClient blobClient = containerClient.getBlobClient(blobName);
+        
+        com.azure.storage.blob.sas.BlobSasPermission permission = new com.azure.storage.blob.sas.BlobSasPermission()
+                .setReadPermission(true);
+        
+        com.azure.storage.blob.sas.BlobServiceSasSignatureValues values = new com.azure.storage.blob.sas.BlobServiceSasSignatureValues(
+                java.time.OffsetDateTime.now().plusHours(downloadSasExpiryHours),
+                permission
+        );
         
         String sasToken = blobClient.generateSas(values);
         return blobClient.getBlobUrl() + "?" + sasToken;

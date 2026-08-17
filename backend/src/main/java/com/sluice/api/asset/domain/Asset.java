@@ -20,6 +20,7 @@ public class Asset {
     @Enumerated(EnumType.STRING)
     private UploadStatus uploadStatus;
     private Instant createdAt;
+    private UUID projectId;
 
     @jakarta.persistence.ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @jakarta.persistence.JoinColumn(name = "parent_asset_id")
@@ -30,9 +31,9 @@ public class Asset {
         COMPLETED
     }
 
-    public Asset() {}
+    protected Asset() {}
 
-    public Asset(UUID id, String filename, long size, String contentType, String storageUrl, UploadStatus uploadStatus, Instant createdAt) {
+    public Asset(UUID id, String filename, long size, String contentType, String storageUrl, UploadStatus uploadStatus, Instant createdAt, UUID projectId) {
         this.id = id;
         this.filename = filename;
         this.size = size;
@@ -40,6 +41,7 @@ public class Asset {
         this.storageUrl = storageUrl;
         this.uploadStatus = uploadStatus;
         this.createdAt = createdAt;
+        this.projectId = projectId;
     }
 
     // Getters and Setters
@@ -64,6 +66,9 @@ public class Asset {
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
+    public UUID getProjectId() { return projectId; }
+    public void setProjectId(UUID projectId) { this.projectId = projectId; }
 
     public Asset getParentAsset() { return parentAsset; }
     public void setParentAsset(Asset parentAsset) { this.parentAsset = parentAsset; }

@@ -1,6 +1,7 @@
 package com.sluice.api.pipeline.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.sluice.api.auth.domain.ProjectContext;
 import com.sluice.api.pipeline.domain.Pipeline;
 import com.sluice.api.pipeline.domain.PipelineVersion;
 import com.sluice.api.pipeline.repository.PipelineRepository;
@@ -28,19 +29,19 @@ public class PipelineService {
     }
 
     @Transactional
-    public Pipeline createPipeline(String name, String description) {
-        Pipeline pipeline = new Pipeline(UUID.randomUUID(), name, description);
+    public Pipeline createPipeline(String name, String description, ProjectContext context) {
+        Pipeline pipeline = new Pipeline(UUID.randomUUID(), name, description, context.getProjectId());
         return pipelineRepository.save(pipeline);
     }
 
     @Transactional(readOnly = true)
-    public List<Pipeline> getAllPipelines() {
-        return pipelineRepository.findAll();
+    public List<Pipeline> getAllPipelines(ProjectContext context) {
+        return pipelineRepository.findByProjectId(context.getProjectId());
     }
 
     @Transactional
-    public PipelineVersion createDraftVersion(UUID pipelineId, String expectedInputMimeType, JsonNode definition) {
-        Pipeline pipeline = pipelineRepository.findById(pipelineId)
+    public PipelineVersion createDraftVersion(UUID pipelineId, String expectedInputMimeType, JsonNode definition, ProjectContext context) {
+        Pipeline pipeline = pipelineRepository.findByIdAndProjectId(pipelineId, context.getProjectId())
                 .orElseThrow(() -> new IllegalArgumentException("Pipeline not found"));
 
         int nextVersion = pipelineVersionRepository.getMaxVersionNumber(pipelineId) + 1;
@@ -57,9 +58,13 @@ public class PipelineService {
     }
 
     @Transactional
-    public PipelineVersion publishVersion(UUID versionId) {
+    public PipelineVersion publishVersion(UUID versionId, ProjectContext context) {
         PipelineVersion version = pipelineVersionRepository.findById(versionId)
                 .orElseThrow(() -> new IllegalArgumentException("PipelineVersion not found"));
+        
+        if (!version.getPipeline().getProjectId().equals(context.getProjectId())) {
+            throw new IllegalArgumentException("PipelineVersion not found");
+        }
 
         if (!"DRAFT".equals(version.getStatus())) {
             throw new IllegalStateException("Only DRAFT versions can be published.");
@@ -72,7 +77,10 @@ public class PipelineService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<PipelineVersion> getLatestPublishedVersion(UUID pipelineId) {
-        return pipelineVersionRepository.findFirstByPipelineIdAndStatusOrderByVersionNumberDesc(pipelineId, "PUBLISHED");
+    public Optional<PipelineVersion> getLatestPublishedVersion(UUID pipelineId, ProjectContext context) {
+        // First ensure the pipeline belongs to the project
+        Pipeline pipeline = pipelineRepository.findByIdAndProjectId(pipelineId, context.getProjectId())
+                .orElseThrow(() -> new IllegalArgumentException("Pipeline not found"));
+        return pipelineVersionRepository.findFirstByPipelineIdAndStatusOrderByVersionNumberDesc(pipeline.getId(), "PUBLISHED");
     }
 }

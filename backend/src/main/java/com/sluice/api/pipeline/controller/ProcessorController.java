@@ -1,6 +1,6 @@
 package com.sluice.api.pipeline.controller;
 
-import com.sluice.api.pipeline.ProcessorMetadata;
+
 import com.sluice.api.pipeline.ProcessorRegistry;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

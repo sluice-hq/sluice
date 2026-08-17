@@ -45,6 +45,13 @@ public interface StorageService {
     String generateUploadUrl(String blobName, String contentType);
 
     /**
+     * Generates a direct download URL (SAS) for a file.
+     * @param fileUrl The URL of the blob.
+     * @return The download URL.
+     */
+    String generateDownloadUrl(String fileUrl);
+
+    /**
      * Checks if a file exists.
      * @param fileUrl The URL of the file.
      * @return true if the file exists.
