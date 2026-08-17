@@ -1,33 +1,33 @@
 # Sluice
 
-**Sluice** is an open-source, cloud-native media infrastructure platform designed to handle complex media processing workflows at scale. It provides a functional, end-to-end media pipeline - from secure, direct-to-storage uploads to distributed background processing and real-time dashboard updates.
+**Sluice** is an open-source, cloud-native media infrastructure platform designed to handle complex media processing workflows at scale. It provides a functional, end-to-end media pipeline from secure, direct-to-storage uploads to distributed background processing and real-time dashboard updates.
 
 By offering a modular Pipeline Engine and pluggable architecture, Sluice executes media processing workflows asynchronously, keeping the control API highly responsive and paving the way for fully user-configurable pipelines in future releases.
 
 ## 🚀 Key Features
 
 - **Pipeline Engine:** Execute ordered processing pipelines through a modular, extensible architecture.
-- **Asynchronous Execution:** Long-running jobs are executed asynchronously by distributed workers, ensuring the control API remains highly responsive.
-- **Pluggable Processors:** Easily add new processors for Image Optimization, Format Conversion, OCR, AI Captions, and Metadata Extraction.
-- **Cloud-Native by Design:** Built for Kubernetes, leveraging distributed messaging and storage.
+- **Asynchronous Execution:** Long-running jobs are executed asynchronously by stateless workers, allowing the processing layer to scale horizontally.
+- **Pluggable Processors:** Processors can be added for capabilities such as image optimisation, format conversion, OCR, AI captions, and metadata extraction.
+- **Cloud-oriented architecture:** Designed for cloud storage, asynchronous workers, and horizontal scaling, with Kubernetes deployment planned for a future milestone.
 
 ---
 
 ## 🏗️ Target Architecture
 
-The diagram below represents the long-term target architecture that future milestones will progressively implement. Once complete, Sluice will employ an event-driven, decoupled architecture to ensure horizontal scalability and resilience. 
+The diagram below represents the long-term target architecture that future milestones will progressively implement. Once complete, Sluice will employ an event-driven, decoupled architecture to ensure horizontal scalability and resilience.
 
-*Note: The current implementation features a production-quality Next.js dashboard, direct client-to-storage ingestion via Azure SAS URLs, and real-time job updates via Server-Sent Events (SSE). On the backend, it leverages Azure Blob Storage, PostgreSQL, and RabbitMQ to drive asynchronous job processing through a dynamic, JSON-configured Pipeline Engine with reliable messaging (retries, idempotency, and dead-letter queues). Future work includes media governance, AI-assisted orchestration, and cloud deployment.*
+_Note: The platform is being extended with a Next.js developer dashboard, direct client-to-storage ingestion via Azure SAS URLs, and real-time job updates via Server-Sent Events (SSE). On the backend, it leverages Azure Blob Storage, PostgreSQL, and RabbitMQ to drive asynchronous job processing through a dynamic, JSON-configured Pipeline Engine with reliable messaging (retries, idempotency, and dead-letter queues)._
 
 ```mermaid
 graph TD
     Client[Client / Dashboard] -->|API Requests| API[Spring Boot API]
     API -->|Reads/Writes State| DB[(PostgreSQL)]
     API -->|Publishes Jobs| MQ[RabbitMQ]
-    
+
     MQ -->|Consumes Jobs| W1[Worker Node 1]
     MQ -->|Consumes Jobs| W2[Worker Node 2]
-    
+
     W1 <-->|Streams/Saves Assets| Storage[(Azure Blob Storage)]
     W2 <-->|Streams/Saves Assets| Storage
     W1 -->|Updates Status| DB
@@ -35,6 +35,7 @@ graph TD
 ```
 
 ### Core Concepts
+
 - **Asset**: A file ingested into Sluice.
 - **Pipeline**: A generic workflow definition (e.g. "Thumbnail Generator").
 - **PipelineVersion**: An immutable, JSON-configured execution graph that strictly enforces MIME type compatibility.
@@ -47,17 +48,12 @@ graph TD
 
 ## 🛠️ Technology Stack
 
-Designed as a modern, enterprise-grade system, Sluice leverages the following technologies:
-
-| Domain | Technology |
-|---|---|
-| **Backend Core** | Java 25, Spring Boot 4, Spring Framework 7, Gradle |
-| **Frontend Dashboard** | Next.js, React, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, Zod |
-| **Database & Migrations** | PostgreSQL, Flyway |
-| **Messaging & Storage** | RabbitMQ, Azure Blob Storage |
-| **Infrastructure** | Docker, Azure, Kubernetes (AKS), Terraform |
-| **Observability** | OpenTelemetry, Prometheus, Grafana, Loki |
-| **Testing** | JUnit, Mockito, Testcontainers |
+- Java 17, Spring Boot 4, Gradle
+- Next.js, React, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, Zod
+- PostgreSQL, Flyway
+- RabbitMQ, Azure Blob Storage
+- Docker
+- JUnit, Mockito
 
 ---
 
@@ -66,13 +62,16 @@ Designed as a modern, enterprise-grade system, Sluice leverages the following te
 To manage complexity and optimize for learning distributed systems fundamentals, Sluice is being built incrementally.
 
 ### Phase 1: The Vertical Slice (Completed)
+
 **Goal:** Establish the core ingestion API.
 **Scope:** Upload an asset synchronously via the Spring Boot API, persist the raw file directly to Azure Blob Storage, save metadata to PostgreSQL, and return the generated Asset ID.
-*Note: This phase intentionally omits queues to establish a solid baseline for asset storage.*
+_Note: This phase intentionally omits queues to establish a solid baseline for asset storage._
 
 ### Phase 2: Asynchronous Workers (Completed)
+
 **Goal:** Introduce the execution layer.
 **Scope:**
+
 - RabbitMQ integration
 - Job creation and persistence
 - Asynchronous background workers
@@ -81,8 +80,10 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 - Basic background processing
 
 ### Phase 3: Pipeline Orchestration (Completed)
+
 **Goal:** Introduce a modular processing architecture.
-**Scope:** 
+**Scope:**
+
 - Pipeline Engine
 - Processor abstraction
 - ProcessingContext
@@ -93,31 +94,39 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 - Extensible processor architecture
 
 ### Phase 4: Resiliency & Reliability (Completed)
+
 **Goal:** Handle distributed failures gracefully.
-**Scope:** 
+**Scope:**
+
 - Dead Letter Queues (DLQs)
 - Exponential backoff retries
 - Message idempotency guarantees
 
 ### Phase 5: Real-time Updates & Direct Uploads (Completed)
+
 **Goal:** Optimize client performance.
-**Scope:** 
+**Scope:**
+
 - Direct-to-storage uploads using Azure SAS URLs
 - Real-time job status updates using Server-Sent Events (SSE)
 
 ### Phase 6: Dashboard & User Experience (Completed)
+
 **Goal:** Build the primary web interface for Sluice.
 **Scope:**
+
 - Dashboard overview with live platform metrics
 - Asset management dashboard
 - Job management dashboard
 - Direct uploads using Azure SAS URLs
 - Live job status updates via Server-Sent Events (SSE)
-- Professional Next.js frontend architecture
+- Next.js dashboard and frontend architecture
 
 ### Phase 6.5: Processing Engine Hardening & Media Foundation (Completed)
+
 **Goal:** Harden the backend engine and prepare for configurable workflows.
 **Scope:**
+
 - Transactional boundaries and concurrency safeguards
 - `@Version` optimistic locking for safe job transitions
 - Self-healing orphan and zombie job recovery services
@@ -125,26 +134,45 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 - Extensible `ProcessorResult` contract and core MIME/Resize/WebP processors
 
 ### Phase 7: Dynamic Pipeline Versioning (Completed)
+
 **Goal:** Allow developers to define custom processing workflows.
 **Scope:**
+
 - JSON pipeline definitions
 - Configurable processors
 - Pipeline validation
-- User-defined pipeline execution
+- Developer-defined pipeline execution
 
-### Phase 8: Media Governance & AI (Current)
-**Goal:** Introduce intelligent media orchestration and governance.
+### Phase 8: Productisation & API Security (Completed)
+
+**Goal:** Introduce multi-tenant isolation and secure M2M authentication.
 **Scope:**
-- AI-assisted pipeline generation
-- Media governance policies
-- Content moderation
-- OCR and document understanding
-- PII detection and redaction
-- Face detection and anonymisation
 
-### Phase 9: Cloud Infrastructure & DevOps
+- Project-level tenant isolation
+- API key authentication for machine-to-machine integrations
+- JWT authentication for human users
+- Strict boundary checks across data APIs
+
+**Result:** External applications can authenticate with a project API key while resources remain isolated by project.
+
+### Phase 9: Developer Platform & Dashboard (Current)
+
+**Goal:** Build a fully usable Developer Platform.
+**Scope:**
+
+- Developer Signup and Login
+- Dashboard Project Management
+- API Key Generation and Revocation
+- Backend-for-Frontend (BFF) authentication via Next.js
+- HttpOnly Cookie Session Management
+
+**Result:** Developers can manage projects and API credentials through the Sluice dashboard.
+
+### Phase 10: Cloud Infrastructure & DevOps
+
 **Goal:** Deploy Sluice as a production-ready cloud platform.
 **Scope:**
+
 - Azure deployment
 - Azure Kubernetes Service (AKS)
 - Terraform infrastructure
@@ -153,27 +181,9 @@ To manage complexity and optimize for learning distributed systems fundamentals,
 - Production configuration
 - OpenTelemetry, Prometheus, and Grafana integration
 
-### 🚧 More Phases Coming Soon
+### 🚧 Future Direction
 
-The roadmap will continue to evolve as Sluice grows, with future milestones expanding the platform across areas such as scalability, AI, governance, and developer experience.
-
----
-
-## 🔮 Future Vision
-
-Sluice aims to evolve beyond a media processing platform into an intelligent media orchestration and governance platform.
-
-Future releases will support policy-driven and AI-assisted pipeline orchestration capable of automatically selecting appropriate processing workflows based on developer intent. Example future capabilities include:
-
-- AI-assisted pipeline generation
-- Media governance
-- Content moderation
-- OCR and document understanding
-- Face detection and anonymisation
-- PII detection and redaction
-- Intelligent processor selection
-
-*(Note: These features are part of the long-term vision for the platform and are not yet implemented.)*
+Sluice aims to evolve beyond a media processing platform into an intelligent media orchestration and governance platform. Future milestones will expand the platform across areas such as scalability, AI-assisted orchestration, media governance, and advanced developer experience.
 
 ---
 
