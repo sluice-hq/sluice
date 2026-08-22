@@ -93,7 +93,7 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
           
           {/* Pipeline execution logs will go here in the future */}
           <div className="bg-gray-900 rounded-lg p-6 font-mono text-sm text-gray-300 shadow-inner">
-            <p className="text-gray-500 mb-4">// Execution Logs</p>
+            <p className="text-gray-500 mb-4">{'// Execution Logs'}</p>
             <p className="text-green-400">{new Date(job.createdAt).toISOString()} - Job created</p>
             {job.status !== 'QUEUED' && (
               <p className="text-green-400">{new Date(job.updatedAt).toISOString()} - Job status changed to {job.status}</p>

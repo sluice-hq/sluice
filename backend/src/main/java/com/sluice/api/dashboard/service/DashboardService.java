@@ -11,6 +11,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import java.util.List;
 import java.util.stream.Collectors;
+import com.sluice.api.auth.domain.ProjectContext;
 
 @Service
 public class DashboardService {
@@ -22,15 +23,16 @@ public class DashboardService {
         this.jobRepository = jobRepository;
     }
 
-    public DashboardResponse getDashboardOverview() {
-        long totalAssets = assetRepository.count();
-        long totalJobs = jobRepository.count();
+    public DashboardResponse getDashboardOverview(ProjectContext context) {
+        java.util.UUID projectId = context.getProjectId();
+        long totalAssets = assetRepository.countByProjectId(projectId);
+        long totalJobs = jobRepository.countByProjectId(projectId);
         
         long runningJobs = 0;
         long completedJobs = 0;
         long failedJobs = 0;
         
-        List<Object[]> statusCounts = jobRepository.countJobsByStatus();
+        List<Object[]> statusCounts = jobRepository.countJobsByStatusAndProjectId(projectId);
         for (Object[] row : statusCounts) {
             JobStatus status = (JobStatus) row[0];
             long count = ((Number) row[1]).longValue();
@@ -43,7 +45,8 @@ public class DashboardService {
             }
         }
 
-        List<AssetResponse> recentAssets = assetRepository.findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")))
+        List<AssetResponse> recentAssets = assetRepository.findAllByProjectId(
+                        projectId, PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")))
                 .stream()
                 .map(asset -> new AssetResponse(
                         asset.getId(),
@@ -56,7 +59,8 @@ public class DashboardService {
                 ))
                 .collect(Collectors.toList());
 
-        List<JobResponse> recentJobs = jobRepository.findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")))
+        List<JobResponse> recentJobs = jobRepository.findAllByProjectId(
+                        projectId, PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")))
                 .stream()
                 .map(job -> new JobResponse(
                         job.getId(),

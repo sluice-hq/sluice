@@ -45,6 +45,8 @@ public class JobWorker {
 
     @RabbitListener(queues = RabbitMqConfig.QUEUE_NAME)
     public void processJob(JobMessage message) throws Exception {
+        com.sluice.api.pipeline.MediaResource finalResource = null;
+        ProcessingContext processingContext = null;
         try {
             // Fetch current job state
             Job job = jobService.getJobSystem(message.getJobId())
@@ -57,8 +59,13 @@ public class JobWorker {
 
             System.out.println("Processing Job: " + job.getId());
 
-            // Update status to RUNNING (this is atomic via JPA @Version)
-            job = jobService.updateJobStatusSystem(message.getJobId(), JobStatus.RUNNING);
+            // Atomically claim QUEUED -> RUNNING so duplicate deliveries cannot
+            // execute the same job in parallel.
+            job = jobService.claimQueuedJob(message.getJobId()).orElse(null);
+            if (job == null) {
+                System.out.println("Job " + message.getJobId() + " was claimed by another worker.");
+                return;
+            }
 
             // Fetch the asset
             Asset asset = assetRepository.findById(message.getAssetId())
@@ -66,6 +73,7 @@ public class JobWorker {
 
             // Download file as MediaResource
             com.sluice.api.pipeline.MediaResource currentResource = storageService.downloadFile(asset.getStorageUrl());
+            finalResource = currentResource;
             
             // Resolve pipeline version
             java.util.UUID pipelineVersionId = job.getPipelineVersionId();
@@ -76,12 +84,10 @@ public class JobWorker {
 
             // Create processing context and run pipeline
             ProcessingContext context = new ProcessingContext(job, asset, currentResource);
+            processingContext = context;
             
-            try {
-                pipelineEngine.execute(pipeline, context);
-            } finally {
-                // PipelineEngine tracks and cleans resources in its finally block
-            }
+            pipelineEngine.execute(pipeline, context);
+            finalResource = context.getCurrentResource();
 
             // Save new derived assets if the pipeline created a new resource
             if (context.getCurrentResource() != currentResource && context.getCurrentResource() instanceof com.sluice.api.pipeline.FileMediaResource fmr) {
@@ -105,6 +111,7 @@ public class JobWorker {
                             job.getProjectId()
                     );
                     derived.setParentAsset(asset);
+                    derived.setProducingJobId(job.getId());
                     assetRepository.save(derived);
                     System.out.println("Created derived asset " + derived.getId() + " from job " + job.getId());
                 }
@@ -115,11 +122,19 @@ public class JobWorker {
         } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
             System.out.println("Job " + message.getJobId() + " overridden by another process (Optimistic Lock). Aborting.");
         } catch (Exception e) {
-            System.err.println("Job " + message.getJobId() + " failed: " + e.getMessage());
+            System.err.println("Job " + message.getJobId() + " attempt failed: " + e.getMessage());
             try {
-                jobService.updateJobStatusSystem(message.getJobId(), JobStatus.FAILED);
+                jobService.requeueRunningJob(message.getJobId());
             } catch (Exception updateEx) {
-                System.err.println("Could not update job to FAILED: " + updateEx.getMessage());
+                System.err.println("Could not reset job for retry: " + updateEx.getMessage());
+            }
+            throw e;
+        } finally {
+            com.sluice.api.pipeline.MediaResource resourceToClean = processingContext != null
+                    ? processingContext.getCurrentResource()
+                    : finalResource;
+            if (resourceToClean != null) {
+                resourceToClean.cleanup();
             }
         }
     }

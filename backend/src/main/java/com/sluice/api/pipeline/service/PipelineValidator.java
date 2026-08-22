@@ -3,6 +3,7 @@ package com.sluice.api.pipeline.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sluice.api.pipeline.ProcessorMetadata;
 import com.sluice.api.pipeline.ProcessorRegistry;
+import com.sluice.api.pipeline.MediaTypeMatcher;
 import com.sluice.api.pipeline.domain.PipelineVersion;
 import org.springframework.stereotype.Component;
 
@@ -35,7 +36,7 @@ public class PipelineValidator {
             // Validate that the processor accepts the current MIME type
             String finalCurrentMimeType = currentMimeType;
             boolean accepts = metadata.acceptedMimeTypes().stream()
-                    .anyMatch(accepted -> finalCurrentMimeType.startsWith(accepted.replace("*", "")) || "*/*".equals(accepted));
+                    .anyMatch(accepted -> MediaTypeMatcher.matches(finalCurrentMimeType, accepted));
 
             if (!accepts && !currentMimeType.equals("*/*")) {
                 throw new IllegalArgumentException(String.format("Processor '%s' does not accept MIME type '%s'", processorName, currentMimeType));

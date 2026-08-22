@@ -6,6 +6,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.sluice.api.auth.domain.ProjectContext;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 @RestController
 @RequestMapping("/api/v1/dashboard")
@@ -18,7 +20,7 @@ public class DashboardController {
     }
 
     @GetMapping
-    public ResponseEntity<DashboardResponse> getDashboard() {
-        return ResponseEntity.ok(dashboardService.getDashboardOverview());
+    public ResponseEntity<DashboardResponse> getDashboard(@AuthenticationPrincipal ProjectContext context) {
+        return ResponseEntity.ok(dashboardService.getDashboardOverview(context));
     }
 }

@@ -11,5 +11,11 @@ import java.util.UUID;
 @Repository
 public interface PipelineRepository extends JpaRepository<Pipeline, UUID> {
     Optional<Pipeline> findByIdAndProjectId(UUID id, UUID projectId);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("SELECT p FROM Pipeline p WHERE p.id = :id AND p.projectId = :projectId")
+    Optional<Pipeline> findByIdAndProjectIdForUpdate(
+            @org.springframework.data.repository.query.Param("id") UUID id,
+            @org.springframework.data.repository.query.Param("projectId") UUID projectId);
     List<Pipeline> findByProjectId(UUID projectId);
 }

@@ -18,17 +18,23 @@ public class AzureBlobStorageService implements StorageService {
     private final String containerName;
     private final long uploadSasExpiryHours;
     private final long downloadSasExpiryHours;
+    private final boolean configureCors;
+    private final String corsAllowedOrigins;
     private BlobContainerClient containerClient;
 
     public AzureBlobStorageService(
             BlobServiceClient blobServiceClient,
             @Value("${azure.storage.container-name:assets}") String containerName,
             @Value("${azure.storage.sas.upload-expiry-hours:1}") long uploadSasExpiryHours,
-            @Value("${azure.storage.sas.download-expiry-hours:24}") long downloadSasExpiryHours) {
+            @Value("${azure.storage.sas.download-expiry-hours:24}") long downloadSasExpiryHours,
+            @Value("${azure.storage.configure-cors:false}") boolean configureCors,
+            @Value("${azure.storage.cors.allowed-origins:}") String corsAllowedOrigins) {
         this.blobServiceClient = blobServiceClient;
         this.containerName = containerName;
         this.uploadSasExpiryHours = uploadSasExpiryHours;
         this.downloadSasExpiryHours = downloadSasExpiryHours;
+        this.configureCors = configureCors;
+        this.corsAllowedOrigins = corsAllowedOrigins;
     }
 
     @PostConstruct
@@ -38,17 +44,20 @@ public class AzureBlobStorageService implements StorageService {
             containerClient.create();
         }
         
+        if (!configureCors || corsAllowedOrigins.isBlank()) {
+            return;
+        }
+
         com.azure.storage.blob.models.BlobServiceProperties properties = blobServiceClient.getProperties();
         java.util.List<com.azure.storage.blob.models.BlobCorsRule> corsRules = properties.getCors();
         if (corsRules == null) {
             corsRules = new java.util.ArrayList<>();
         }
         
-        // Remove existing rule for localhost:3000 if it exists
-        corsRules.removeIf(rule -> rule.getAllowedOrigins().contains("http://localhost:3000"));
+        corsRules.removeIf(rule -> rule.getAllowedOrigins().equals(corsAllowedOrigins));
         
         com.azure.storage.blob.models.BlobCorsRule corsRule = new com.azure.storage.blob.models.BlobCorsRule()
-                .setAllowedOrigins("http://localhost:3000")
+                .setAllowedOrigins(corsAllowedOrigins)
                 .setAllowedMethods("GET,PUT,OPTIONS,POST")
                 .setAllowedHeaders("*")
                 .setExposedHeaders("*")
@@ -107,10 +116,22 @@ public class AzureBlobStorageService implements StorageService {
         String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
         BlobClient blobClient = containerClient.getBlobClient(blobName);
         
-        java.io.InputStream is = blobClient.openInputStream();
-        long size = blobClient.getProperties().getBlobSize();
-        
-        return new com.sluice.api.pipeline.StreamMediaResource(is, size);
+        java.nio.file.Path tempFile = null;
+        try {
+            tempFile = java.nio.file.Files.createTempFile("sluice-input-", ".bin");
+            blobClient.downloadToFile(tempFile.toString(), true);
+            String contentType = blobClient.getProperties().getContentType();
+            return new com.sluice.api.pipeline.FileMediaResource(tempFile.toFile(), contentType);
+        } catch (Exception e) {
+            if (tempFile != null) {
+                try {
+                    java.nio.file.Files.deleteIfExists(tempFile);
+                } catch (java.io.IOException ignored) {
+                    // Preserve the original download failure.
+                }
+            }
+            throw new RuntimeException("Failed to download blob for processing", e);
+        }
     }
 
     @Override

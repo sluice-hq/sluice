@@ -4,6 +4,7 @@ import com.sluice.api.auth.repository.ApiKeyRepository;
 import com.sluice.api.project.repository.ProjectMemberRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -15,7 +16,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -24,11 +25,16 @@ public class SecurityConfig {
     private final JwtService jwtService;
     private final ProjectMemberRepository projectMemberRepository;
     private final ApiKeyRepository apiKeyRepository;
+    private final List<String> allowedOrigins;
 
-    public SecurityConfig(JwtService jwtService, ProjectMemberRepository projectMemberRepository, ApiKeyRepository apiKeyRepository) {
+    public SecurityConfig(JwtService jwtService, ProjectMemberRepository projectMemberRepository,
+                          ApiKeyRepository apiKeyRepository,
+                          @Value("${sluice.cors.allowed-origins:http://localhost:3000}") String allowedOrigins) {
         this.jwtService = jwtService;
         this.projectMemberRepository = projectMemberRepository;
         this.apiKeyRepository = apiKeyRepository;
+        this.allowedOrigins = List.of(allowedOrigins.split(",")).stream().map(String::trim)
+                .filter(origin -> !origin.isEmpty()).toList();
     }
 
     @Bean
@@ -54,10 +60,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("*")); // Update in prod
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("authorization", "content-type", "x-api-key", "x-project-id"));
-        configuration.setExposedHeaders(Arrays.asList("x-api-key"));
+        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("authorization", "content-type", "x-api-key", "x-project-id"));
+        configuration.setExposedHeaders(List.of("x-api-key"));
+        configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;

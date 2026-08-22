@@ -1,4 +1,6 @@
-export const BASE_URL = 'http://localhost:8080/api/v1';
+import { getAuthHeaders } from '@/lib/auth';
+
+export const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1';
 
 export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;
@@ -6,6 +8,7 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
       ...options.headers,
     },
   });

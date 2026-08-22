@@ -16,8 +16,8 @@ export async function requestUploadUrl(request: UploadUrlRequest): Promise<Uploa
   });
 }
 
-export async function completeUpload(assetId: string): Promise<any> {
-  return fetchApi<any>(`/assets/${assetId}/complete`, {
+export async function completeUpload(assetId: string, pipelineId: string): Promise<unknown> {
+  return fetchApi<unknown>(`/assets/${assetId}/complete?pipelineId=${encodeURIComponent(pipelineId)}`, {
     method: 'POST',
   });
 }

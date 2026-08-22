@@ -110,7 +110,7 @@ public class ProjectIsolationTests {
         mockMvc.perform(get("/api/v1/assets/" + assetA.getId())
                 .header("Authorization", "Bearer " + token)
                 .header("X-Project-ID", projectA.getId().toString()))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
     }
 
     @Test

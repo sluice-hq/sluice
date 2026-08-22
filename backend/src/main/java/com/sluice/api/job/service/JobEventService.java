@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.time.Instant;
 
 @Service
 public class JobEventService {
@@ -44,7 +45,7 @@ public class JobEventService {
                     emitter.send(SseEmitter.event()
                             .id(UUID.randomUUID().toString())
                             .name("JobStatusChanged")
-                            .data(status.name()));
+                            .data(new JobStatusUpdate(jobId, status.name(), Instant.now())));
                             
                     if (status == com.sluice.api.job.domain.JobStatus.COMPLETED || status == com.sluice.api.job.domain.JobStatus.FAILED) {
                         emitter.complete();
@@ -57,4 +58,6 @@ public class JobEventService {
             }
         }
     }
+
+    public record JobStatusUpdate(UUID jobId, String status, Instant timestamp) {}
 }

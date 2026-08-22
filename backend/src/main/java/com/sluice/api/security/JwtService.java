@@ -18,7 +18,7 @@ public class JwtService {
     private final long expirationTime;
 
     public JwtService(
-            @Value("${sluice.security.jwt.secret:defaultSecretKeyForDevelopmentOnlyShouldBeChanged123!}") String secret,
+            @Value("${sluice.security.jwt.secret}") String secret,
             @Value("${sluice.security.jwt.expiration:86400000}") long expirationTime) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes());
         this.expirationTime = expirationTime;

@@ -118,12 +118,8 @@ public class AssetController {
             @PathVariable java.util.UUID assetId, 
             @RequestParam("pipelineId") java.util.UUID pipelineId,
             @AuthenticationPrincipal ProjectContext context) {
-        try {
-            UploadAssetResponse response = assetService.completeUpload(assetId, pipelineId, context);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+        UploadAssetResponse response = assetService.completeUpload(assetId, pipelineId, context);
+        return ResponseEntity.ok(response);
     }
     @GetMapping("/{id}/download")
     public ResponseEntity<?> getDownloadUrl(

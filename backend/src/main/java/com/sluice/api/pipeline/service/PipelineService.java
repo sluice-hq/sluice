@@ -41,7 +41,7 @@ public class PipelineService {
 
     @Transactional
     public PipelineVersion createDraftVersion(UUID pipelineId, String expectedInputMimeType, JsonNode definition, ProjectContext context) {
-        Pipeline pipeline = pipelineRepository.findByIdAndProjectId(pipelineId, context.getProjectId())
+        Pipeline pipeline = pipelineRepository.findByIdAndProjectIdForUpdate(pipelineId, context.getProjectId())
                 .orElseThrow(() -> new IllegalArgumentException("Pipeline not found"));
 
         int nextVersion = pipelineVersionRepository.getMaxVersionNumber(pipelineId) + 1;
@@ -83,4 +83,20 @@ public class PipelineService {
                 .orElseThrow(() -> new IllegalArgumentException("Pipeline not found"));
         return pipelineVersionRepository.findFirstByPipelineIdAndStatusOrderByVersionNumberDesc(pipeline.getId(), "PUBLISHED");
     }
+
+    @Transactional(readOnly = true)
+    public List<PublishedPipeline> getPublishedPipelines(ProjectContext context) {
+        return pipelineRepository.findByProjectId(context.getProjectId()).stream()
+                .map(pipeline -> pipelineVersionRepository
+                        .findFirstByPipelineIdAndStatusOrderByVersionNumberDesc(pipeline.getId(), "PUBLISHED")
+                        .map(version -> new PublishedPipeline(
+                                pipeline.getId(), pipeline.getName(), pipeline.getDescription(),
+                                version.getId(), version.getVersionNumber(), version.getExpectedInputMimeType()))
+                        .orElse(null))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+    }
+
+    public record PublishedPipeline(UUID id, String name, String description,
+                                    UUID versionId, int versionNumber, String expectedInputMimeType) {}
 }
