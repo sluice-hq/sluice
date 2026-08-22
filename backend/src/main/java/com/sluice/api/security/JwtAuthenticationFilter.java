@@ -50,9 +50,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     }
                 }
 
-                // Data APIs are project-scoped. A valid user token without a valid
-                // project selection must not create a partially authenticated context.
-                if (projectId != null) {
+                // A user identity is valid independently of the currently selected project.
+                // Project-scoped services call ProjectContext#getProjectId(), which rejects
+                // requests that have no valid project selection.
+                if (SecurityContextHolder.getContext().getAuthentication() == null) {
                     ProjectContext context = new ProjectContext(projectId, userId, false);
                     UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                             context, null, Collections.emptyList()

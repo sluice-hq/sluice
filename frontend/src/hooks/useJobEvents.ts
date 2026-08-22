@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { BASE_URL } from '@/api/client';
 import { Job } from '@/api/types';
-import { getAuthHeaders } from '@/lib/auth';
 
 export function useJobEvents(jobId: string | undefined) {
   const queryClient = useQueryClient();
@@ -17,7 +16,6 @@ export function useJobEvents(jobId: string | undefined) {
         const response = await fetch(`${BASE_URL}/jobs/${jobId}/events`, {
           headers: {
             Accept: 'text/event-stream',
-            ...getAuthHeaders(),
           },
           cache: 'no-store',
           signal: controller.signal,

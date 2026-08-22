@@ -1,5 +1,7 @@
 package com.sluice.api.auth.domain;
 
+import org.springframework.security.access.AccessDeniedException;
+
 import java.util.UUID;
 
 public class ProjectContext {
@@ -14,6 +16,9 @@ public class ProjectContext {
     }
 
     public UUID getProjectId() {
+        if (projectId == null) {
+            throw new AccessDeniedException("A project must be selected for this operation");
+        }
         return projectId;
     }
     

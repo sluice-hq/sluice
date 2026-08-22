@@ -2,13 +2,16 @@ package com.sluice.api.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -32,6 +35,26 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ProblemDetail handleUnreadableRequest(HttpMessageNotReadableException exc) {
         return problem(HttpStatus.BAD_REQUEST, "Request body is invalid.", "invalid_request_body");
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ProblemDetail handleValidation(MethodArgumentNotValidException exc) {
+        return problem(HttpStatus.BAD_REQUEST, "Request validation failed.", "validation_failed");
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ProblemDetail handleBadCredentials(BadCredentialsException exc) {
+        return problem(HttpStatus.UNAUTHORIZED, "Invalid email or password.", "invalid_credentials");
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(AccessDeniedException exc) {
+        return problem(HttpStatus.FORBIDDEN, "You do not have permission for this operation.", "forbidden");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException exc) {
+        return problem(HttpStatus.CONFLICT, "The request conflicts with an existing resource.", "resource_conflict");
     }
 
     @ExceptionHandler(Exception.class)

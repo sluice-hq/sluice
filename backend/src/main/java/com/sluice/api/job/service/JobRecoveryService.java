@@ -6,6 +6,7 @@ import com.sluice.api.job.repository.JobRepository;
 import com.sluice.api.messaging.RabbitMqConfig;
 import com.sluice.api.messaging.dto.JobMessage;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,7 @@ import java.time.Duration;
 import java.util.List;
 
 @Service
+@Profile("!test")
 public class JobRecoveryService {
 
     private final JobRepository jobRepository;
