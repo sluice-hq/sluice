@@ -1,12 +1,6 @@
 import { Asset, Job } from '@/api/types';
 import { StatusBadge } from './StatusBadge';
 import { FileIcon, FileVideo, FileAudio, FileImage, FileText } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-interface DashboardTablesProps {
-  assets: Asset[];
-  jobs: Job[];
-}
 
 export function RecentAssetsTable({ assets }: { assets: Asset[] }) {
   return (

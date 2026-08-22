@@ -35,6 +35,12 @@ public class PipelineController {
         return pipelineService.getAllPipelines(context);
     }
 
+    @GetMapping("/published")
+    public List<PipelineService.PublishedPipeline> getPublishedPipelines(
+            @AuthenticationPrincipal ProjectContext context) {
+        return pipelineService.getPublishedPipelines(context);
+    }
+
     @PostMapping("/{pipelineId}/versions")
     @ResponseStatus(HttpStatus.CREATED)
     public PipelineVersion createVersion(

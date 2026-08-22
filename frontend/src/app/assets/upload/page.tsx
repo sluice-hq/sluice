@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Upload, X, FileVideo, CheckCircle2, ArrowLeft, Loader2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import { getPublishedPipelines } from '@/api/pipelines';
 
 type UploadStep = 'IDLE' | 'REQUESTING' | 'UPLOADING' | 'VERIFYING' | 'COMPLETED' | 'ERROR';
 
@@ -16,6 +18,11 @@ export default function UploadPage() {
   const [step, setStep] = useState<UploadStep>('IDLE');
   const [error, setError] = useState<string | null>(null);
   const [assetId, setAssetId] = useState<string | null>(null);
+  const [pipelineId, setPipelineId] = useState('');
+  const { data: pipelines = [], isLoading: pipelinesLoading, error: pipelinesError } = useQuery({
+    queryKey: ['pipelines', 'published'],
+    queryFn: getPublishedPipelines,
+  });
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -35,7 +42,7 @@ export default function UploadPage() {
   };
 
   const handleUpload = async () => {
-    if (!file) return;
+    if (!file || !pipelineId) return;
     
     try {
       setStep('REQUESTING');
@@ -68,12 +75,12 @@ export default function UploadPage() {
       setStep('VERIFYING');
       
       // Step 3: Complete upload in Sluice
-      await completeUpload(newAssetId);
+      await completeUpload(newAssetId, pipelineId);
       
       setStep('COMPLETED');
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStep('ERROR');
-      setError(err.message || 'An unexpected error occurred during upload.');
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred during upload.');
     }
   };
 
@@ -125,11 +132,12 @@ export default function UploadPage() {
                   <Upload className="w-8 h-8 text-primary" />
                 </div>
                 <h3 className="text-lg font-medium text-white">Click or drag a file to upload</h3>
-                <p className="text-sm text-muted-foreground mt-1">Video, audio, or image files up to 5GB.</p>
+                <p className="text-sm text-muted-foreground mt-1">JPEG, PNG, GIF, PDF, or MP4 files up to 50 MB.</p>
                 <input 
                   type="file" 
                   id="file-upload" 
                   className="hidden" 
+                  accept="image/jpeg,image/png,image/gif,application/pdf,video/mp4"
                   onChange={handleFileChange}
                 />
               </div>
@@ -181,11 +189,36 @@ export default function UploadPage() {
                   </div>
                 )}
 
+                <div className="space-y-2">
+                  <label htmlFor="pipeline" className="text-sm font-medium">Processing pipeline</label>
+                  <select
+                    id="pipeline"
+                    value={pipelineId}
+                    onChange={(event) => setPipelineId(event.target.value)}
+                    disabled={isUploading || pipelinesLoading}
+                    className="w-full h-10 rounded-md border border-border bg-background px-3 text-sm disabled:opacity-50"
+                    required
+                  >
+                    <option value="">{pipelinesLoading ? 'Loading pipelines…' : 'Select a published pipeline'}</option>
+                    {pipelines.map((pipeline) => (
+                      <option key={pipeline.id} value={pipeline.id}>
+                        {pipeline.name} (v{pipeline.versionNumber}, {pipeline.expectedInputMimeType})
+                      </option>
+                    ))}
+                  </select>
+                  {pipelinesError && (
+                    <p className="text-xs text-status-error">Could not load pipelines. Check API Connection in Settings.</p>
+                  )}
+                  {!pipelinesLoading && !pipelinesError && pipelines.length === 0 && (
+                    <p className="text-xs text-muted-foreground">This project has no published pipelines yet.</p>
+                  )}
+                </div>
+
                 <div className="flex justify-end gap-3 pt-4 border-t border-border">
                   <Button variant="outline" onClick={() => router.back()} disabled={isUploading}>
                     Cancel
                   </Button>
-                  <Button onClick={handleUpload} disabled={isUploading}>
+                  <Button onClick={handleUpload} disabled={isUploading || !pipelineId}>
                     {isUploading ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />

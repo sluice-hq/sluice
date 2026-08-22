@@ -28,6 +28,11 @@ public class PipelineEngine {
             }
         } finally {
             for (MediaResource resource : trackedResources) {
+                // The caller owns the final pipeline output and may still need to
+                // persist it. Only intermediate resources are engine-owned.
+                if (resource == context.getCurrentResource()) {
+                    continue;
+                }
                 try {
                     resource.cleanup();
                 } catch (Exception e) {

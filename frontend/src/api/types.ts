@@ -1,12 +1,12 @@
 export interface Page<T> {
   content: T[];
-  pageable: any;
+  pageable: unknown;
   totalElements: number;
   totalPages: number;
   last: boolean;
   size: number;
   number: number;
-  sort: any;
+  sort: unknown;
   numberOfElements: number;
   first: boolean;
   empty: boolean;
@@ -73,4 +73,13 @@ export interface UploadUrlResponse {
   assetId: string;
   uploadUrl: string;
   blobName: string;
+}
+
+export interface PublishedPipeline {
+  id: string;
+  name: string;
+  description: string | null;
+  versionId: string;
+  versionNumber: number;
+  expectedInputMimeType: string;
 }

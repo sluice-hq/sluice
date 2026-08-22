@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, FileVideo, Activity, Play, Shield, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 const navigation = [
   { name: 'Overview', href: '/', icon: LayoutDashboard },
@@ -24,7 +25,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex-1 flex flex-col min-h-0 bg-sidebar border-r border-sidebar-border">
           <div className="flex items-center h-40 flex-shrink-0 px-6 border-b border-sidebar-border overflow-hidden">
             <div className="w-32 h-32 flex items-center justify-center flex-shrink-0 ml-5 z-10">
-              <img src="/logo-3.png" alt="Sluice Logo" className="w-full h-full object-contain" />
+              <Image src="/logo-3.png" alt="Sluice Logo" width={128} height={128} className="w-full h-full object-contain" priority />
             </div>
           </div>
           <div className="flex-1 flex flex-col overflow-y-auto">
@@ -84,7 +85,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex-1 flex justify-between px-4">
             <div className="flex-1 flex items-center">
               <div className="w-32 h-32 flex items-center justify-center flex-shrink-0 z-10 ml-2">
-                <img src="/logo-3.png" alt="Sluice Logo" className="w-full h-full object-contain" />
+                <Image src="/logo-3.png" alt="Sluice Logo" width={128} height={128} className="w-full h-full object-contain" priority />
               </div>
             </div>
           </div>

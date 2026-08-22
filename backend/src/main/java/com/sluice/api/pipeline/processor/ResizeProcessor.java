@@ -48,11 +48,14 @@ public class ResizeProcessor implements Processor {
         targetWidth = Math.min(targetWidth, absoluteMaxWidth);
         targetHeight = Math.min(targetHeight, absoluteMaxHeight);
 
+        if (targetWidth <= 0 || targetHeight <= 0) {
+            throw new IllegalArgumentException("Resize width and height must be positive");
+        }
+
         try (InputStream is = context.getCurrentResource().getInputStream()) {
             BufferedImage originalImage = ImageIO.read(is);
             if (originalImage == null) {
-                System.out.println("Not an image, skipping resize.");
-                return null;
+                throw new IllegalArgumentException("Resize input is not a readable image");
             }
 
             int originalWidth = originalImage.getWidth();
@@ -76,10 +79,6 @@ public class ResizeProcessor implements Processor {
                                ". New dimensions: " + targetWidth + "x" + targetHeight);
 
             return new ProcessorResult(new FileMediaResource(tempFile, "image/jpeg"), Map.of("resized", true));
-
-        } catch (Exception e) {
-            System.err.println("Failed to resize image: " + e.getMessage());
-            return null;
         }
     }
 }

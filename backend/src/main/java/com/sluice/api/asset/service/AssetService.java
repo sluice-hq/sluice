@@ -17,6 +17,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class AssetService {
@@ -67,7 +69,7 @@ public class AssetService {
             Asset savedAsset = assetRepository.save(asset);
             
             Job job = jobService.createJob(savedAsset.getId(), pipelineId, context);
-            jobPublisher.publishJob(new JobMessage(job.getId(), savedAsset.getId()));
+            publishAfterCommit(new JobMessage(job.getId(), savedAsset.getId()));
             
             return new UploadAssetResponse(
                     savedAsset.getId(),
@@ -142,7 +144,7 @@ public class AssetService {
         Asset savedAsset = assetRepository.save(asset);
         
         Job job = jobService.createJob(savedAsset.getId(), pipelineId, context);
-        jobPublisher.publishJob(new JobMessage(job.getId(), savedAsset.getId()));
+        publishAfterCommit(new JobMessage(job.getId(), savedAsset.getId()));
         
         return new UploadAssetResponse(
                 asset.getId(),
@@ -155,5 +157,26 @@ public class AssetService {
                 job.getStatus().name(),
                 job.getCreatedAt()
         );
+    }
+
+    private void publishAfterCommit(JobMessage message) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            jobPublisher.publishJob(message);
+            return;
+        }
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    jobPublisher.publishJob(message);
+                } catch (RuntimeException e) {
+                    // The committed QUEUED job remains discoverable by the orphan
+                    // recovery scan, which will publish it again.
+                    System.err.println("Failed to publish committed job " + message.getJobId()
+                            + "; orphan recovery will retry: " + e.getMessage());
+                }
+            }
+        });
     }
 }

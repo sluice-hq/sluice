@@ -1,4 +1,4 @@
-import { DashboardOverview } from '@/api/types';
+import { Asset, DashboardOverview, Job } from '@/api/types';
 
 // --- View Models ---
 
@@ -40,8 +40,8 @@ export interface DashboardOverviewViewModel {
   throughput: ThroughputData[];
   pipelineActivity: PipelineStage[];
   systemHealth: PlatformService[];
-  recentAssets: any[]; // Using existing Asset type
-  recentJobs: any[]; // Using existing Job type
+  recentAssets: Asset[];
+  recentJobs: Job[];
 }
 
 // --- Mapper ---

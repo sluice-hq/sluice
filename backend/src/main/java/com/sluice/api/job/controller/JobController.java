@@ -57,7 +57,12 @@ public class JobController {
     }
 
     @GetMapping(value = "/{id}/events", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
-    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter subscribeToJobEvents(@PathVariable UUID id) {
-        return jobEventService.subscribeToJobEvents(id);
+    public ResponseEntity<org.springframework.web.servlet.mvc.method.annotation.SseEmitter> subscribeToJobEvents(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal ProjectContext context) {
+        if (jobService.getJob(id, context).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(jobEventService.subscribeToJobEvents(id));
     }
 }

@@ -21,6 +21,7 @@ public class Asset {
     private UploadStatus uploadStatus;
     private Instant createdAt;
     private UUID projectId;
+    private UUID producingJobId;
 
     @jakarta.persistence.ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @jakarta.persistence.JoinColumn(name = "parent_asset_id")
@@ -69,6 +70,9 @@ public class Asset {
 
     public UUID getProjectId() { return projectId; }
     public void setProjectId(UUID projectId) { this.projectId = projectId; }
+
+    public UUID getProducingJobId() { return producingJobId; }
+    public void setProducingJobId(UUID producingJobId) { this.producingJobId = producingJobId; }
 
     public Asset getParentAsset() { return parentAsset; }
     public void setParentAsset(Asset parentAsset) { this.parentAsset = parentAsset; }

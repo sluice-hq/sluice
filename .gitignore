@@ -1,2 +1,68 @@
 docs/
 .agents/
+
+# Local architectural and agent context
+/SDD.md
+/.codex/
+/.claude/
+
+# Local environment and secrets
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.sample
+*.local
+
+# IDE and editor files
+/.idea/
+/.vscode/
+*.iml
+*.iws
+*.ipr
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.swp
+*.swo
+*~
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs, process files, crash dumps, and temporary output
+*.log
+*.pid
+*.seed
+*.tmp
+*.temp
+*.orig
+*.hprof
+hs_err_pid*
+/tmp/
+/temp/
+
+# Tool and test caches
+/.cache/
+/.pytest_cache/
+/.eslintcache
+/.turbo/
+/coverage/
+/test-results/
+/playwright-report/
+
+# Terraform local state and generated data
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars
+!*.tfvars.example

@@ -34,27 +34,21 @@ public class WebpProcessor implements Processor {
         try (InputStream is = context.getCurrentResource().getInputStream()) {
             BufferedImage originalImage = ImageIO.read(is);
             if (originalImage == null) {
-                System.out.println("Not an image, skipping WebP conversion.");
-                return null;
+                throw new IllegalArgumentException("WebP input is not a readable image");
             }
 
             File tempFile = new File(System.getProperty("java.io.tmpdir"), UUID.randomUUID().toString() + ".webp");
-            
-            // Note: writing WebP requires a plugin in Java. If none is present, this will fail or write empty.
-            // We assume an appropriate plugin or fallback strategy is deployed.
             boolean wrote = ImageIO.write(originalImage, "webp", tempFile);
             if (!wrote) {
-                System.err.println("No WebP ImageWriter found, falling back to PNG.");
-                tempFile = new File(System.getProperty("java.io.tmpdir"), UUID.randomUUID().toString() + ".png");
-                ImageIO.write(originalImage, "png", tempFile);
+                java.nio.file.Files.deleteIfExists(tempFile.toPath());
+                throw new IllegalStateException(
+                        "WebP processing is unavailable because no WebP ImageIO writer is installed");
             }
             
             System.out.println("Successfully converted image for Job " + context.getJob().getId());
 
-            return new ProcessorResult(new FileMediaResource(tempFile, "image/webp"), Map.of("webpConverted", true));
-        } catch (Exception e) {
-            System.err.println("Failed to convert image to WebP: " + e.getMessage());
-            return null;
+            return new ProcessorResult(new FileMediaResource(tempFile, "image/webp"),
+                    Map.of("webpConverted", true));
         }
     }
 }
