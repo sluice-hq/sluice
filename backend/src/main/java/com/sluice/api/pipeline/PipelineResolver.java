@@ -21,12 +21,13 @@ public class PipelineResolver {
         if (definition != null && definition.has("steps") && definition.get("steps").isArray()) {
             for (JsonNode stepNode : definition.get("steps")) {
                 String processorName = stepNode.get("processor").asText();
+                String stepId = stepNode.get("id").asText();
                 JsonNode config = stepNode.has("config") ? stepNode.get("config") : null;
                 
                 Processor processor = stepNode.hasNonNull("version")
                         ? processorRegistry.get(processorName, stepNode.get("version").asText())
                         : processorRegistry.get(processorName);
-                steps.add(new ConfiguredStep(processor, config));
+                steps.add(new ConfiguredStep(stepId, processor, config));
             }
         }
         

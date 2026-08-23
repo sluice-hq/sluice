@@ -24,6 +24,13 @@ public interface StorageService {
     String uploadFile(String filename, String contentType, java.io.InputStream inputStream, long size) throws IOException;
 
     /**
+     * Writes a file to a caller-controlled, stable object name, replacing the prior bytes when present.
+     * This is reserved for idempotent durable outputs whose object identity is owned by the application.
+     */
+    String uploadFileAt(String objectName, String contentType, java.io.InputStream inputStream, long size)
+            throws IOException;
+
+    /**
      * Deletes a file from the underlying storage mechanism.
      * @param fileUrl The URL or path of the file to delete.
      */

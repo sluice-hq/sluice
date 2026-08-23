@@ -7,5 +7,6 @@ import java.util.List;
 import java.util.UUID;
 
 public interface StepRunRepository extends JpaRepository<StepRun, UUID> {
-    List<StepRun> findByJobIdOrderByCreatedAtAsc(UUID jobId);
+    List<StepRun> findByJobIdOrderByStepIndexAsc(UUID jobId);
+    java.util.Optional<StepRun> findByJobIdAndStepId(UUID jobId, String stepId);
 }

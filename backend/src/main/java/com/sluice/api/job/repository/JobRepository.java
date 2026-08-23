@@ -28,6 +28,8 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
             UPDATE Job j
             SET j.status = :newStatus,
                 j.updatedAt = :updatedAt,
+                j.processingStartedAt = COALESCE(j.processingStartedAt, :updatedAt),
+                j.nextRetryAt = null,
                 j.version = j.version + 1
             WHERE j.id = :id AND j.status = com.sluice.api.job.domain.JobStatus.QUEUED
             """)
@@ -35,4 +37,8 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
             @org.springframework.data.repository.query.Param("id") UUID id,
             @org.springframework.data.repository.query.Param("updatedAt") java.time.Instant updatedAt,
             @org.springframework.data.repository.query.Param("newStatus") com.sluice.api.job.domain.JobStatus newStatus);
+
+    java.util.List<Job> findByStatusAndNextRetryAtBeforeOrderByNextRetryAtAsc(
+            com.sluice.api.job.domain.JobStatus status, java.time.Instant nextRetryAt,
+            org.springframework.data.domain.Pageable pageable);
 }
