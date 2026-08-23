@@ -41,11 +41,24 @@ public class JobService {
 
     @Transactional
     public Job createJob(UUID assetId, UUID pipelineId, ProjectContext context) {
-        Instant now = Instant.now();
-        Job job = new Job(UUID.randomUUID(), assetId, JobStatus.QUEUED, now, now, context.getProjectId());
-        
         com.sluice.api.pipeline.domain.PipelineVersion version = pipelineService.getLatestPublishedVersion(pipelineId, context)
                 .orElseThrow(() -> new IllegalArgumentException("No published version found for pipeline: " + pipelineId));
+
+        return createJobForVersion(assetId, version, context);
+    }
+
+    @Transactional
+    public Job createJobForVersion(UUID assetId, com.sluice.api.pipeline.domain.PipelineVersion version,
+                                   ProjectContext context) {
+        return createJobForVersion(UUID.randomUUID(), assetId, version, context);
+    }
+
+    @Transactional
+    public Job createJobForVersion(UUID jobId, UUID assetId,
+                                   com.sluice.api.pipeline.domain.PipelineVersion version,
+                                   ProjectContext context) {
+        Instant now = Instant.now();
+        Job job = new Job(jobId, assetId, JobStatus.QUEUED, now, now, context.getProjectId());
 
         Asset asset = assetRepository.findByIdAndProjectId(assetId, context.getProjectId())
                 .orElseThrow(() -> new IllegalArgumentException("Asset not found"));

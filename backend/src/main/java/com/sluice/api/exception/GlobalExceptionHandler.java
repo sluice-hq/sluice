@@ -14,6 +14,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.sluice.api.pipeline.validation.ProcessorConfigurationException;
 import com.sluice.api.pipeline.service.PipelineValidationException;
+import com.sluice.api.idempotency.service.IdempotencyConflictException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -49,6 +50,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     public ProblemDetail handleIllegalState(IllegalStateException exc) {
         return problem(HttpStatus.CONFLICT, "The request conflicts with the current resource state.", "invalid_state");
+    }
+
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ProblemDetail handleIdempotencyConflict(IdempotencyConflictException exc) {
+        return problem(HttpStatus.CONFLICT, exc.getMessage(), "idempotency_key_reused");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

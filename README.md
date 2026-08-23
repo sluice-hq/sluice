@@ -1,8 +1,8 @@
 # Sluice
 
-Sluice is an API-first media processing platform. A developer application authenticates with a project API key, uploads media directly to object storage, starts a processing job, and reads the asset/job result through the API. The Next.js dashboard is the human control plane for projects, keys, assets, jobs, and testing.
+Sluice is an API-first media processing platform. A developer application authenticates with a project API key, uploads media directly to object storage, starts a versioned pipeline run, and reads the durable run result through the API. The Next.js dashboard is the human control plane for projects, keys, assets, jobs, and testing.
 
-This repository is an early, working foundation—not the finished V1. Identity, project isolation, API keys, direct uploads, asynchronous jobs, versioned processor contracts, a curated processor market, JSON/Form pipeline authoring, and a dashboard are implemented. The final `/runs` API, durable step analytics, governance, Prometheus/Grafana setup, and Azure deployment are planned work.
+This repository is an early, working foundation, not the finished V1. Identity, project isolation, API keys, reusable uploads, slug-based run creation, idempotency, durable outbox/step planning, asynchronous jobs, versioned processor contracts, a curated processor market, JSON/Form pipeline authoring, and a dashboard are implemented. Durable step outcomes, governance, Prometheus/Grafana setup, and Azure deployment remain planned work.
 
 ## What works today
 
@@ -11,6 +11,9 @@ This repository is an early, working foundation—not the finished V1. Identity,
 - One-time API-key reveal, hash-only persistence, revocation, and throttled last-used tracking.
 - Project-isolated assets, pipelines, jobs, and dashboard queries.
 - Direct Azure Blob/Azurite upload URLs, upload completion checks, and short-lived download URLs.
+- Reusable `POST /uploads` and `POST /runs` APIs. Upload completion is separate from processing, so one asset can be run through multiple pipelines.
+- Idempotency-key replay protection for run creation and upload completion, with conflicting key reuse rejected.
+- Immutable pipeline slug/alias/version resolution, planned `StepRun` records, and a persisted queue outbox for each run.
 - RabbitMQ-backed asynchronous jobs with worker processing, retries, recovery scans, and SSE job events.
 - Versioned pipeline authoring with canonical JSON/Form editing, processor-version validation, immutable publishing, stable aliases, and history.
 - Dashboard pages for overview, assets, jobs, upload testing, login/signup, projects, API keys, pipelines, and the processor market.
@@ -20,8 +23,8 @@ This repository is an early, working foundation—not the finished V1. Identity,
 
 The following are intentionally not claimed as complete yet:
 
-- The public API still uses the legacy asset-completion flow; the final separate `/uploads` and `/runs` contract is planned.
-- Reusable `/uploads` and `/runs`, durable step facts, webhooks, idempotency, quotas, governance decisions, and OpenAPI quick starts are planned.
+- The old `/assets/{assetId}/complete?pipelineId=...` endpoint still exists for compatibility; new integrations should use separate `/uploads` and `/runs` endpoints.
+- Step records currently begin as `PENDING`; durable processor outcomes, timings, errors, compression facts, and webhooks are L-04/L-05 work.
 - WebP fails closed when an encoder is unavailable. No production WebP/AVIF codec is bundled yet.
 - Dashboard charts, search, notifications, health, and pagination still contain placeholder UI and are not product metrics.
 - Azure resources and deployment automation are not in this branch yet.
@@ -151,25 +154,37 @@ All paths below include the `/api/v1` prefix.
 | `POST` | `/pipelines/{slug}/validate` | Validate a draft or candidate definition |
 | `POST` | `/pipelines/{slug}/publish` | Validate and publish a draft immutably |
 | `PUT` | `/pipelines/{slug}/aliases/{alias}` | Move an alias to a published version |
-| `POST` | `/assets/upload-url` | Create a pending asset and write-only upload URL |
-| `POST` | `/assets/{assetId}/complete?pipelineId={id}` | Verify the upload and queue a job |
+| `POST` | `/uploads` | Create a pending asset and write-only upload URL |
+| `POST` | `/uploads/{assetId}/complete` | Verify and finalize an asset without starting work; supports `Idempotency-Key` |
+| `POST` | `/runs` | Start a run using a pipeline slug and optional alias or immutable version; supports `Idempotency-Key` |
+| `GET` | `/runs`, `/runs/{id}` | List or inspect durable runs, planned steps, and outputs |
+| `GET` | `/runs/{id}/outputs` | List output assets produced by a run |
+| `GET` | `/runs/{id}/events` | Subscribe to authenticated SSE run events |
+| `POST` | `/assets/upload-url` | Legacy pending asset URL endpoint |
+| `POST` | `/assets/{assetId}/complete?pipelineId={id}` | Legacy verify-and-queue endpoint |
 | `GET` | `/assets`, `/assets/{id}` | List or inspect project assets |
 | `GET` | `/assets/{id}/download` | Create a short-lived download URL |
 | `GET` | `/jobs`, `/jobs/{id}` | List or inspect jobs |
 | `GET` | `/jobs/{id}/events` | Subscribe to authenticated SSE job events |
 | `GET` | `/dashboard` | Read the current dashboard overview |
 
-The upload completion endpoint currently starts a job immediately. The final reusable upload/run API is planned as separate upload completion and run creation endpoints.
+The preferred flow completes the upload first, then starts one or more runs:
+
+1. `POST /uploads` with `{filename, contentType, size}`.
+2. PUT the bytes to the returned SAS URL.
+3. `POST /uploads/{assetId}/complete`.
+4. `POST /runs` with `{pipeline: "product-images", alias: "stable", inputAssetId: "..."}`.
+5. Poll `GET /runs/{id}` or subscribe to `GET /runs/{id}/events`.
 
 ### API key upload example
 
-After creating a key and obtaining a published pipeline ID, request an upload URL:
+After creating a key and publishing a pipeline with slug `product-images`, request an upload URL:
 
 ```powershell
 $api = "http://localhost:8080/api/v1"
 $headers = @{ "X-API-Key" = $env:SLUICE_API_KEY }
 $body = @{ filename = "photo.png"; contentType = "image/png"; size = (Get-Item .\photo.png).Length } | ConvertTo-Json
-$upload = Invoke-RestMethod -Method Post -Uri "$api/assets/upload-url" -Headers $headers -ContentType "application/json" -Body $body
+$upload = Invoke-RestMethod -Method Post -Uri "$api/uploads" -Headers $headers -ContentType "application/json" -Body $body
 ```
 
 Upload the bytes directly to the returned SAS URL, then complete the upload:
@@ -179,13 +194,21 @@ Invoke-WebRequest -Method Put -Uri $upload.uploadUrl `
   -Headers @{ "x-ms-blob-type" = "BlockBlob"; "Content-Type" = "image/png" } `
   -InFile .\photo.png
 
-$pipelineId = "<published-pipeline-id>"
 Invoke-RestMethod -Method Post `
-  -Uri "$api/assets/$($upload.assetId)/complete?pipelineId=$pipelineId" `
-  -Headers $headers
+  -Uri "$api/uploads/$($upload.assetId)/complete" `
+  -Headers ($headers + @{ "Idempotency-Key" = "upload-photo-001" })
 ```
 
-The completion response contains the asset and queued job IDs. Poll `/jobs/{jobId}` or subscribe to `/jobs/{jobId}/events`.
+Start a reusable run against the completed asset:
+
+```powershell
+$runBody = @{ pipeline = "product-images"; alias = "stable"; inputAssetId = $upload.assetId } | ConvertTo-Json
+$run = Invoke-RestMethod -Method Post -Uri "$api/runs" `
+  -Headers ($headers + @{ "Idempotency-Key" = "run-photo-001" }) `
+  -ContentType "application/json" -Body $runBody
+
+Invoke-RestMethod -Method Get -Uri "$api/runs/$($run.id)" -Headers $headers
+```
 
 ## Configuration
 
@@ -217,7 +240,7 @@ Backend tests must be run from `backend`:
 .\gradlew.bat test --rerun-tasks --console=plain
 ```
 
-The default suite uses Testcontainers PostgreSQL and the `test` profile. It disables RabbitMQ listener startup, scheduled job recovery, and real Azure Blob initialization. The current suite contains 44 tests and should finish with zero failures.
+The default suite uses Testcontainers PostgreSQL and the `test` profile. It disables RabbitMQ listener startup, scheduled job recovery, and real Azure Blob initialization. The current suite contains 57 tests and should finish with zero failures.
 
 The separate task is reserved for tests tagged `external-integration`:
 
