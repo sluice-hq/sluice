@@ -1,62 +1,86 @@
 package com.sluice.api.pipeline.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.sluice.api.pipeline.domain.Pipeline;
-import com.sluice.api.pipeline.domain.PipelineVersion;
-import com.sluice.api.pipeline.service.PipelineService;
 import com.sluice.api.auth.domain.ProjectContext;
+import com.sluice.api.pipeline.service.PipelineService;
+import com.sluice.api.pipeline.service.PipelineValidationReport;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/pipelines")
 public class PipelineController {
+    private final PipelineService pipelines;
 
-    private final PipelineService pipelineService;
-
-    public PipelineController(PipelineService pipelineService) {
-        this.pipelineService = pipelineService;
-    }
+    public PipelineController(PipelineService pipelines) { this.pipelines = pipelines; }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Pipeline createPipeline(
-            @RequestBody PipelineCreateRequest request,
-            @AuthenticationPrincipal ProjectContext context) {
-        return pipelineService.createPipeline(request.name(), request.description(), context);
+    public PipelineService.PipelineDetail create(@RequestBody CreateRequest request,
+                                                 @AuthenticationPrincipal ProjectContext context) {
+        return pipelines.createPipeline(request.name(), request.description(), request.definition(), context);
     }
 
     @GetMapping
-    public List<Pipeline> getPipelines(@AuthenticationPrincipal ProjectContext context) {
-        return pipelineService.getAllPipelines(context);
+    public List<PipelineService.PipelineSummary> list(@AuthenticationPrincipal ProjectContext context) {
+        return pipelines.list(context);
     }
 
     @GetMapping("/published")
-    public List<PipelineService.PublishedPipeline> getPublishedPipelines(
-            @AuthenticationPrincipal ProjectContext context) {
-        return pipelineService.getPublishedPipelines(context);
+    public List<PipelineService.PublishedPipeline> published(@AuthenticationPrincipal ProjectContext context) {
+        return pipelines.getPublishedPipelines(context);
     }
 
-    @PostMapping("/{pipelineId}/versions")
-    @ResponseStatus(HttpStatus.CREATED)
-    public PipelineVersion createVersion(
-            @PathVariable UUID pipelineId,
-            @RequestBody VersionCreateRequest request,
-            @AuthenticationPrincipal ProjectContext context) {
-        return pipelineService.createDraftVersion(pipelineId, request.expectedInputMimeType(), request.definition(), context);
+    @GetMapping("/{slug}")
+    public PipelineService.PipelineDetail get(@PathVariable String slug, @AuthenticationPrincipal ProjectContext context) {
+        return pipelines.get(slug, context);
     }
 
-    @PostMapping("/versions/{versionId}/publish")
-    public PipelineVersion publishVersion(
-            @PathVariable UUID versionId,
-            @AuthenticationPrincipal ProjectContext context) {
-        return pipelineService.publishVersion(versionId, context);
+    @GetMapping("/{slug}/versions")
+    public List<PipelineService.PipelineVersionView> history(@PathVariable String slug,
+                                                             @AuthenticationPrincipal ProjectContext context) {
+        return pipelines.history(slug, context);
     }
 
-    public record PipelineCreateRequest(String name, String description) {}
-    public record VersionCreateRequest(String expectedInputMimeType, JsonNode definition) {}
+    @GetMapping("/{slug}/versions/{number}")
+    public PipelineService.PipelineVersionView version(@PathVariable String slug, @PathVariable int number,
+                                                       @AuthenticationPrincipal ProjectContext context) {
+        return pipelines.version(slug, number, context);
+    }
+
+    @PutMapping("/{slug}/draft")
+    public PipelineService.PipelineVersionView updateDraft(@PathVariable String slug,
+                                                           @RequestBody DraftRequest request,
+                                                           @AuthenticationPrincipal ProjectContext context) {
+        return pipelines.updateDraft(slug, request.revision(), request.definition(), context);
+    }
+
+    @PostMapping("/{slug}/validate")
+    public PipelineValidationReport validate(@PathVariable String slug,
+                                             @RequestBody(required = false) ValidateRequest request,
+                                             @AuthenticationPrincipal ProjectContext context) {
+        return pipelines.validateDraft(slug, request == null ? null : request.definition(), context);
+    }
+
+    @PostMapping("/{slug}/publish")
+    public PipelineService.PipelineVersionView publish(@PathVariable String slug, @RequestBody RevisionRequest request,
+                                                       @AuthenticationPrincipal ProjectContext context) {
+        return pipelines.publish(slug, request.revision(), context);
+    }
+
+    @PutMapping("/{slug}/aliases/{alias}")
+    public PipelineService.PipelineAliasView moveAlias(@PathVariable String slug, @PathVariable String alias,
+                                                       @RequestBody AliasRequest request,
+                                                       @AuthenticationPrincipal ProjectContext context) {
+        return pipelines.moveAlias(slug, alias, request.versionNumber(), context);
+    }
+
+    public record CreateRequest(String name, String description, JsonNode definition) {}
+    public record DraftRequest(int revision, JsonNode definition) {}
+    public record ValidateRequest(JsonNode definition) {}
+    public record RevisionRequest(int revision) {}
+    public record AliasRequest(int versionNumber) {}
 }

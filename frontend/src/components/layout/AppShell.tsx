@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { LayoutDashboard, FileVideo, Activity, Play, Shield, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, FileVideo, Activity, Play, Shield, Settings, LogOut, Boxes } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 
@@ -13,7 +13,8 @@ const navigation = [
   { name: 'Overview', href: '/', icon: LayoutDashboard },
   { name: 'Assets', href: '/assets', icon: FileVideo },
   { name: 'Jobs', href: '/jobs', icon: Activity },
-  { name: 'Pipelines', href: '/pipelines', icon: Play, disabled: true },
+  { name: 'Pipelines', href: '/pipelines', icon: Play },
+  { name: 'Processor Market', href: '/processors', icon: Boxes },
   { name: 'Governance', href: '/governance', icon: Shield, disabled: true },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

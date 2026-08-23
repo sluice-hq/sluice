@@ -23,7 +23,9 @@ public class PipelineResolver {
                 String processorName = stepNode.get("processor").asText();
                 JsonNode config = stepNode.has("config") ? stepNode.get("config") : null;
                 
-                Processor processor = processorRegistry.get(processorName);
+                Processor processor = stepNode.hasNonNull("version")
+                        ? processorRegistry.get(processorName, stepNode.get("version").asText())
+                        : processorRegistry.get(processorName);
                 steps.add(new ConfiguredStep(processor, config));
             }
         }

@@ -12,6 +12,8 @@ import com.sluice.api.pipeline.ProcessorMetadata;
 import java.util.List;
 import java.util.Map;
 import java.io.InputStream;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.sluice.api.pipeline.ProcessorManifestResources;
 
 @Component
 public class ChecksumProcessor implements Processor {
@@ -21,7 +23,8 @@ public class ChecksumProcessor implements Processor {
         return new ProcessorMetadata(
             "checksum",
             List.of("*/*"),
-            (inputMimeType, config) -> inputMimeType
+            (inputMimeType, config) -> inputMimeType,
+            ProcessorManifestResources.load("checksum-1.0.0.json")
         );
     }
 

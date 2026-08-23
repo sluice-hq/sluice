@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1",
+  "slug": "mime-validation",
+  "version": "1.0.0",
+  "displayName": "MIME Validation",
+  "description": "First-party Sluice MIME validation processor",
+  "category": "validation",
+  "input": {"kind": "media", "mimeTypes": ["*/*"], "maxBytes": 0, "maxPixels": 0, "alphaSupported": false, "animationSupported": false},
+  "output": {"kind": "media", "mimeTypes": ["*/*"], "maxBytes": 0, "maxPixels": 0, "alphaSupported": false, "animationSupported": false},
+  "configSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "allowedTypes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+    }
+  },
+  "limits": {"timeoutSeconds": 30, "memoryMb": 512, "maxOutputBytes": 50000000},
+  "permissions": ["blob.read.input"],
+  "status": "PUBLISHED",
+  "releaseNotes": "Initial built-in release"
+}

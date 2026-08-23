@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1",
+  "slug": "metadata",
+  "version": "1.0.0",
+  "displayName": "Image Metadata",
+  "description": "First-party Sluice image metadata processor",
+  "category": "metadata",
+  "input": {"kind": "image", "mimeTypes": ["image/*"], "maxBytes": 0, "maxPixels": 0, "alphaSupported": true, "animationSupported": false},
+  "output": {"kind": "image", "mimeTypes": ["image/*"], "maxBytes": 0, "maxPixels": 0, "alphaSupported": true, "animationSupported": false},
+  "configSchema": {"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "additionalProperties": false, "properties": {}},
+  "limits": {"timeoutSeconds": 30, "memoryMb": 512, "maxOutputBytes": 50000000},
+  "permissions": ["blob.read.input"],
+  "status": "PUBLISHED",
+  "releaseNotes": "Initial built-in release"
+}
