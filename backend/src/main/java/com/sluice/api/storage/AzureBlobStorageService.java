@@ -82,7 +82,13 @@ public class AzureBlobStorageService implements StorageService {
             extension = filename.substring(filename.lastIndexOf("."));
         }
         String blobName = UUID.randomUUID().toString() + extension;
-        BlobClient blobClient = containerClient.getBlobClient(blobName);
+        return uploadFileAt(blobName, contentType, inputStream, size);
+    }
+
+    @Override
+    public String uploadFileAt(String objectName, String contentType, java.io.InputStream inputStream, long size)
+            throws IOException {
+        BlobClient blobClient = containerClient.getBlobClient(objectName);
         blobClient.upload(inputStream, size, true);
         
         com.azure.storage.blob.models.BlobHttpHeaders headers = new com.azure.storage.blob.models.BlobHttpHeaders();

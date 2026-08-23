@@ -67,11 +67,12 @@ public class RabbitMqConfig {
     @Bean
     public org.springframework.amqp.rabbit.retry.MessageRecoverer messageRecoverer(
             com.sluice.api.job.service.JobService jobService) {
-        com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
         return (message, cause) -> {
             try {
                 com.sluice.api.messaging.dto.JobMessage jobMsg = objectMapper.readValue(message.getBody(), com.sluice.api.messaging.dto.JobMessage.class);
-                jobService.updateJobStatusSystem(jobMsg.getJobId(), com.sluice.api.job.domain.JobStatus.FAILED);
+                jobService.failJobSystem(jobMsg.getJobId(), "broker_retry_exhausted",
+                        "Broker delivery retry limit was reached");
             } catch (Exception e) {
                 System.err.println("Failed to parse message in recoverer: " + e.getMessage());
             }

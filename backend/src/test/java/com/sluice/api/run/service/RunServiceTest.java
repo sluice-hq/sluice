@@ -79,7 +79,10 @@ class RunServiceTest {
         Pipeline pipeline = new Pipeline(UUID.randomUUID(), "product-images", "Product images", null, projectId);
         PipelineVersion version = new PipelineVersion(UUID.randomUUID(), pipeline, 3, "PUBLISHED", "image/*",
                 new ObjectMapper().readTree("""
-                        {"steps":[{"id":"resize","processor":"resize","version":"1.0.0"}]}
+                        {"steps":[
+                          {"id":"resize","processor":"resize","version":"1.0.0"},
+                          {"id":"encode","processor":"webp","version":"1.0.0"}
+                        ]}
                         """));
         PipelineService pipelines = mock(PipelineService.class);
         when(pipelines.resolvePublishedVersion("product-images", null, null, context)).thenReturn(version);
@@ -101,6 +104,11 @@ class RunServiceTest {
         var planned = iterator.next();
         assertEquals("resize", planned.getStepId());
         assertEquals("PENDING", planned.getStatus());
+        assertEquals(0, planned.getStepIndex());
+        org.junit.jupiter.api.Assertions.assertTrue(iterator.hasNext());
+        var second = iterator.next();
+        assertEquals("encode", second.getStepId());
+        assertEquals(1, second.getStepIndex());
         org.junit.jupiter.api.Assertions.assertFalse(iterator.hasNext());
         verify(outbox).createRunQueuedEvent(any(Job.class));
         verify(outbox).publishAfterCommit(any(OutboxEvent.class), any());

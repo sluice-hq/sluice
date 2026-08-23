@@ -31,9 +31,79 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.ArgumentCaptor;
+import com.sluice.api.step.service.StepRunService;
 
 class JobWorkerTest {
+
+    @Test
+    void duplicateDeliveryOfATerminalRunDoesNotExecuteAgain() throws Exception {
+        UUID jobId = UUID.randomUUID();
+        Job completed = new Job(jobId, UUID.randomUUID(), JobStatus.COMPLETED,
+                Instant.now(), Instant.now(), UUID.randomUUID());
+        JobService jobs = mock(JobService.class);
+        when(jobs.getJobSystem(jobId)).thenReturn(Optional.of(completed));
+        PipelineEngine engine = mock(PipelineEngine.class);
+
+        new JobWorker(jobs, mock(AssetRepository.class), mock(StorageService.class), engine,
+                mock(PipelineVersionRepository.class), mock(PipelineResolver.class),
+                mock(StepRunService.class), mock(OutputReconciliationService.class))
+                .processJob(new JobMessage(jobId, completed.getAssetId()));
+
+        verify(jobs, never()).claimQueuedJob(any());
+        verifyNoInteractions(engine);
+    }
+
+    @Test
+    void rejectsAMessageWhoseAssetDoesNotMatchTheDurableRunBeforeClaiming() {
+        UUID jobId = UUID.randomUUID();
+        UUID durableAssetId = UUID.randomUUID();
+        Job queued = new Job(jobId, durableAssetId, JobStatus.QUEUED,
+                Instant.now(), Instant.now(), UUID.randomUUID());
+        JobService jobs = mock(JobService.class);
+        AssetRepository assets = mock(AssetRepository.class);
+        when(jobs.getJobSystem(jobId)).thenReturn(Optional.of(queued));
+
+        JobWorker worker = new JobWorker(jobs, assets, mock(StorageService.class), mock(PipelineEngine.class),
+                mock(PipelineVersionRepository.class), mock(PipelineResolver.class),
+                mock(StepRunService.class), mock(OutputReconciliationService.class));
+
+        PermanentProcessingException failure = assertThrows(PermanentProcessingException.class,
+                () -> worker.processJob(new JobMessage(jobId, UUID.randomUUID())));
+
+        assertEquals("queue_asset_mismatch", failure.getCode());
+        verify(jobs, never()).claimQueuedJob(any());
+        verifyNoInteractions(assets);
+    }
+
+    @Test
+    void transientFailureRecordsDurableRetryWaitInsteadOfLeakingTheException() throws Exception {
+        FailureFixture fixture = new FailureFixture();
+        doThrow(new java.io.IOException("storage unavailable")).when(fixture.engine)
+                .execute(any(com.sluice.api.pipeline.Pipeline.class), any(ProcessingContext.class), any());
+
+        fixture.worker().processJob(new JobMessage(fixture.jobId, fixture.assetId));
+
+        verify(fixture.jobs).scheduleRetry(eq(fixture.jobId), eq("storage_unavailable"),
+                eq("Processing will be retried"), any(java.time.Duration.class));
+        verify(fixture.jobs, never()).failJobSystem(any(), any(), any());
+    }
+
+    @Test
+    void permanentFailureMovesRunToFailedWithoutRetry() throws Exception {
+        FailureFixture fixture = new FailureFixture();
+        doThrow(new IllegalArgumentException("invalid media")).when(fixture.engine)
+                .execute(any(com.sluice.api.pipeline.Pipeline.class), any(ProcessingContext.class), any());
+
+        fixture.worker().processJob(new JobMessage(fixture.jobId, fixture.assetId));
+
+        verify(fixture.jobs).failJobSystem(fixture.jobId, "invalid_processing_input",
+                "Processing failed permanently");
+        verify(fixture.jobs, never()).scheduleRetry(any(), any(), any(), any());
+    }
 
     @Test
     void processingFailureRequeuesRethrowsAndCleansResource() throws Exception {
@@ -61,7 +131,7 @@ class JobWorkerTest {
 
         when(jobs.getJobSystem(jobId)).thenReturn(Optional.of(queued));
         when(jobs.claimQueuedJob(jobId)).thenReturn(Optional.of(running));
-        when(assets.findById(assetId)).thenReturn(Optional.of(asset));
+        when(assets.findByIdAndProjectId(assetId, projectId)).thenReturn(Optional.of(asset));
         when(storage.downloadFile("blob-url")).thenReturn(resource);
         when(versions.findById(versionId)).thenReturn(Optional.of(version));
         when(resolver.resolve(version.getDefinition())).thenReturn(new com.sluice.api.pipeline.Pipeline(List.of()));
@@ -102,7 +172,7 @@ class JobWorkerTest {
 
         when(jobs.getJobSystem(jobId)).thenReturn(Optional.of(queued));
         when(jobs.claimQueuedJob(jobId)).thenReturn(Optional.of(running));
-        when(assets.findById(assetId)).thenReturn(Optional.of(asset));
+        when(assets.findByIdAndProjectId(assetId, projectId)).thenReturn(Optional.of(asset));
         when(storage.downloadFile("blob-url")).thenReturn(input);
         when(versions.findById(versionId)).thenReturn(Optional.of(version));
         when(resolver.resolve(version.getDefinition())).thenReturn(new com.sluice.api.pipeline.Pipeline(List.of()));
@@ -137,6 +207,40 @@ class JobWorkerTest {
         @Override
         public void cleanup() {
             cleaned = true;
+        }
+    }
+
+    private static class FailureFixture {
+        final UUID jobId = UUID.randomUUID();
+        final UUID assetId = UUID.randomUUID();
+        final UUID projectId = UUID.randomUUID();
+        final UUID versionId = UUID.randomUUID();
+        final JobService jobs = mock(JobService.class);
+        final AssetRepository assets = mock(AssetRepository.class);
+        final StorageService storage = mock(StorageService.class);
+        final PipelineEngine engine = mock(PipelineEngine.class);
+        final PipelineVersionRepository versions = mock(PipelineVersionRepository.class);
+        final PipelineResolver resolver = mock(PipelineResolver.class);
+
+        FailureFixture() throws Exception {
+            Job queued = new Job(jobId, assetId, JobStatus.QUEUED, Instant.now(), Instant.now(), projectId);
+            Job running = new Job(jobId, assetId, JobStatus.RUNNING, Instant.now(), Instant.now(), projectId);
+            running.setPipelineVersionId(versionId);
+            Asset asset = new Asset(assetId, "input.png", 1, "image/png", "blob-url",
+                    Asset.UploadStatus.COMPLETED, Instant.now(), projectId);
+            PipelineVersion version = new PipelineVersion(versionId, null, 1, "PUBLISHED", "image/png",
+                    new ObjectMapper().readTree("{\"steps\":[]}"));
+            when(jobs.getJobSystem(jobId)).thenReturn(Optional.of(queued));
+            when(jobs.claimQueuedJob(jobId)).thenReturn(Optional.of(running));
+            when(assets.findByIdAndProjectId(assetId, projectId)).thenReturn(Optional.of(asset));
+            when(storage.downloadFile("blob-url")).thenReturn(new TrackingResource());
+            when(versions.findById(versionId)).thenReturn(Optional.of(version));
+            when(resolver.resolve(version.getDefinition())).thenReturn(new com.sluice.api.pipeline.Pipeline(List.of()));
+        }
+
+        JobWorker worker() {
+            return new JobWorker(jobs, assets, storage, engine, versions, resolver,
+                    mock(StepRunService.class), mock(OutputReconciliationService.class));
         }
     }
 }

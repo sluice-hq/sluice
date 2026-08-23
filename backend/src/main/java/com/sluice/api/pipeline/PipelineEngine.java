@@ -6,6 +6,10 @@ import org.springframework.stereotype.Service;
 public class PipelineEngine {
 
     public void execute(Pipeline pipeline, ProcessingContext context) throws Exception {
+        execute(pipeline, context, StepExecutionListener.NO_OP);
+    }
+
+    public void execute(Pipeline pipeline, ProcessingContext context, StepExecutionListener listener) throws Exception {
         java.util.List<MediaResource> trackedResources = new java.util.ArrayList<>();
         if (context.getCurrentResource() != null) {
             trackedResources.add(context.getCurrentResource());
@@ -13,17 +17,27 @@ public class PipelineEngine {
 
         try {
             for (ConfiguredStep step : pipeline.getSteps()) {
-                ProcessorResult result = step.getProcessor().process(context, step.getConfig());
-                
-                if (result != null) {
-                    if (result.getMetadata() != null) {
-                        context.getAttributes().putAll(result.getMetadata());
+                listener.beforeStep(step, context.getCurrentResource());
+                try {
+                    ProcessorResult result = step.getProcessor().process(context, step.getConfig());
+                    boolean changed = false;
+                    java.util.Map<String, Object> metadata = java.util.Map.of();
+                    if (result != null) {
+                        if (result.getMetadata() != null) {
+                            metadata = result.getMetadata();
+                            context.getAttributes().putAll(metadata);
+                        }
+                        if (result.getNewResource().isPresent()) {
+                            MediaResource newResource = result.getNewResource().get();
+                            trackedResources.add(newResource);
+                            context.setCurrentResource(newResource);
+                            changed = true;
+                        }
                     }
-                    if (result.getNewResource().isPresent()) {
-                        MediaResource newResource = result.getNewResource().get();
-                        trackedResources.add(newResource);
-                        context.setCurrentResource(newResource);
-                    }
+                    listener.afterStep(step, context.getCurrentResource(), metadata, changed);
+                } catch (Exception exception) {
+                    listener.onFailure(step, exception);
+                    throw exception;
                 }
             }
         } finally {

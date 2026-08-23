@@ -5,8 +5,7 @@ import com.sluice.api.asset.dto.UploadAssetResponse;
 import com.sluice.api.asset.repository.AssetRepository;
 import com.sluice.api.job.domain.Job;
 import com.sluice.api.job.service.JobService;
-import com.sluice.api.messaging.JobPublisher;
-import com.sluice.api.messaging.dto.JobMessage;
+import com.sluice.api.outbox.service.OutboxService;
 import com.sluice.api.storage.StorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,8 +16,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class AssetService {
@@ -26,13 +23,14 @@ public class AssetService {
     private final StorageService storageService;
     private final AssetRepository assetRepository;
     private final JobService jobService;
-    private final JobPublisher jobPublisher;
+    private final OutboxService outboxService;
 
-    public AssetService(StorageService storageService, AssetRepository assetRepository, JobService jobService, JobPublisher jobPublisher) {
+    public AssetService(StorageService storageService, AssetRepository assetRepository, JobService jobService,
+                        OutboxService outboxService) {
         this.storageService = storageService;
         this.assetRepository = assetRepository;
         this.jobService = jobService;
-        this.jobPublisher = jobPublisher;
+        this.outboxService = outboxService;
     }
 
     public Page<Asset> getAssets(ProjectContext context, Pageable pageable) {
@@ -69,7 +67,7 @@ public class AssetService {
             Asset savedAsset = assetRepository.save(asset);
             
             Job job = jobService.createJob(savedAsset.getId(), pipelineId, context);
-            publishAfterCommit(new JobMessage(job.getId(), savedAsset.getId()));
+            outboxService.createRunQueuedEvent(job);
             
             return new UploadAssetResponse(
                     savedAsset.getId(),
@@ -144,7 +142,7 @@ public class AssetService {
         Asset savedAsset = assetRepository.save(asset);
         
         Job job = jobService.createJob(savedAsset.getId(), pipelineId, context);
-        publishAfterCommit(new JobMessage(job.getId(), savedAsset.getId()));
+        outboxService.createRunQueuedEvent(job);
         
         return new UploadAssetResponse(
                 asset.getId(),
@@ -184,24 +182,4 @@ public class AssetService {
         return assetRepository.save(asset);
     }
 
-    private void publishAfterCommit(JobMessage message) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            jobPublisher.publishJob(message);
-            return;
-        }
-
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                try {
-                    jobPublisher.publishJob(message);
-                } catch (RuntimeException e) {
-                    // The committed QUEUED job remains discoverable by the orphan
-                    // recovery scan, which will publish it again.
-                    System.err.println("Failed to publish committed job " + message.getJobId()
-                            + "; orphan recovery will retry: " + e.getMessage());
-                }
-            }
-        });
-    }
 }
