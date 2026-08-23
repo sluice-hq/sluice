@@ -159,6 +159,31 @@ public class AssetService {
         );
     }
 
+    /**
+     * Finalizes a direct upload without starting processing. The public /uploads API
+     * uses this method so the same completed asset can be run through multiple pipelines.
+     */
+    @Transactional
+    public Asset completeUpload(UUID assetId, ProjectContext context) {
+        Asset asset = assetRepository.findByIdAndProjectId(assetId, context.getProjectId())
+                .orElseThrow(() -> new IllegalArgumentException("Asset not found"));
+
+        if (asset.getUploadStatus() == Asset.UploadStatus.COMPLETED) {
+            return asset;
+        }
+        if (!storageService.fileExists(asset.getStorageUrl())) {
+            throw new IllegalStateException("Uploaded file does not exist in storage");
+        }
+
+        long actualSize = storageService.getFileSize(asset.getStorageUrl());
+        if (actualSize != asset.getSize()) {
+            throw new IllegalStateException("Uploaded file size does not match the declared size");
+        }
+
+        asset.setUploadStatus(Asset.UploadStatus.COMPLETED);
+        return assetRepository.save(asset);
+    }
+
     private void publishAfterCommit(JobMessage message) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             jobPublisher.publishJob(message);

@@ -14,4 +14,5 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
     Optional<Asset> findByIdAndProjectId(UUID id, UUID projectId);
     Page<Asset> findAllByProjectId(UUID projectId, Pageable pageable);
     long countByProjectId(UUID projectId);
+    java.util.List<Asset> findByProducingJobIdAndProjectId(UUID producingJobId, UUID projectId);
 }

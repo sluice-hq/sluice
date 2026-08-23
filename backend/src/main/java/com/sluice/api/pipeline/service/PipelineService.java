@@ -151,6 +151,35 @@ public class PipelineService {
                 .or(() -> versions.findFirstByPipelineIdAndStatusOrderByVersionNumberDesc(pipeline.getId(), "PUBLISHED"));
     }
 
+    /**
+     * Resolves the public pipeline name to an immutable published version.
+     * A run may pin a version explicitly or use a project-scoped alias (stable by default).
+     */
+    @Transactional(readOnly = true)
+    public PipelineVersion resolvePublishedVersion(String slug, String alias, Integer versionNumber,
+                                                   ProjectContext context) {
+        Pipeline pipeline = findPipeline(slug, context);
+        if (versionNumber != null && alias != null && !alias.isBlank()) {
+            throw new IllegalArgumentException("Specify either pipeline version or alias, not both");
+        }
+
+        PipelineVersion version;
+        if (versionNumber != null) {
+            version = versions.findByPipelineIdAndVersionNumber(pipeline.getId(), versionNumber)
+                    .orElseThrow(() -> new IllegalArgumentException("Pipeline version not found"));
+        } else {
+            String selectedAlias = alias == null || alias.isBlank() ? "stable" : alias;
+            version = aliases.findByPipelineIdAndAlias(pipeline.getId(), selectedAlias)
+                    .map(PipelineAlias::getPipelineVersion)
+                    .orElseThrow(() -> new IllegalArgumentException("Pipeline alias not found"));
+        }
+
+        if (!"PUBLISHED".equals(version.getStatus()) && !"DEPRECATED".equals(version.getStatus())) {
+            throw new IllegalArgumentException("Runs may target only published pipeline versions");
+        }
+        return version;
+    }
+
     @Transactional(readOnly = true)
     public List<PublishedPipeline> getPublishedPipelines(ProjectContext context) {
         return pipelines.findByProjectId(context.getProjectId()).stream()

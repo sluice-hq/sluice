@@ -51,6 +51,19 @@ class PipelineServiceTest {
                 () -> fixture.service.moveAlias("product-images", "stable", 1, fixture.context));
     }
 
+    @Test
+    void resolvesStableAliasToAnImmutablePublishedVersion() throws Exception {
+        Fixture fixture = fixture("PUBLISHED");
+        PipelineAlias stable = new PipelineAlias(fixture.pipeline.getId(), "stable", fixture.version);
+        when(fixture.aliases.findByPipelineIdAndAlias(fixture.pipeline.getId(), "stable"))
+                .thenReturn(Optional.of(stable));
+
+        PipelineVersion resolved = fixture.service.resolvePublishedVersion(
+                "product-images", null, null, fixture.context);
+
+        assertEquals(fixture.version.getId(), resolved.getId());
+    }
+
     private Fixture fixture(String status) throws Exception {
         PipelineRepository pipelines = mock(PipelineRepository.class);
         PipelineVersionRepository versions = mock(PipelineVersionRepository.class);
