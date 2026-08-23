@@ -2,7 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, FileVideo, Activity, Play, Shield, Settings } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { LayoutDashboard, FileVideo, Activity, Play, Shield, Settings, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 
@@ -17,6 +20,38 @@ const navigation = [
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const publicRoute = pathname === '/login' || pathname === '/signup';
+  const { data: session, isLoading, isError } = useQuery<Session>({
+    queryKey: ['session'],
+    queryFn: async () => {
+      const response = await fetch('/api/session', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Not signed in');
+      return response.json();
+    },
+    enabled: !publicRoute,
+    retry: false,
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (!publicRoute && isError) router.replace('/login');
+  }, [isError, publicRoute, router]);
+
+  if (publicRoute) return children;
+  if (isLoading || !session) return <div className="min-h-screen grid place-items-center bg-background text-muted-foreground">Loading Sluice…</div>;
+
+  async function selectProject(projectId: string) {
+    await fetch('/api/session/project', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }),
+    });
+    window.location.reload();
+  }
+
+  async function logout() {
+    await fetch('/api/session/logout', { method: 'POST' });
+    router.replace('/login'); router.refresh();
+  }
 
   return (
     <div className="flex h-screen bg-background text-foreground antialiased selection:bg-primary/30">
@@ -63,14 +98,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </nav>
             {/* User Profile */}
             <div className="p-4 border-t border-sidebar-border mt-auto">
+              <select value={session.selectedProjectId || ''} onChange={(event) => selectProject(event.target.value)}
+                className="mb-4 w-full rounded-md border border-sidebar-border bg-sidebar px-2 py-2 text-xs text-white">
+                {session.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
-                  JD
+                  {session.user.email.slice(0, 2).toUpperCase()}
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-white">Jane Doe</span>
-                  <span className="text-xs text-muted-foreground">Admin</span>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-sm font-medium text-white truncate">{session.user.email}</span>
+                  <span className="text-xs text-muted-foreground">{session.projects.find((project) => project.id === session.selectedProjectId)?.role}</span>
                 </div>
+                <button onClick={logout} title="Sign out" className="text-muted-foreground hover:text-white"><LogOut className="h-4 w-4" /></button>
               </div>
             </div>
           </div>
@@ -133,4 +173,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </div>
     </div>
   );
+}
+
+interface Session {
+  user: { id: string; email: string; createdAt: string };
+  projects: Array<{ id: string; name: string; role: string }>;
+  selectedProjectId?: string;
 }

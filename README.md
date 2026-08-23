@@ -1,213 +1,267 @@
 # Sluice
 
-**Sluice** is an open-source, cloud-native media infrastructure platform designed to handle complex media processing workflows at scale. It provides a functional, end-to-end media pipeline from secure, direct-to-storage uploads to distributed background processing and real-time dashboard updates.
+Sluice is an API-first media processing platform. A developer application authenticates with a project API key, uploads media directly to object storage, starts a processing job, and reads the asset/job result through the API. The Next.js dashboard is the human control plane for projects, keys, assets, jobs, and testing.
 
-By offering a modular Pipeline Engine and pluggable architecture, Sluice executes media processing workflows asynchronously, keeping the control API highly responsive and paving the way for fully user-configurable pipelines in future releases.
+This repository is an early, working foundation—not the finished V1. Identity, project isolation, API keys, direct uploads, asynchronous jobs, a first pipeline engine, and a dashboard are implemented. The curated processor market, lossless JSON/UI pipeline builder, final `/runs` API, durable step analytics, governance, Prometheus/Grafana setup, and Azure deployment are planned work.
 
-## 🚀 Key Features
+## What works today
 
-- **Pipeline Engine:** Execute ordered processing pipelines through a modular, extensible architecture.
-- **Asynchronous Execution:** Long-running jobs are executed asynchronously by stateless workers, allowing the processing layer to scale horizontally.
-- **Pluggable Processors:** Processors can be added for capabilities such as image optimisation, format conversion, OCR, AI captions, and metadata extraction.
-- **Cloud-oriented architecture:** Designed for cloud storage, asynchronous workers, and horizontal scaling, with Kubernetes deployment planned for a future milestone.
+- Developer signup, login, logout, project creation, project switching, and HttpOnly dashboard sessions.
+- Project-scoped JWT and API-key authentication.
+- One-time API-key reveal, hash-only persistence, revocation, and throttled last-used tracking.
+- Project-isolated assets, pipelines, jobs, and dashboard queries.
+- Direct Azure Blob/Azurite upload URLs, upload completion checks, and short-lived download URLs.
+- RabbitMQ-backed asynchronous jobs with worker processing, retries, recovery scans, and SSE job events.
+- Early pipeline endpoints for project pipelines, draft versions, publishing, and hard-coded processor metadata.
+- Dashboard pages for overview, assets, jobs, upload testing, login/signup, projects, and API keys.
+- RFC-style problem responses for validation, authentication, authorization, and database conflicts.
 
----
+## Current limitations
 
-## 🏗️ Target Architecture
+The following are intentionally not claimed as complete yet:
 
-The diagram below represents the long-term target architecture that future milestones will progressively implement. Once complete, Sluice will employ an event-driven, decoupled architecture to ensure horizontal scalability and resilience.
+- The public API still uses the legacy asset-completion flow; the final separate `/uploads` and `/runs` contract is planned.
+- Pipeline definitions are not yet the complete versioned processor-manifest contract described in the SDD.
+- The processor market and JSON/Form pipeline editor are not implemented; related navigation is disabled.
+- WebP fails closed when an encoder is unavailable. No production WebP/AVIF codec is bundled yet.
+- Run step facts, compression totals, webhooks, idempotency, quotas, governance decisions, and OpenAPI quick starts are planned.
+- Dashboard charts, search, notifications, health, and pagination still contain placeholder UI and are not product metrics.
+- Azure resources and deployment automation are not in this branch yet.
+- Arbitrary custom processor code is outside V1 for safety reasons.
 
-_Note: The platform is being extended with a Next.js developer dashboard, direct client-to-storage ingestion via Azure SAS URLs, and real-time job updates via Server-Sent Events (SSE). On the backend, it leverages Azure Blob Storage, PostgreSQL, and RabbitMQ to drive asynchronous job processing through a dynamic, JSON-configured Pipeline Engine with reliable messaging (retries, idempotency, and dead-letter queues)._
+The detailed implementation plan is maintained locally in `SDD.md`. It is intentionally ignored by Git.
+
+## Architecture
 
 ```mermaid
-graph TD
-    Client[Client / Dashboard] -->|API Requests| API[Spring Boot API]
-    API -->|Reads/Writes State| DB[(PostgreSQL)]
-    API -->|Publishes Jobs| MQ[RabbitMQ]
-
-    MQ -->|Consumes Jobs| W1[Worker Node 1]
-    MQ -->|Consumes Jobs| W2[Worker Node 2]
-
-    W1 <-->|Streams/Saves Assets| Storage[(Azure Blob Storage)]
-    W2 <-->|Streams/Saves Assets| Storage
-    W1 -->|Updates Status| DB
-    W2 -->|Updates Status| DB
+flowchart LR
+    Dev[Developer application] -->|API key| API[Spring Boot API]
+    Browser[Dashboard browser] --> Dashboard[Next.js dashboard]
+    Dashboard -->|HttpOnly BFF session| API
+    API --> DB[(PostgreSQL)]
+    API --> Queue[RabbitMQ]
+    Queue --> Worker[Processing worker]
+    Worker --> DB
+    API -->|short-lived upload/download URLs| Blob[Azure Blob Storage / Azurite]
+    Dev -->|direct media upload| Blob
+    Worker --> Blob
 ```
 
-### Core Concepts
+| Responsibility | Local development | V1 Azure target |
+|---|---|---|
+| Dashboard | Next.js development server | Azure Container App |
+| API | Spring Boot process | Azure Container App |
+| Worker | Spring AMQP/RabbitMQ listener | Queue-scaled Azure Container App |
+| Relational data | PostgreSQL 16 | Azure Database for PostgreSQL Flexible Server |
+| Media bytes | Azurite | Private Azure Blob Storage |
+| Work queue | RabbitMQ | Azure Service Bus |
+| Secrets | Environment variables | Key Vault and Managed Identity |
+| Telemetry | Actuator foundation | Azure Monitor/Application Insights, with Prometheus/Grafana planned |
 
-- **Asset**: A file ingested into Sluice.
-- **Pipeline**: A generic workflow definition (e.g. "Thumbnail Generator").
-- **PipelineVersion**: An immutable, JSON-configured execution graph that strictly enforces MIME type compatibility.
-- **Processor**: A reusable unit of compute (e.g., `ResizeProcessor`) that advertises its `ProcessorMetadata`.
-- **Job**: A single execution instance of a specific `PipelineVersion` against an Asset.
-- **Worker**: A stateless service responsible for resolving and executing the pipeline.
-- **Queue**: Coordinates asynchronous task distribution.
+The API creates state and queues work. Workers perform media processing. Project IDs are enforced in the authentication context and repository queries. The browser never receives the dashboard JWT; the Next.js backend-for-frontend stores it in an HttpOnly cookie.
 
----
+## Technology
 
-## 🛠️ Technology Stack
+- Java 17, Spring Boot 4.1, Spring MVC, Spring Security, Spring Data JPA
+- PostgreSQL and Flyway
+- RabbitMQ and Spring AMQP
+- Azure Blob Storage SDK with Azurite for local development
+- Next.js 16, React 19, TypeScript, Tailwind CSS, and TanStack Query
+- Gradle, npm, Docker Compose, JUnit, Mockito, and Testcontainers
 
-- Java 17, Spring Boot 4, Gradle
-- Next.js, React, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, Zod
-- PostgreSQL, Flyway
-- RabbitMQ, Azure Blob Storage
-- Docker
-- JUnit, Mockito
+## Prerequisites
 
----
+- Java 17
+- Node.js 20.9 or newer with npm
+- Docker Desktop with the Docker engine running
 
-## 🗺️ Implementation Roadmap
+Docker is required for the local PostgreSQL/RabbitMQ/Azurite stack and for backend integration tests. The integration tests create a disposable PostgreSQL database named `sluice_test`; they do not clean or reuse the development database.
 
-To manage complexity and optimize for learning distributed systems fundamentals, Sluice is being built incrementally.
+Check Docker before testing:
 
-### Phase 1: The Vertical Slice (Completed)
+```powershell
+docker version
+```
 
-**Goal:** Establish the core ingestion API.
-**Scope:** Upload an asset synchronously via the Spring Boot API, persist the raw file directly to Azure Blob Storage, save metadata to PostgreSQL, and return the generated Asset ID.
-_Note: This phase intentionally omits queues to establish a solid baseline for asset storage._
+If Testcontainers reports that it cannot find a Docker environment, start Docker Desktop and rerun the command above before running Gradle tests.
 
-### Phase 2: Asynchronous Workers (Completed)
+## Start the local application
 
-**Goal:** Introduce the execution layer.
-**Scope:**
+From the repository root, start local infrastructure:
 
-- RabbitMQ integration
-- Job creation and persistence
-- Asynchronous background workers
-- Job lifecycle tracking
-- Job status API
-- Basic background processing
+```powershell
+docker compose up -d
+```
 
-### Phase 3: Pipeline Orchestration (Completed)
+Start the backend in a second terminal:
 
-**Goal:** Introduce a modular processing architecture.
-**Scope:**
+```powershell
+cd backend
+.\gradlew.bat bootRun
+```
 
-- Pipeline Engine
-- Processor abstraction
-- ProcessingContext
-- Modular processing pipeline
-- MetadataProcessor
-- ChecksumProcessor
-- ThumbnailProcessor
-- Extensible processor architecture
+Start the dashboard in a third terminal:
 
-### Phase 4: Resiliency & Reliability (Completed)
+```powershell
+cd frontend
+npm ci
+npm run dev
+```
 
-**Goal:** Handle distributed failures gracefully.
-**Scope:**
+Open [http://localhost:3000/signup](http://localhost:3000/signup), create an account and project, then open Settings to create an API key. The backend listens on [http://localhost:8080](http://localhost:8080). RabbitMQ management is at [http://localhost:15672](http://localhost:15672).
 
-- Dead Letter Queues (DLQs)
-- Exponential backoff retries
-- Message idempotency guarantees
+Stop the local services while retaining their Docker volumes:
 
-### Phase 5: Real-time Updates & Direct Uploads (Completed)
+```powershell
+docker compose down
+```
 
-**Goal:** Optimize client performance.
-**Scope:**
+To remove the local database, queue, and Azurite data as well, use `docker compose down -v`. This deletes only the named local Compose volumes.
 
-- Direct-to-storage uploads using Azure SAS URLs
-- Real-time job status updates using Server-Sent Events (SSE)
+## API-first developer flow
 
-### Phase 6: Dashboard & User Experience (Completed)
+The dashboard is useful for creating a project and revealing a key, but applications should use the API.
 
-**Goal:** Build the primary web interface for Sluice.
-**Scope:**
+### Authentication
 
-- Dashboard overview with live platform metrics
-- Asset management dashboard
-- Job management dashboard
-- Direct uploads using Azure SAS URLs
-- Live job status updates via Server-Sent Events (SSE)
-- Next.js dashboard and frontend architecture
+Human dashboard requests use a JWT and `X-Project-ID`. Machine requests use a project API key:
 
-### Phase 6.5: Processing Engine Hardening & Media Foundation (Completed)
+```http
+X-API-Key: sl_live_<one-time-secret>
+```
 
-**Goal:** Harden the backend engine and prepare for configurable workflows.
-**Scope:**
+The raw key is returned only from `POST /api/v1/projects/{projectId}/api-keys`. Sluice stores a SHA-256 hash and cannot show the raw value again.
 
-- Transactional boundaries and concurrency safeguards
-- `@Version` optimistic locking for safe job transitions
-- Self-healing orphan and zombie job recovery services
-- `MediaResource` stream-based abstractions for safe file handling
-- Extensible `ProcessorResult` contract and core MIME/Resize/WebP processors
+### Current endpoint flow
 
-### Phase 7: Dynamic Pipeline Versioning (Completed)
+All paths below include the `/api/v1` prefix.
 
-**Goal:** Allow developers to define custom processing workflows.
-**Scope:**
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/auth/signup` | Create a user and owner project; returns a JWT for initial setup |
+| `POST` | `/auth/login` | Authenticate a human user |
+| `GET` | `/auth/me` | Read the current user and memberships |
+| `GET/POST` | `/projects` | List or create projects |
+| `GET/POST` | `/projects/{id}/api-keys` | List key metadata or create/reveal a key |
+| `DELETE` | `/projects/{id}/api-keys/{keyId}` | Revoke a key |
+| `GET` | `/processors` | List current hard-coded processor metadata |
+| `GET/POST` | `/pipelines` | List or create project pipelines |
+| `GET` | `/pipelines/published` | List published pipelines available to the project |
+| `POST` | `/pipelines/{id}/versions` | Create a draft pipeline version |
+| `POST` | `/pipelines/versions/{id}/publish` | Validate and publish a draft version |
+| `POST` | `/assets/upload-url` | Create a pending asset and write-only upload URL |
+| `POST` | `/assets/{assetId}/complete?pipelineId={id}` | Verify the upload and queue a job |
+| `GET` | `/assets`, `/assets/{id}` | List or inspect project assets |
+| `GET` | `/assets/{id}/download` | Create a short-lived download URL |
+| `GET` | `/jobs`, `/jobs/{id}` | List or inspect jobs |
+| `GET` | `/jobs/{id}/events` | Subscribe to authenticated SSE job events |
+| `GET` | `/dashboard` | Read the current dashboard overview |
 
-- JSON pipeline definitions
-- Configurable processors
-- Pipeline validation
-- Developer-defined pipeline execution
+The upload completion endpoint currently starts a job immediately. The final reusable upload/run API is planned as separate upload completion and run creation endpoints.
 
-### Phase 8: Productisation & API Security (Completed)
+### API key upload example
 
-**Goal:** Introduce multi-tenant isolation and secure M2M authentication.
-**Scope:**
+After creating a key and obtaining a published pipeline ID, request an upload URL:
 
-- Project-level tenant isolation
-- API key authentication for machine-to-machine integrations
-- JWT authentication for human users
-- Strict boundary checks across data APIs
+```powershell
+$api = "http://localhost:8080/api/v1"
+$headers = @{ "X-API-Key" = $env:SLUICE_API_KEY }
+$body = @{ filename = "photo.png"; contentType = "image/png"; size = (Get-Item .\photo.png).Length } | ConvertTo-Json
+$upload = Invoke-RestMethod -Method Post -Uri "$api/assets/upload-url" -Headers $headers -ContentType "application/json" -Body $body
+```
 
-**Result:** External applications can authenticate with a project API key while resources remain isolated by project.
+Upload the bytes directly to the returned SAS URL, then complete the upload:
 
-### Phase 9: Developer Platform & Dashboard (Current)
+```powershell
+Invoke-WebRequest -Method Put -Uri $upload.uploadUrl `
+  -Headers @{ "x-ms-blob-type" = "BlockBlob"; "Content-Type" = "image/png" } `
+  -InFile .\photo.png
 
-**Goal:** Build a fully usable Developer Platform.
-**Scope:**
+$pipelineId = "<published-pipeline-id>"
+Invoke-RestMethod -Method Post `
+  -Uri "$api/assets/$($upload.assetId)/complete?pipelineId=$pipelineId" `
+  -Headers $headers
+```
 
-- Developer Signup and Login
-- Dashboard Project Management
-- API Key Generation and Revocation
-- Backend-for-Frontend (BFF) authentication via Next.js
-- HttpOnly Cookie Session Management
+The completion response contains the asset and queued job IDs. Poll `/jobs/{jobId}` or subscribe to `/jobs/{jobId}/events`.
 
-**Result:** Developers can manage projects and API credentials through the Sluice dashboard.
+## Configuration
 
-### Phase 10: Cloud Infrastructure & DevOps
+Local defaults are defined in `backend/src/main/resources/application.properties` and match `docker-compose.yml`. Override them with environment variables; never commit real credentials.
 
-**Goal:** Deploy Sluice as a production-ready cloud platform.
-**Scope:**
+| Variable | Purpose | Local default |
+|---|---|---|
+| `SLUICE_DB_URL` | API PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/sluice` |
+| `SLUICE_DB_USERNAME` | API database user | `sluice` |
+| `SLUICE_DB_PASSWORD` | API database password | `sluice_password` |
+| `SLUICE_FLYWAY_URL` | Optional Flyway JDBC URL | API database URL |
+| `SLUICE_FLYWAY_USERNAME` | Optional Flyway user | API database user |
+| `SLUICE_FLYWAY_PASSWORD` | Optional Flyway password | API database password |
+| `AZURE_STORAGE_CONNECTION_STRING` | Blob/Azurite connection string | Local Azurite account |
+| `AZURE_STORAGE_CONTAINER_NAME` | Blob container | `assets` |
+| `AZURE_STORAGE_CONFIGURE_CORS` | Mutate storage CORS at startup | `true` locally; false in production |
+| `SLUICE_CORS_ALLOWED_ORIGINS` | Allowed browser origins | `http://localhost:3000` |
+| `SLUICE_JWT_SECRET` | JWT signing secret | Development-only fallback |
+| `SPRING_PROFILES_ACTIVE` | Activate production-required settings | Set to `production` in Azure |
+| `API_BASE_URL` | Backend URL used by the Next.js BFF | `http://localhost:8080/api/v1` |
 
-- Azure deployment
-- Azure Kubernetes Service (AKS)
-- Terraform infrastructure
-- GitHub Actions CI/CD
-- Container Registry
-- Production configuration
-- OpenTelemetry, Prometheus, and Grafana integration
+Production must supply a strong JWT secret and managed database, storage, queue, CORS, and API URL settings. `application-production.properties` intentionally has no source-code fallbacks for required database, storage, JWT, and CORS values.
 
-### 🚧 Future Direction
+## Verification
 
-Sluice aims to evolve beyond a media processing platform into an intelligent media orchestration and governance platform. Future milestones will expand the platform across areas such as scalability, AI-assisted orchestration, media governance, and advanced developer experience.
+Backend tests must be run from `backend`:
 
----
+```powershell
+.\gradlew.bat test --rerun-tasks --console=plain
+```
 
-## 💻 Getting Started
+The default suite uses Testcontainers PostgreSQL and the `test` profile. It disables RabbitMQ listener startup, scheduled job recovery, and real Azure Blob initialization. The current suite contains 23 tests and should finish with zero failures.
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/sluice-hq/sluice.git
-   cd sluice
-   ```
-2. Start the local infrastructure (PostgreSQL, RabbitMQ, Azurite) using Docker Compose:
-   ```bash
-   docker-compose up -d
-   ```
-3. Start the Spring Boot backend API:
-   ```bash
-   cd backend
-   ./gradlew bootRun
-   ```
-4. Start the Next.js frontend dashboard (in a new terminal):
-   ```bash
-   cd frontend
-   npm ci
-   npm run dev
-   ```
-5. Navigate to [http://localhost:3000](http://localhost:3000) to access the Sluice Dashboard.
-6. **Test the Platform:** Upload an asset through the dashboard to experience the complete direct-to-storage upload, asynchronous background processing, and real-time job tracking workflow.
+The separate task is reserved for tests tagged `external-integration`:
+
+```powershell
+.\gradlew.bat externalIntegrationTest --console=plain
+```
+
+It currently has no tagged broker/storage tests; that coverage is planned for the product verification workstream.
+
+Frontend checks must be run from `frontend`:
+
+```powershell
+npm run lint
+npm run build
+```
+
+`git diff --check` is also expected to pass before a commit.
+
+## Repository layout
+
+```text
+backend/    Spring Boot API, workers, migrations, and tests
+frontend/   Next.js dashboard and backend-for-frontend routes
+docker-compose.yml
+README.md   This developer guide
+SDD.md      Local architectural reference, ignored by Git
+```
+
+## Security boundaries
+
+- Every tenant resource is scoped to a project.
+- Human JWTs and the selected project are stored server-side in HttpOnly cookies by the Next.js BFF.
+- API keys are high-entropy, revealed once, hashed at rest, project-scoped, and revocable.
+- Default tests use an isolated database rather than developer data.
+- Blob containers are private and upload/download access uses short-lived SAS URLs.
+- Arbitrary executable processor code, unrestricted graphs, remote URL processing, quotas, and custom marketplace submissions are not V1 capabilities.
+
+## Roadmap and Azure status
+
+The intended V1 path is:
+
+1. Versioned processor contracts and curated market.
+2. Canonical JSON plus Form pipeline builder.
+3. Separate upload/run APIs with durable step data and webhooks.
+4. Real compression and Azure AI Content Safety governance.
+5. Complete dashboard, Prometheus/Grafana operations, and local product gate.
+6. Terraform, Azure Container Apps, Service Bus, managed PostgreSQL/Blob, Key Vault, API Management, and Azure telemetry.
+
+Azure deployment is part of the final demo, but it has not been implemented on this branch. Read the local `SDD.md` for the dependency-ordered ticket plan and current acceptance gates.

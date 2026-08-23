@@ -1,6 +1,7 @@
 package com.sluice.api.exception;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ProblemDetail;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,5 +18,15 @@ class GlobalExceptionHandlerTest {
         assertEquals("The request is invalid.", response.getDetail());
         assertEquals("invalid_request", response.getProperties().get("code"));
         assertFalse(response.getDetail().contains("storage URL"));
+    }
+
+    @Test
+    void mapsDatabaseConflictsWithoutExposingConstraintDetails() {
+        ProblemDetail response = new GlobalExceptionHandler()
+                .handleDataIntegrityViolation(new DataIntegrityViolationException("users_email_key"));
+
+        assertEquals(409, response.getStatus());
+        assertEquals("resource_conflict", response.getProperties().get("code"));
+        assertFalse(response.getDetail().contains("users_email_key"));
     }
 }

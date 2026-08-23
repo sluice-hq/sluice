@@ -33,12 +33,30 @@ dependencies {
 	implementation 'com.azure:azure-storage-blob:12.25.1'
 	runtimeOnly 'org.postgresql:postgresql'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
 	testImplementation 'org.springframework.security:spring-security-test'
+	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+	testImplementation 'org.testcontainers:testcontainers-postgresql'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+	useJUnitPlatform {
+		excludeTags 'external-integration'
+	}
+	systemProperty 'user.timezone', 'UTC'
+}
+
+tasks.register('externalIntegrationTest', Test) {
+	description = 'Runs tests that require real broker or storage services.'
+	group = 'verification'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	dependsOn tasks.named('testClasses')
+	useJUnitPlatform {
+		includeTags 'external-integration'
+	}
+	shouldRunAfter tasks.named('test')
 	systemProperty 'user.timezone', 'UTC'
 }
 

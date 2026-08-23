@@ -12,11 +12,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.Optional;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
 
@@ -34,7 +33,7 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
         String apiKey = request.getHeader(API_KEY_HEADER);
 
         if (apiKey != null && apiKey.startsWith("sl_live_")) {
-            String keyHash = hashKey(apiKey);
+            String keyHash = ApiKeyHasher.sha256(apiKey);
             Optional<ApiKey> validKey = apiKeyRepository.findByKeyHashAndRevokedAtIsNull(keyHash);
 
             if (validKey.isPresent()) {
@@ -45,31 +44,12 @@ public class ApiKeyAuthenticationFilter extends OncePerRequestFilter {
                         context, null, Collections.emptyList()
                 );
                 SecurityContextHolder.getContext().setAuthentication(auth);
+                apiKeyRepository.updateLastUsedAtIfStale(
+                        key.getId(), Instant.now(), Instant.now().minus(15, ChronoUnit.MINUTES));
             }
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private String hashKey(String key) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] encodedhash = digest.digest(key.getBytes(StandardCharsets.UTF_8));
-            return bytesToHex(encodedhash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm not found", e);
-        }
-    }
-
-    private String bytesToHex(byte[] hash) {
-        StringBuilder hexString = new StringBuilder(2 * hash.length);
-        for (byte b : hash) {
-            String hex = Integer.toHexString(0xff & b);
-            if (hex.length() == 1) {
-                hexString.append('0');
-            }
-            hexString.append(hex);
-        }
-        return hexString.toString();
-    }
 }

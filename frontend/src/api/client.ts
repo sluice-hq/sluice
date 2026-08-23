@@ -1,6 +1,4 @@
-import { getAuthHeaders } from '@/lib/auth';
-
-export const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1';
+export const BASE_URL = '/api/backend';
 
 export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE_URL}${endpoint}`;
@@ -8,14 +6,18 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
       ...options.headers,
     },
   });
 
   if (!response.ok) {
     const errorData = await response.text();
-    throw new Error(errorData || 'An error occurred while fetching data');
+    let message = errorData || 'The request failed';
+    try {
+      const problem = JSON.parse(errorData) as { detail?: string };
+      message = problem.detail || message;
+    } catch { /* Non-JSON error response. */ }
+    throw new Error(message);
   }
 
   // Handle empty responses
