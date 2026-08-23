@@ -16,6 +16,8 @@ import java.util.UUID;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sluice.api.pipeline.ProcessorMetadata;
 import java.util.List;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.sluice.api.pipeline.ProcessorManifestResources;
 
 @Component
 public class WebpProcessor implements Processor {
@@ -25,7 +27,8 @@ public class WebpProcessor implements Processor {
         return new ProcessorMetadata(
             "webp",
             List.of("image/*"),
-            (inputMimeType, config) -> "image/webp"
+            (inputMimeType, config) -> "image/webp",
+            ProcessorManifestResources.load("webp-1.0.0.json")
         );
     }
 

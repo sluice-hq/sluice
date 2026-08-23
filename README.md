@@ -2,7 +2,7 @@
 
 Sluice is an API-first media processing platform. A developer application authenticates with a project API key, uploads media directly to object storage, starts a processing job, and reads the asset/job result through the API. The Next.js dashboard is the human control plane for projects, keys, assets, jobs, and testing.
 
-This repository is an early, working foundation—not the finished V1. Identity, project isolation, API keys, direct uploads, asynchronous jobs, a first pipeline engine, and a dashboard are implemented. The curated processor market, lossless JSON/UI pipeline builder, final `/runs` API, durable step analytics, governance, Prometheus/Grafana setup, and Azure deployment are planned work.
+This repository is an early, working foundation—not the finished V1. Identity, project isolation, API keys, direct uploads, asynchronous jobs, versioned processor contracts, a curated processor market, JSON/Form pipeline authoring, and a dashboard are implemented. The final `/runs` API, durable step analytics, governance, Prometheus/Grafana setup, and Azure deployment are planned work.
 
 ## What works today
 
@@ -12,8 +12,8 @@ This repository is an early, working foundation—not the finished V1. Identity,
 - Project-isolated assets, pipelines, jobs, and dashboard queries.
 - Direct Azure Blob/Azurite upload URLs, upload completion checks, and short-lived download URLs.
 - RabbitMQ-backed asynchronous jobs with worker processing, retries, recovery scans, and SSE job events.
-- Early pipeline endpoints for project pipelines, draft versions, publishing, and hard-coded processor metadata.
-- Dashboard pages for overview, assets, jobs, upload testing, login/signup, projects, and API keys.
+- Versioned pipeline authoring with canonical JSON/Form editing, processor-version validation, immutable publishing, stable aliases, and history.
+- Dashboard pages for overview, assets, jobs, upload testing, login/signup, projects, API keys, pipelines, and the processor market.
 - RFC-style problem responses for validation, authentication, authorization, and database conflicts.
 
 ## Current limitations
@@ -21,10 +21,8 @@ This repository is an early, working foundation—not the finished V1. Identity,
 The following are intentionally not claimed as complete yet:
 
 - The public API still uses the legacy asset-completion flow; the final separate `/uploads` and `/runs` contract is planned.
-- Pipeline definitions are not yet the complete versioned processor-manifest contract described in the SDD.
-- The processor market and JSON/Form pipeline editor are not implemented; related navigation is disabled.
+- Reusable `/uploads` and `/runs`, durable step facts, webhooks, idempotency, quotas, governance decisions, and OpenAPI quick starts are planned.
 - WebP fails closed when an encoder is unavailable. No production WebP/AVIF codec is bundled yet.
-- Run step facts, compression totals, webhooks, idempotency, quotas, governance decisions, and OpenAPI quick starts are planned.
 - Dashboard charts, search, notifications, health, and pagination still contain placeholder UI and are not product metrics.
 - Azure resources and deployment automation are not in this branch yet.
 - Arbitrary custom processor code is outside V1 for safety reasons.
@@ -144,11 +142,15 @@ All paths below include the `/api/v1` prefix.
 | `GET/POST` | `/projects` | List or create projects |
 | `GET/POST` | `/projects/{id}/api-keys` | List key metadata or create/reveal a key |
 | `DELETE` | `/projects/{id}/api-keys/{keyId}` | Revoke a key |
-| `GET` | `/processors` | List current hard-coded processor metadata |
+| `GET` | `/processors` | List published processor releases and their contracts |
 | `GET/POST` | `/pipelines` | List or create project pipelines |
 | `GET` | `/pipelines/published` | List published pipelines available to the project |
-| `POST` | `/pipelines/{id}/versions` | Create a draft pipeline version |
-| `POST` | `/pipelines/versions/{id}/publish` | Validate and publish a draft version |
+| `GET` | `/pipelines/{slug}` | Read a pipeline draft, aliases, and current state |
+| `GET` | `/pipelines/{slug}/versions` | Read immutable version history |
+| `PUT` | `/pipelines/{slug}/draft` | Create/update a revision-checked draft |
+| `POST` | `/pipelines/{slug}/validate` | Validate a draft or candidate definition |
+| `POST` | `/pipelines/{slug}/publish` | Validate and publish a draft immutably |
+| `PUT` | `/pipelines/{slug}/aliases/{alias}` | Move an alias to a published version |
 | `POST` | `/assets/upload-url` | Create a pending asset and write-only upload URL |
 | `POST` | `/assets/{assetId}/complete?pipelineId={id}` | Verify the upload and queue a job |
 | `GET` | `/assets`, `/assets/{id}` | List or inspect project assets |
@@ -215,7 +217,7 @@ Backend tests must be run from `backend`:
 .\gradlew.bat test --rerun-tasks --console=plain
 ```
 
-The default suite uses Testcontainers PostgreSQL and the `test` profile. It disables RabbitMQ listener startup, scheduled job recovery, and real Azure Blob initialization. The current suite contains 23 tests and should finish with zero failures.
+The default suite uses Testcontainers PostgreSQL and the `test` profile. It disables RabbitMQ listener startup, scheduled job recovery, and real Azure Blob initialization. The current suite contains 44 tests and should finish with zero failures.
 
 The separate task is reserved for tests tagged `external-integration`:
 
@@ -255,13 +257,11 @@ SDD.md      Local architectural reference, ignored by Git
 
 ## Roadmap and Azure status
 
-The intended V1 path is:
+The remaining V1 path is:
 
-1. Versioned processor contracts and curated market.
-2. Canonical JSON plus Form pipeline builder.
-3. Separate upload/run APIs with durable step data and webhooks.
-4. Real compression and Azure AI Content Safety governance.
-5. Complete dashboard, Prometheus/Grafana operations, and local product gate.
-6. Terraform, Azure Container Apps, Service Bus, managed PostgreSQL/Blob, Key Vault, API Management, and Azure telemetry.
+1. Separate upload/run APIs with durable step data and webhooks.
+2. Real compression and Azure AI Content Safety governance.
+3. Complete dashboard, Prometheus/Grafana operations, and local product gate.
+4. Terraform, Azure Container Apps, Service Bus, managed PostgreSQL/Blob, Key Vault, API Management, and Azure telemetry.
 
 Azure deployment is part of the final demo, but it has not been implemented on this branch. Read the local `SDD.md` for the dependency-ordered ticket plan and current acceptance gates.

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1",
+  "slug": "webp",
+  "version": "1.0.0",
+  "displayName": "WebP Encoder",
+  "description": "First-party Sluice WebP encoder; execution fails closed until the V1 codec is installed",
+  "category": "compression",
+  "input": {"kind": "image", "mimeTypes": ["image/*"], "maxBytes": 50000000, "maxPixels": 40000000, "alphaSupported": true, "animationSupported": false},
+  "output": {"kind": "image", "mimeTypes": ["image/webp"], "maxBytes": 50000000, "maxPixels": 40000000, "alphaSupported": true, "animationSupported": false},
+  "configSchema": {"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "additionalProperties": false, "properties": {}},
+  "limits": {"timeoutSeconds": 30, "memoryMb": 512, "maxOutputBytes": 50000000},
+  "permissions": ["blob.read.input", "blob.write.output"],
+  "status": "PUBLISHED",
+  "releaseNotes": "Initial contract release; deterministic encoder delivery remains in L-05"
+}

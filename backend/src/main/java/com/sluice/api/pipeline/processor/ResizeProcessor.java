@@ -17,6 +17,8 @@ import java.util.UUID;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sluice.api.pipeline.ProcessorMetadata;
 import java.util.List;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.sluice.api.pipeline.ProcessorManifestResources;
 
 @Component
 public class ResizeProcessor implements Processor {
@@ -36,7 +38,8 @@ public class ResizeProcessor implements Processor {
         return new ProcessorMetadata(
             "resize",
             List.of("image/*"),
-            (inputMimeType, config) -> "image/jpeg"
+            (inputMimeType, config) -> "image/jpeg",
+            ProcessorManifestResources.load("resize-1.0.0.json")
         );
     }
 

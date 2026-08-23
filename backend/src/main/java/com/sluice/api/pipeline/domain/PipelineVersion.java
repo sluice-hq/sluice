@@ -26,6 +26,12 @@ public class PipelineVersion {
     @Column(nullable = false)
     private String status; // DRAFT, PUBLISHED, ARCHIVED
 
+    @Column(name = "schema_version", nullable = false)
+    private String schemaVersion = "1";
+
+    @Column(nullable = false)
+    private int revision = 1;
+
     @Column(name = "expected_input_mime_type")
     private String expectedInputMimeType = "*/*";
 
@@ -33,8 +39,26 @@ public class PipelineVersion {
     @Column(columnDefinition = "jsonb", nullable = false)
     private JsonNode definition;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "validation_result", columnDefinition = "jsonb")
+    private JsonNode validationResult;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "resolved_input_contract", columnDefinition = "jsonb")
+    private JsonNode resolvedInputContract;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "resolved_output_contract", columnDefinition = "jsonb")
+    private JsonNode resolvedOutputContract;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
+
+    @Column(name = "updated_at", insertable = false)
+    private Instant updatedAt;
+
+    @Column(name = "published_at")
+    private Instant publishedAt;
 
     protected PipelineVersion() {}
 
@@ -51,11 +75,47 @@ public class PipelineVersion {
     public Pipeline getPipeline() { return pipeline; }
     public int getVersionNumber() { return versionNumber; }
     public String getStatus() { return status; }
+    public String getSchemaVersion() { return schemaVersion; }
+    public int getRevision() { return revision; }
     public String getExpectedInputMimeType() { return expectedInputMimeType; }
     public JsonNode getDefinition() { return definition; }
+    public JsonNode getValidationResult() { return validationResult; }
+    public JsonNode getResolvedInputContract() { return resolvedInputContract; }
+    public JsonNode getResolvedOutputContract() { return resolvedOutputContract; }
     public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
+    public Instant getPublishedAt() { return publishedAt; }
 
-    public void setStatus(String status) { this.status = status; }
-    public void setDefinition(JsonNode definition) { this.definition = definition; }
-    public void setExpectedInputMimeType(String expectedInputMimeType) { this.expectedInputMimeType = expectedInputMimeType; }
+    public void updateDraft(JsonNode definition, String expectedInputMimeType, JsonNode validationResult,
+                            JsonNode resolvedInputContract, JsonNode resolvedOutputContract) {
+        requireDraft();
+        this.definition = definition;
+        this.expectedInputMimeType = expectedInputMimeType;
+        this.validationResult = validationResult;
+        this.resolvedInputContract = resolvedInputContract;
+        this.resolvedOutputContract = resolvedOutputContract;
+        this.revision++;
+    }
+
+    public void recordValidation(JsonNode validationResult, JsonNode resolvedInputContract, JsonNode resolvedOutputContract) {
+        requireDraft();
+        this.validationResult = validationResult;
+        this.resolvedInputContract = resolvedInputContract;
+        this.resolvedOutputContract = resolvedOutputContract;
+    }
+
+    public void publish(JsonNode validationResult, JsonNode resolvedInputContract, JsonNode resolvedOutputContract) {
+        requireDraft();
+        this.validationResult = validationResult;
+        this.resolvedInputContract = resolvedInputContract;
+        this.resolvedOutputContract = resolvedOutputContract;
+        this.status = "PUBLISHED";
+        this.publishedAt = Instant.now();
+    }
+
+    private void requireDraft() {
+        if (!"DRAFT".equals(status)) {
+            throw new IllegalStateException("Published pipeline versions are immutable");
+        }
+    }
 }

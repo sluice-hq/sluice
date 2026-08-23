@@ -14,6 +14,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.sluice.api.pipeline.ProcessorMetadata;
 import java.util.List;
 import java.util.ArrayList;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.sluice.api.pipeline.ProcessorManifestResources;
 
 @Component
 public class MimeValidationProcessor implements Processor {
@@ -23,7 +25,8 @@ public class MimeValidationProcessor implements Processor {
         return new ProcessorMetadata(
             "mime-validation",
             List.of("*/*"),
-            (inputMimeType, config) -> inputMimeType
+            (inputMimeType, config) -> inputMimeType,
+            ProcessorManifestResources.load("mime-validation-1.0.0.json")
         );
     }
 

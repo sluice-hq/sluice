@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 @Repository
@@ -17,5 +18,8 @@ public interface PipelineVersionRepository extends JpaRepository<PipelineVersion
     int getMaxVersionNumber(@Param("pipelineId") UUID pipelineId);
 
     Optional<PipelineVersion> findFirstByPipelineIdAndStatusOrderByVersionNumberDesc(UUID pipelineId, String status);
+    Optional<PipelineVersion> findFirstByPipelineIdAndStatus(UUID pipelineId, String status);
+    Optional<PipelineVersion> findByPipelineIdAndVersionNumber(UUID pipelineId, int versionNumber);
+    List<PipelineVersion> findByPipelineIdOrderByVersionNumberDesc(UUID pipelineId);
 
 }

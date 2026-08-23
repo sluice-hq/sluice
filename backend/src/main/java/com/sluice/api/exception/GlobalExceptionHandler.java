@@ -12,10 +12,29 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.dao.DataIntegrityViolationException;
+import com.sluice.api.pipeline.validation.ProcessorConfigurationException;
+import com.sluice.api.pipeline.service.PipelineValidationException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(ProcessorConfigurationException.class)
+    public ProblemDetail handleProcessorConfiguration(ProcessorConfigurationException exc) {
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST,
+                "Processor configuration validation failed.", "processor_configuration_invalid");
+        problem.setProperty("processor", exc.getProcessor());
+        problem.setProperty("errors", exc.getErrors());
+        return problem;
+    }
+
+    @ExceptionHandler(PipelineValidationException.class)
+    public ProblemDetail handlePipelineValidation(PipelineValidationException exc) {
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST,
+                "Pipeline validation failed.", "pipeline_validation_failed");
+        problem.setProperty("validation", exc.getReport());
+        return problem;
+    }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ProblemDetail handleMaxSizeException(MaxUploadSizeExceededException exc) {
