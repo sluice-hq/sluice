@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { getAssets } from '@/api/assets';
 import { StatusBadge } from '@/components/domain/StatusBadge';
 import { TableSkeleton } from '@/components/domain/SkeletonLoader';
@@ -10,9 +11,10 @@ import { Upload, FileVideo } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AssetsPage() {
+  const [page, setPage] = useState(0);
   const { data: pageData, isLoading, error } = useQuery({
-    queryKey: ['assets', 0, 20],
-    queryFn: () => getAssets(0, 20),
+    queryKey: ['assets', page, 20],
+    queryFn: () => getAssets(page, 20),
     refetchInterval: 5000,
   });
 
@@ -80,10 +82,9 @@ export default function AssetsPage() {
           </table>
           <div className="px-6 py-4 border-t border-white/5 bg-black/20 text-xs text-muted-foreground flex justify-between items-center">
             <span>Showing {pageData.numberOfElements} of {pageData.totalElements} assets</span>
-            {/* Pagination placeholder */}
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled className="border-white/10 bg-white/5 text-muted-foreground">Previous</Button>
-              <Button variant="outline" size="sm" disabled className="border-white/10 bg-white/5 text-muted-foreground">Next</Button>
+              <Button variant="outline" size="sm" disabled={pageData.first} onClick={() => setPage((current) => current - 1)} className="border-white/10 bg-white/5 text-muted-foreground">Previous</Button>
+              <Button variant="outline" size="sm" disabled={pageData.last} onClick={() => setPage((current) => current + 1)} className="border-white/10 bg-white/5 text-muted-foreground">Next</Button>
             </div>
           </div>
         </div>

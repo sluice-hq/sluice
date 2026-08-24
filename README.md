@@ -27,7 +27,9 @@ The following are intentionally not claimed as complete yet:
 - Step records persist outcomes, timings, errors, MIME/byte facts, processor metadata, output assets, and attempt history.
 - WebP uses pinned `com.github.usefulness:webp-imageio:0.11.0`, verifies encode/decode capability at startup, defaults to quality 82, and fails closed if the native codec cannot load.
 - Governance uses a deterministic local provider by default. Production selects the Azure Content Safety adapter with `SLUICE_GOVERNANCE_PROVIDER=azure`, `AZURE_CONTENT_SAFETY_ENDPOINT`, and `AZURE_CONTENT_SAFETY_API_KEY`.
-- Dashboard charts, search, notifications, health, and pagination still contain placeholder UI and are not product metrics.
+- Dashboard search, notifications, and dependency health details remain outside the current operational surface; dashboard counts and asset/job pagination are backed by API data.
+- Prometheus is available at `http://localhost:9090` and Grafana at `http://localhost:3001` after `docker compose up`; Grafana is populated from the API's `/actuator/prometheus` HTTP request metrics.
+- Authenticated API clients can inspect the generated route index at `GET /api/v1/openapi.json`.
 - Azure resources and deployment automation are not in this branch yet.
 - Arbitrary custom processor code is outside V1 for safety reasons.
 

@@ -11,9 +11,9 @@ import org.springframework.web.multipart.MultipartFile;
 import com.sluice.api.asset.dto.AssetResponse;
 import com.sluice.api.auth.domain.ProjectContext;
 import com.sluice.api.storage.StorageService;
+import com.sluice.api.config.MediaSafetyPolicy;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/assets")
@@ -22,17 +22,19 @@ public class AssetController {
     private final AssetService assetService;
     private final StorageService storageService;
 
-    // Allowed content types for Milestone 1
-    private static final List<String> ALLOWED_CONTENT_TYPES = List.of(
-            "image/jpeg", "image/png", "image/gif", "application/pdf", "video/mp4");
-
-    // Max size 50MB
-    private static final long MAX_FILE_SIZE = 50 * 1024 * 1024;
-
     public AssetController(AssetService assetService, StorageService storageService) {
+        this(assetService, storageService, new MediaSafetyPolicy(50 * 1024 * 1024, 255,
+                "image/jpeg,image/png,image/gif,application/pdf,video/mp4"));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AssetController(AssetService assetService, StorageService storageService, MediaSafetyPolicy safety) {
         this.assetService = assetService;
         this.storageService = storageService;
+        this.safety = safety;
     }
+
+    private final MediaSafetyPolicy safety;
 
     @GetMapping
     public ResponseEntity<Page<AssetResponse>> getAssets(
@@ -77,19 +79,7 @@ public class AssetController {
             @RequestParam("file") MultipartFile file, 
             @RequestParam("pipelineId") java.util.UUID pipelineId,
             @AuthenticationPrincipal ProjectContext context) {
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("File must not be empty.");
-        }
-
-        if (file.getSize() > MAX_FILE_SIZE) {
-            return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body("File size exceeds the 50MB limit.");
-        }
-
-        String contentType = file.getContentType();
-        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
-            return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-                    .body("Unsupported content type. Allowed types: " + ALLOWED_CONTENT_TYPES);
-        }
+        safety.validate(file);
 
         UploadAssetResponse response = assetService.uploadAsset(file, pipelineId, context);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -99,14 +89,8 @@ public class AssetController {
     public ResponseEntity<?> requestUploadUrl(
             @RequestBody com.sluice.api.asset.dto.UploadUrlRequest request,
             @AuthenticationPrincipal ProjectContext context) {
-        if (request.getSize() > MAX_FILE_SIZE) {
-            return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE).body("File size exceeds the 50MB limit.");
-        }
-
-        if (request.getContentType() == null || !ALLOWED_CONTENT_TYPES.contains(request.getContentType())) {
-            return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
-                    .body("Unsupported content type. Allowed types: " + ALLOWED_CONTENT_TYPES);
-        }
+        if (request == null) throw new IllegalArgumentException("Upload request is required");
+        safety.validate(request.getFilename(), request.getContentType(), request.getSize());
 
         com.sluice.api.asset.dto.UploadUrlResponse response = assetService.requestUploadUrl(
                 request.getFilename(), request.getContentType(), request.getSize(), context);

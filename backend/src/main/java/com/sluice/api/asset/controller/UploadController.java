@@ -6,6 +6,7 @@ import com.sluice.api.asset.dto.UploadUrlResponse;
 import com.sluice.api.asset.service.AssetService;
 import com.sluice.api.asset.service.UploadService;
 import com.sluice.api.auth.domain.ProjectContext;
+import com.sluice.api.config.MediaSafetyPolicy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,16 +22,20 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/uploads")
 public class UploadController {
-    private static final long MAX_FILE_SIZE = 50 * 1024 * 1024;
-    private static final java.util.Set<String> ALLOWED_CONTENT_TYPES = java.util.Set.of(
-            "image/jpeg", "image/png", "image/gif", "application/pdf", "video/mp4");
-
     private final AssetService assets;
     private final UploadService uploads;
+    private final MediaSafetyPolicy safety;
 
     public UploadController(AssetService assets, UploadService uploads) {
+        this(assets, uploads, new MediaSafetyPolicy(50 * 1024 * 1024, 255,
+                "image/jpeg,image/png,image/gif,application/pdf,video/mp4"));
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public UploadController(AssetService assets, UploadService uploads, MediaSafetyPolicy safety) {
         this.assets = assets;
         this.uploads = uploads;
+        this.safety = safety;
     }
 
     @PostMapping
@@ -50,14 +55,7 @@ public class UploadController {
     }
 
     private void validate(UploadUrlRequest request) {
-        if (request == null || request.getFilename() == null || request.getFilename().isBlank()) {
-            throw new IllegalArgumentException("Filename is required");
-        }
-        if (request.getSize() <= 0 || request.getSize() > MAX_FILE_SIZE) {
-            throw new IllegalArgumentException("File size must be between 1 byte and 50MB");
-        }
-        if (request.getContentType() == null || !ALLOWED_CONTENT_TYPES.contains(request.getContentType())) {
-            throw new IllegalArgumentException("Unsupported content type");
-        }
+        if (request == null) throw new IllegalArgumentException("Upload request is required");
+        safety.validate(request.getFilename(), request.getContentType(), request.getSize());
     }
 }

@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 
 public class FileMediaResource implements MediaResource {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(FileMediaResource.class);
     private final File file;
     private final String contentType;
 
@@ -39,7 +40,7 @@ public class FileMediaResource implements MediaResource {
                 Files.deleteIfExists(file.toPath());
             }
         } catch (Exception e) {
-            System.err.println("Failed to delete FileMediaResource: " + e.getMessage());
+            log.warn("media_resource_cleanup_failed path={}", file, e);
         }
     }
 }

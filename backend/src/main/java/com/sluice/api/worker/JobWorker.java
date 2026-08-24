@@ -23,9 +23,14 @@ import com.sluice.api.pipeline.StepExecutionListener;
 import com.sluice.api.pipeline.ConfiguredStep;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import com.sluice.api.observability.SluiceMetrics;
 
 @Service
 public class JobWorker {
+    private static final Logger log = LoggerFactory.getLogger(JobWorker.class);
 
     private final JobService jobService;
     private final AssetRepository assetRepository;
@@ -36,6 +41,7 @@ public class JobWorker {
     private final StepRunService stepRuns;
     private final OutputReconciliationService outputs;
     private final com.sluice.api.governance.GovernanceDecisionService governanceDecisions;
+    private final SluiceMetrics metrics;
 
     @org.springframework.beans.factory.annotation.Autowired
     public JobWorker(JobService jobService, 
@@ -45,7 +51,8 @@ public class JobWorker {
                      PipelineVersionRepository pipelineVersionRepository,
                      PipelineResolver pipelineResolver, StepRunService stepRuns,
                      OutputReconciliationService outputs,
-                     com.sluice.api.governance.GovernanceDecisionService governanceDecisions) {
+                     com.sluice.api.governance.GovernanceDecisionService governanceDecisions,
+                     SluiceMetrics metrics) {
         this.jobService = jobService;
         this.assetRepository = assetRepository;
         this.storageService = storageService;
@@ -55,6 +62,7 @@ public class JobWorker {
         this.stepRuns = stepRuns;
         this.outputs = outputs;
         this.governanceDecisions = governanceDecisions;
+        this.metrics = metrics;
     }
 
     public JobWorker(JobService jobService, AssetRepository assetRepository, StorageService storageService,
@@ -62,7 +70,16 @@ public class JobWorker {
                      PipelineResolver pipelineResolver, StepRunService stepRuns,
                      OutputReconciliationService outputs) {
         this(jobService, assetRepository, storageService, pipelineEngine, pipelineVersionRepository,
-                pipelineResolver, stepRuns, outputs, null);
+                pipelineResolver, stepRuns, outputs, null, null);
+    }
+
+    public JobWorker(JobService jobService, AssetRepository assetRepository, StorageService storageService,
+                     PipelineEngine pipelineEngine, PipelineVersionRepository pipelineVersionRepository,
+                     PipelineResolver pipelineResolver, StepRunService stepRuns,
+                     OutputReconciliationService outputs,
+                     com.sluice.api.governance.GovernanceDecisionService governanceDecisions) {
+        this(jobService, assetRepository, storageService, pipelineEngine, pipelineVersionRepository,
+                pipelineResolver, stepRuns, outputs, governanceDecisions, null);
     }
 
     public JobWorker(JobService jobService, AssetRepository assetRepository, StorageService storageService,
@@ -74,6 +91,7 @@ public class JobWorker {
 
     @RabbitListener(queues = RabbitMqConfig.QUEUE_NAME)
     public void processJob(JobMessage message) throws Exception {
+        if (message.getRequestId() != null) MDC.put("requestId", message.getRequestId());
         com.sluice.api.pipeline.MediaResource finalResource = null;
         ProcessingContext processingContext = null;
         Job claimedJob = null;
@@ -83,7 +101,7 @@ public class JobWorker {
                     .orElseThrow(() -> new IllegalArgumentException("Job not found: " + message.getJobId()));
 
             if (job.getStatus() != JobStatus.QUEUED) {
-                System.out.println("Job " + job.getId() + " is already in state " + job.getStatus() + ". Skipping duplicate delivery.");
+                log.info("job_skipped jobId={} status={} reason=duplicate_delivery", job.getId(), job.getStatus());
                 return;
             }
 
@@ -92,16 +110,17 @@ public class JobWorker {
                         "Queued asset does not match the durable run input");
             }
 
-            System.out.println("Processing Job: " + job.getId());
+            log.info("job_processing_started jobId={} assetId={}", job.getId(), job.getAssetId());
 
             // Atomically claim QUEUED -> RUNNING so duplicate deliveries cannot
             // execute the same job in parallel.
             job = jobService.claimQueuedJob(message.getJobId()).orElse(null);
             if (job == null) {
-                System.out.println("Job " + message.getJobId() + " was claimed by another worker.");
+                log.info("job_claim_skipped jobId={} reason=claimed_by_other_worker", message.getJobId());
                 return;
             }
             claimedJob = job;
+            if (metrics != null) metrics.job("RUNNING");
 
             // Fetch the asset
             Asset asset = assetRepository.findByIdAndProjectId(job.getAssetId(), job.getProjectId())
@@ -137,6 +156,7 @@ public class JobWorker {
                     public void afterStep(ConfiguredStep step, com.sluice.api.pipeline.MediaResource output,
                                           java.util.Map<String, Object> metadata, boolean resourceChanged) {
                         stepRuns.complete(message.getJobId(), step.getId(), output, metadata);
+                        if (metrics != null) metrics.step(step.getProcessor().getMetadata().name(), "COMPLETED");
                         if (governanceDecisions != null && metadata.containsKey(
                                 com.sluice.api.pipeline.processor.ContentSafetyProcessor.DECISION_FACT)) {
                             governanceDecisions.persist(message.getJobId(), step.getId(), metadata);
@@ -156,10 +176,12 @@ public class JobWorker {
             String governanceDecision = (String) context.getAttributes().get(
                     com.sluice.api.pipeline.processor.ContentSafetyProcessor.DECISION_FACT);
             if ("REVIEW".equals(governanceDecision)) {
+                if (metrics != null) metrics.governance("REVIEW");
                 jobService.requireReviewSystem(job.getId(), asset.getSize());
                 return;
             }
             if ("BLOCK".equals(governanceDecision)) {
+                if (metrics != null) metrics.governance("BLOCK");
                 jobService.failJobSystem(job.getId(), "governance_blocked", "Content was blocked by governance policy");
                 return;
             }
@@ -194,11 +216,13 @@ public class JobWorker {
                 jobService.completeJobSystem(job.getId(), asset.getSize(), outputBytes,
                         derived == null ? null : derived.getId());
             }
+            if (metrics != null) metrics.job("COMPLETED");
         } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
-            System.out.println("Job " + message.getJobId() + " overridden by another process (Optimistic Lock). Aborting.");
+            log.info("job_claim_lost jobId={} reason=optimistic_lock", message.getJobId());
         } catch (Exception e) {
-            System.err.println("Job " + message.getJobId() + " attempt failed with " + errorCode(e));
+            log.error("job_attempt_failed jobId={} errorCode={}", message.getJobId(), errorCode(e), e);
             if (claimedJob == null) throw e;
+            if (metrics != null) metrics.job("FAILED");
             if (stepRuns == null) {
                 jobService.requeueRunningJob(message.getJobId());
                 throw e;
@@ -219,6 +243,7 @@ public class JobWorker {
             if (resourceToClean != null) {
                 resourceToClean.cleanup();
             }
+            if (message.getRequestId() != null) MDC.remove("requestId");
         }
     }
 

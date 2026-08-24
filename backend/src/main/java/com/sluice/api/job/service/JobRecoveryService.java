@@ -6,6 +6,8 @@ import com.sluice.api.job.repository.JobRepository;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.time.Duration;
@@ -14,6 +16,7 @@ import java.util.List;
 @Service
 @Profile("!test")
 public class JobRecoveryService {
+    private static final Logger log = LoggerFactory.getLogger(JobRecoveryService.class);
 
     private final JobRepository jobRepository;
     private final JobService jobService;
@@ -33,11 +36,11 @@ public class JobRecoveryService {
             try {
                 jobService.scheduleRetry(job.getId(), "worker_interrupted", "Worker execution was interrupted",
                         Duration.ZERO);
-                System.out.println("Recovered zombie job " + job.getId() + " to RETRY_WAIT status.");
+                log.info("job_recovered jobId={} status=RETRY_WAIT", job.getId());
             } catch (org.springframework.orm.ObjectOptimisticLockingFailureException e) {
                 // Ignore, another instance handled it or the worker just finished
             } catch (Exception e) {
-                System.err.println("Failed to recover zombie job " + job.getId() + ": " + e.getMessage());
+                log.error("job_recovery_failed jobId={}", job.getId(), e);
             }
         }
     }

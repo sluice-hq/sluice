@@ -6,9 +6,6 @@ import { mapDashboardOverview } from '@/lib/dashboard-mapper';
 import { MetricsSkeleton, TableSkeleton } from '@/components/domain/SkeletonLoader';
 import { EmptyState } from '@/components/domain/EmptyState';
 import { TrendMetricCard } from '@/components/domain/TrendMetricCard';
-import { ThroughputChart } from '@/components/domain/ThroughputChart';
-import { PipelineActivity } from '@/components/domain/PipelineActivity';
-import { SystemHealth } from '@/components/domain/SystemHealth';
 import { RecentAssetsTable, RecentJobsTable } from '@/components/domain/DashboardTables';
 
 export default function OverviewPage() {
@@ -59,45 +56,9 @@ export default function OverviewPage() {
             <TrendMetricCard metric={dashboard.kpis.failedToday} />
           </div>
 
-          {/* Charts Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-8 h-[400px]">
-              {dashboard.throughput.length > 0 ? (
-                <ThroughputChart data={dashboard.throughput} />
-              ) : (
-                <div className="h-full bg-card border border-border rounded-xl shadow-sm flex items-center justify-center p-8">
-                  <EmptyState title="No Throughput Data" description="Throughput metrics are not yet implemented on the backend." />
-                </div>
-              )}
-            </div>
-            
-            <div className="lg:col-span-4 h-[400px]">
-              {dashboard.pipelineActivity.length > 0 ? (
-                <PipelineActivity stages={dashboard.pipelineActivity} />
-              ) : (
-                <div className="h-full bg-card border border-border rounded-xl shadow-sm flex items-center justify-center p-8">
-                  <EmptyState title="No Pipeline Activity" description="Pipeline metrics are not yet implemented." />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Bottom Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-3">
-              {dashboard.systemHealth.length > 0 ? (
-                <SystemHealth services={dashboard.systemHealth} />
-              ) : (
-                <div className="h-full bg-card border border-border rounded-xl shadow-sm flex items-center justify-center p-8">
-                  <EmptyState title="System Health Unknown" description="Health checks are not yet implemented." />
-                </div>
-              )}
-            </div>
-            
-            <div className="lg:col-span-9 grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <RecentAssetsTable assets={dashboard.recentAssets} />
-              <RecentJobsTable jobs={dashboard.recentJobs} />
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <RecentAssetsTable assets={dashboard.recentAssets} />
+            <RecentJobsTable jobs={dashboard.recentJobs} />
           </div>
         </div>
       )}

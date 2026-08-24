@@ -8,6 +8,7 @@ public class DashboardResponse {
     private long totalAssets;
     private long totalJobs;
     private long runningJobs;
+    private long queuedJobs;
     private long completedJobs;
     private long failedJobs;
     
@@ -15,9 +16,16 @@ public class DashboardResponse {
     private List<JobResponse> recentJobs;
 
     public DashboardResponse(long totalAssets, long totalJobs, long runningJobs, long completedJobs, long failedJobs, List<AssetResponse> recentAssets, List<JobResponse> recentJobs) {
+        this(totalAssets, totalJobs, runningJobs, 0, completedJobs, failedJobs, recentAssets, recentJobs);
+    }
+
+    public DashboardResponse(long totalAssets, long totalJobs, long runningJobs, long queuedJobs,
+                              long completedJobs, long failedJobs, List<AssetResponse> recentAssets,
+                              List<JobResponse> recentJobs) {
         this.totalAssets = totalAssets;
         this.totalJobs = totalJobs;
         this.runningJobs = runningJobs;
+        this.queuedJobs = queuedJobs;
         this.completedJobs = completedJobs;
         this.failedJobs = failedJobs;
         this.recentAssets = recentAssets;
@@ -27,6 +35,7 @@ public class DashboardResponse {
     public long getTotalAssets() { return totalAssets; }
     public long getTotalJobs() { return totalJobs; }
     public long getRunningJobs() { return runningJobs; }
+    public long getQueuedJobs() { return queuedJobs; }
     public long getCompletedJobs() { return completedJobs; }
     public long getFailedJobs() { return failedJobs; }
     public List<AssetResponse> getRecentAssets() { return recentAssets; }

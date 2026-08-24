@@ -98,7 +98,7 @@ public class RunService {
                 : jobs.createJobForVersion(requestedRunId, request.inputAssetId(), version, webhookEndpointId, context);
         createPlannedSteps(job, version.getDefinition());
         OutboxEvent event = outbox.createRunQueuedEvent(job);
-        outbox.publishAfterCommit(event, new JobMessage(job.getId(), job.getAssetId()));
+        outbox.publishAfterCommit(event, new JobMessage(job.getId(), job.getAssetId(), org.slf4j.MDC.get("requestId")));
         return job;
     }
 

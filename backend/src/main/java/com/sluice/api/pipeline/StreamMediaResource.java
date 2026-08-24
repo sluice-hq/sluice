@@ -3,6 +3,7 @@ package com.sluice.api.pipeline;
 import java.io.InputStream;
 
 public class StreamMediaResource implements MediaResource {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(StreamMediaResource.class);
     private final InputStream inputStream;
     private final long size;
 
@@ -28,7 +29,7 @@ public class StreamMediaResource implements MediaResource {
                 inputStream.close();
             }
         } catch (Exception e) {
-            System.err.println("Failed to close StreamMediaResource: " + e.getMessage());
+            log.warn("stream_resource_cleanup_failed", e);
         }
     }
 }

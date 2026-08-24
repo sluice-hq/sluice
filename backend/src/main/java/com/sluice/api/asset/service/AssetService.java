@@ -16,21 +16,32 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AssetService {
+    private static final Logger log = LoggerFactory.getLogger(AssetService.class);
 
     private final StorageService storageService;
     private final AssetRepository assetRepository;
     private final JobService jobService;
     private final OutboxService outboxService;
+    private final MediaContentVerifier mediaContentVerifier;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public AssetService(StorageService storageService, AssetRepository assetRepository, JobService jobService,
-                        OutboxService outboxService) {
+                        OutboxService outboxService, MediaContentVerifier mediaContentVerifier) {
         this.storageService = storageService;
         this.assetRepository = assetRepository;
         this.jobService = jobService;
         this.outboxService = outboxService;
+        this.mediaContentVerifier = mediaContentVerifier;
+    }
+
+    public AssetService(StorageService storageService, AssetRepository assetRepository, JobService jobService,
+                        OutboxService outboxService) {
+        this(storageService, assetRepository, jobService, outboxService, null);
     }
 
     public Page<Asset> getAssets(ProjectContext context, Pageable pageable) {
@@ -86,7 +97,7 @@ public class AssetService {
                 storageService.deleteFile(fileUrl);
             } catch (Exception cleanupException) {
                 // In a production app, we would log this failure to a DLQ or alerting system
-                System.err.println("Failed to delete orphaned blob during compensation: " + fileUrl);
+                log.error("asset_compensation_failed storageUrl={}", fileUrl, cleanupException);
             }
             throw new RuntimeException("Failed to persist asset metadata or job. Initiated blob cleanup.", e);
         }
@@ -137,6 +148,7 @@ public class AssetService {
         if (actualSize != asset.getSize()) {
             throw new RuntimeException("Uploaded file size (" + actualSize + " bytes) does not match expected size (" + asset.getSize() + " bytes)");
         }
+        if (mediaContentVerifier != null) mediaContentVerifier.verify(asset.getStorageUrl(), asset.getContentType());
         
         asset.setUploadStatus(Asset.UploadStatus.COMPLETED);
         Asset savedAsset = assetRepository.save(asset);
@@ -177,6 +189,7 @@ public class AssetService {
         if (actualSize != asset.getSize()) {
             throw new IllegalStateException("Uploaded file size does not match the declared size");
         }
+        if (mediaContentVerifier != null) mediaContentVerifier.verify(asset.getStorageUrl(), asset.getContentType());
 
         asset.setUploadStatus(Asset.UploadStatus.COMPLETED);
         return assetRepository.save(asset);
