@@ -35,6 +35,7 @@ public class JobWorker {
     private final PipelineResolver pipelineResolver;
     private final StepRunService stepRuns;
     private final OutputReconciliationService outputs;
+    private final com.sluice.api.governance.GovernanceDecisionService governanceDecisions;
 
     @org.springframework.beans.factory.annotation.Autowired
     public JobWorker(JobService jobService, 
@@ -43,7 +44,8 @@ public class JobWorker {
                      PipelineEngine pipelineEngine,
                      PipelineVersionRepository pipelineVersionRepository,
                      PipelineResolver pipelineResolver, StepRunService stepRuns,
-                     OutputReconciliationService outputs) {
+                     OutputReconciliationService outputs,
+                     com.sluice.api.governance.GovernanceDecisionService governanceDecisions) {
         this.jobService = jobService;
         this.assetRepository = assetRepository;
         this.storageService = storageService;
@@ -52,13 +54,22 @@ public class JobWorker {
         this.pipelineResolver = pipelineResolver;
         this.stepRuns = stepRuns;
         this.outputs = outputs;
+        this.governanceDecisions = governanceDecisions;
+    }
+
+    public JobWorker(JobService jobService, AssetRepository assetRepository, StorageService storageService,
+                     PipelineEngine pipelineEngine, PipelineVersionRepository pipelineVersionRepository,
+                     PipelineResolver pipelineResolver, StepRunService stepRuns,
+                     OutputReconciliationService outputs) {
+        this(jobService, assetRepository, storageService, pipelineEngine, pipelineVersionRepository,
+                pipelineResolver, stepRuns, outputs, null);
     }
 
     public JobWorker(JobService jobService, AssetRepository assetRepository, StorageService storageService,
                      PipelineEngine pipelineEngine, PipelineVersionRepository pipelineVersionRepository,
                      PipelineResolver pipelineResolver) {
         this(jobService, assetRepository, storageService, pipelineEngine, pipelineVersionRepository,
-                pipelineResolver, null, null);
+                pipelineResolver, null, null, null);
     }
 
     @RabbitListener(queues = RabbitMqConfig.QUEUE_NAME)
@@ -126,6 +137,10 @@ public class JobWorker {
                     public void afterStep(ConfiguredStep step, com.sluice.api.pipeline.MediaResource output,
                                           java.util.Map<String, Object> metadata, boolean resourceChanged) {
                         stepRuns.complete(message.getJobId(), step.getId(), output, metadata);
+                        if (governanceDecisions != null && metadata.containsKey(
+                                com.sluice.api.pipeline.processor.ContentSafetyProcessor.DECISION_FACT)) {
+                            governanceDecisions.persist(message.getJobId(), step.getId(), metadata);
+                        }
                         if (resourceChanged) finalOutputStep.set(step.getId());
                     }
 
@@ -137,6 +152,17 @@ public class JobWorker {
                 });
             }
             finalResource = context.getCurrentResource();
+
+            String governanceDecision = (String) context.getAttributes().get(
+                    com.sluice.api.pipeline.processor.ContentSafetyProcessor.DECISION_FACT);
+            if ("REVIEW".equals(governanceDecision)) {
+                jobService.requireReviewSystem(job.getId(), asset.getSize());
+                return;
+            }
+            if ("BLOCK".equals(governanceDecision)) {
+                jobService.failJobSystem(job.getId(), "governance_blocked", "Content was blocked by governance policy");
+                return;
+            }
 
             // Save new derived assets if the pipeline created a new resource
             Asset derived = null;

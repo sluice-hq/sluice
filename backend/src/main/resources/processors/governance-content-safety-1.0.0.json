@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1",
+  "slug": "governance.content-safety",
+  "version": "1.0.0",
+  "displayName": "Content Safety",
+  "description": "Normalizes local or Azure image moderation scores into ALLOW, REVIEW, or BLOCK",
+  "category": "governance",
+  "input": {"kind": "image", "mimeTypes": ["image/jpeg", "image/png", "image/webp"], "maxBytes": 50000000, "maxPixels": 40000000, "alphaSupported": true, "animationSupported": false},
+  "output": {"kind": "image", "mimeTypes": ["image/jpeg", "image/png", "image/webp"], "maxBytes": 50000000, "maxPixels": 40000000, "alphaSupported": true, "animationSupported": false},
+  "configSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "reviewThreshold": {"type": "integer", "minimum": 0, "maximum": 6},
+      "blockThreshold": {"type": "integer", "minimum": 1, "maximum": 7}
+    }
+  },
+  "limits": {"timeoutSeconds": 10, "memoryMb": 256, "maxOutputBytes": 50000000},
+  "permissions": ["blob.read.input", "network.azure-content-safety"],
+  "status": "PUBLISHED",
+  "releaseNotes": "Initial local-deterministic and Azure Content Safety provider contract"
+}
