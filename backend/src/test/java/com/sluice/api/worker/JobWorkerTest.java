@@ -106,6 +106,30 @@ class JobWorkerTest {
     }
 
     @Test
+    void blockedGovernanceDecisionProducesNoNormalOutput() throws Exception {
+        FailureFixture fixture = new FailureFixture();
+        StepRunService stepRuns = mock(StepRunService.class);
+        OutputReconciliationService outputs = mock(OutputReconciliationService.class);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            ProcessingContext context = invocation.getArgument(1);
+            context.getAttributes().put(
+                    com.sluice.api.pipeline.processor.ContentSafetyProcessor.DECISION_FACT, "BLOCK");
+            return null;
+        }).when(fixture.engine).execute(any(com.sluice.api.pipeline.Pipeline.class),
+                any(ProcessingContext.class), any());
+
+        new JobWorker(fixture.jobs, fixture.assets, fixture.storage, fixture.engine, fixture.versions,
+                fixture.resolver, stepRuns, outputs, mock(com.sluice.api.governance.GovernanceDecisionService.class))
+                .processJob(new JobMessage(fixture.jobId, fixture.assetId));
+
+        verify(fixture.jobs).failJobSystem(fixture.jobId, "governance_blocked",
+                "Content was blocked by governance policy");
+        verifyNoInteractions(outputs);
+        verify(fixture.jobs, never()).completeJobSystem(any(), org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(), any());
+    }
+
+    @Test
     void processingFailureRequeuesRethrowsAndCleansResource() throws Exception {
         UUID jobId = UUID.randomUUID();
         UUID assetId = UUID.randomUUID();

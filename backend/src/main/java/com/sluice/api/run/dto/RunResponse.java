@@ -10,7 +10,14 @@ import java.util.UUID;
 public record RunResponse(UUID id, String status, PipelineReference pipeline, UUID inputAssetId,
                           List<StepResponse> steps, List<AssetResponse> outputs,
                           Instant createdAt, Instant updatedAt, Metrics metrics, ErrorResponse error,
-                          List<AttemptResponse> attempts) {
+                          List<AttemptResponse> attempts, GovernanceResponse governance) {
+    public RunResponse(UUID id, String status, PipelineReference pipeline, UUID inputAssetId,
+                       List<StepResponse> steps, List<AssetResponse> outputs,
+                       Instant createdAt, Instant updatedAt, Metrics metrics, ErrorResponse error,
+                       List<AttemptResponse> attempts) {
+        this(id, status, pipeline, inputAssetId, steps, outputs, createdAt, updatedAt,
+                metrics, error, attempts, null);
+    }
     public RunResponse(UUID id, String status, PipelineReference pipeline, UUID inputAssetId,
                        List<StepResponse> steps, List<AssetResponse> outputs,
                        Instant createdAt, Instant updatedAt) {
@@ -39,4 +46,7 @@ public record RunResponse(UUID id, String status, PipelineReference pipeline, UU
     public record ErrorResponse(String code, String message) {}
     public record AttemptResponse(int attempt, String status, Instant startedAt, Instant completedAt,
                                   ErrorResponse error, Boolean transientFailure) {}
+    public record GovernanceResponse(String decision, String policyVersion, String provider,
+                                     String modelVersion, com.fasterxml.jackson.databind.JsonNode categoryScores,
+                                     com.fasterxml.jackson.databind.JsonNode reasonCodes) {}
 }

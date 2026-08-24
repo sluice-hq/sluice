@@ -2,7 +2,7 @@
 
 Sluice is an API-first media processing platform. A developer application authenticates with a project API key, uploads media directly to object storage, starts a versioned pipeline run, and reads the durable run result through the API. The Next.js dashboard is the human control plane for projects, keys, assets, jobs, and testing.
 
-This repository is an early, working foundation, not the finished V1. Identity, project isolation, API keys, reusable uploads, slug-based run creation, idempotency, durable outbox/step planning, asynchronous jobs, versioned processor contracts, a curated processor market, JSON/Form pipeline authoring, and a dashboard are implemented. Durable step outcomes, governance, Prometheus/Grafana setup, and Azure deployment remain planned work.
+This repository is an early, working foundation, not the finished V1. Identity, project isolation, API keys, reusable uploads, slug-based run creation, idempotency, durable asynchronous execution, versioned processor contracts, real bounded image processing, persisted governance decisions, a curated processor market, JSON/Form pipeline authoring, and a dashboard are implemented. Prometheus/Grafana setup and Azure deployment remain planned work.
 
 ## What works today
 
@@ -24,8 +24,9 @@ This repository is an early, working foundation, not the finished V1. Identity, 
 The following are intentionally not claimed as complete yet:
 
 - The old `/assets/{assetId}/complete?pipelineId=...` endpoint still exists for compatibility; new integrations should use separate `/uploads` and `/runs` endpoints.
-- Step records currently begin as `PENDING`; durable processor outcomes, timings, errors, compression facts, and webhooks are L-04/L-05 work.
-- WebP fails closed when an encoder is unavailable. No production WebP/AVIF codec is bundled yet.
+- Step records persist outcomes, timings, errors, MIME/byte facts, processor metadata, output assets, and attempt history.
+- WebP uses pinned `com.github.usefulness:webp-imageio:0.11.0`, verifies encode/decode capability at startup, defaults to quality 82, and fails closed if the native codec cannot load.
+- Governance uses a deterministic local provider by default. Production selects the Azure Content Safety adapter with `SLUICE_GOVERNANCE_PROVIDER=azure`, `AZURE_CONTENT_SAFETY_ENDPOINT`, and `AZURE_CONTENT_SAFETY_API_KEY`.
 - Dashboard charts, search, notifications, health, and pagination still contain placeholder UI and are not product metrics.
 - Azure resources and deployment automation are not in this branch yet.
 - Arbitrary custom processor code is outside V1 for safety reasons.
@@ -283,7 +284,7 @@ SDD.md      Local architectural reference, ignored by Git
 The remaining V1 path is:
 
 1. Separate upload/run APIs with durable step data and webhooks.
-2. Real compression and Azure AI Content Safety governance.
+2. Product surface, fixed API/media safety limits, and operational metrics over the implemented processing/governance core.
 3. Complete dashboard, Prometheus/Grafana operations, and local product gate.
 4. Terraform, Azure Container Apps, Service Bus, managed PostgreSQL/Blob, Key Vault, API Management, and Azure telemetry.
 

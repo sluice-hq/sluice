@@ -45,13 +45,15 @@ public class RunService {
     private final RunAttemptRepository attempts;
     private final WebhookEndpointService webhookEndpoints;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final com.sluice.api.governance.GovernanceDecisionService governanceDecisions;
 
     @org.springframework.beans.factory.annotation.Autowired
     public RunService(JobService jobs, JobRepository jobRepository, AssetRepository assets,
                       PipelineService pipelines, PipelineVersionRepository versions,
                       StepRunRepository steps, IdempotencyService idempotency, OutboxService outbox,
                       RunAttemptRepository attempts, WebhookEndpointService webhookEndpoints,
-                      com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+                      com.fasterxml.jackson.databind.ObjectMapper objectMapper,
+                      com.sluice.api.governance.GovernanceDecisionService governanceDecisions) {
         this.jobs = jobs;
         this.jobRepository = jobRepository;
         this.assets = assets;
@@ -63,13 +65,14 @@ public class RunService {
         this.attempts = attempts;
         this.webhookEndpoints = webhookEndpoints;
         this.objectMapper = objectMapper;
+        this.governanceDecisions = governanceDecisions;
     }
 
     public RunService(JobService jobs, JobRepository jobRepository, AssetRepository assets,
                       PipelineService pipelines, PipelineVersionRepository versions,
                       StepRunRepository steps, IdempotencyService idempotency, OutboxService outbox) {
         this(jobs, jobRepository, assets, pipelines, versions, steps, idempotency, outbox, null, null,
-                new com.fasterxml.jackson.databind.ObjectMapper());
+                new com.fasterxml.jackson.databind.ObjectMapper(), null);
     }
 
     @Transactional
@@ -138,13 +141,18 @@ public class RunService {
                         attempt.getStartedAt(), attempt.getCompletedAt(), attempt.getErrorCode() == null ? null
                         : new RunResponse.ErrorResponse(attempt.getErrorCode(), attempt.getErrorMessage()),
                         attempt.getTransientFailure())).toList();
+        RunResponse.GovernanceResponse governance = governanceDecisions == null ? null
+                : governanceDecisions.latest(job.getId()).map(decision -> new RunResponse.GovernanceResponse(
+                        decision.getDecision().name(), decision.getPolicyVersion(), decision.getProvider(),
+                        decision.getModelVersion(), decision.getCategoryScores(), decision.getReasonCodes()))
+                .orElse(null);
         return new RunResponse(job.getId(), job.getStatus().name(),
                 new RunResponse.PipelineReference(version.getPipeline().getSlug(), version.getVersionNumber()),
                 job.getAssetId(), plannedSteps, outputs, job.getCreatedAt(), job.getUpdatedAt(),
                 new RunResponse.Metrics(queueWait, processing, job.getInputBytes(), job.getOutputBytes(),
                         job.getBytesSaved(), job.getCompressionRatio()),
                 job.getErrorCode() == null ? null : new RunResponse.ErrorResponse(job.getErrorCode(), job.getErrorMessage()),
-                attemptResponses);
+                attemptResponses, governance);
     }
 
     private void createPlannedSteps(Job job, JsonNode definition) {

@@ -1,5 +1,6 @@
 package com.sluice.api.pipeline.catalog;
 
+import com.sluice.api.pipeline.ProcessorRegistry;
 import com.sluice.api.pipeline.catalog.repository.ProcessorDefinitionRepository;
 import com.sluice.api.pipeline.catalog.repository.ProcessorVersionRepository;
 import com.sluice.api.support.SluiceIntegrationTest;
@@ -17,12 +18,20 @@ class ProcessorCatalogPersistenceTests {
     @Autowired
     private ProcessorVersionRepository versionRepository;
 
+    @Autowired
+    private ProcessorRegistry processorRegistry;
+
     @Test
     void flywayCatalogContainsEveryRegisteredPublishedManifest() {
-        assertEquals(5, definitionRepository.count());
+        var manifests = processorRegistry.getAllManifests();
+        var registeredDefinitionCount = manifests.stream()
+                .map(manifest -> manifest.slug())
+                .distinct()
+                .count();
+        assertEquals(registeredDefinitionCount, definitionRepository.count());
         var releases = versionRepository
                 .findByLifecycleStatusOrderByDefinitionSlugAscSemanticVersionDesc("PUBLISHED");
-        assertEquals(5, releases.size());
+        assertEquals(manifests.size(), releases.size());
         assertFalse(releases.stream().anyMatch(release ->
                 !release.getManifest().path("configSchema").path("type").asText().equals("object")));
     }

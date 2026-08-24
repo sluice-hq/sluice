@@ -188,6 +188,23 @@ public class JobService {
     }
 
     @Transactional
+    public Job requireReviewSystem(UUID id, long inputBytes) {
+        Job job = jobRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Run not found"));
+        if (job.getStatus() == JobStatus.REVIEW_REQUIRED) return job;
+        requireState(job, JobStatus.RUNNING);
+        job.setInputBytes(inputBytes);
+        job.setProcessingCompletedAt(Instant.now());
+        job.setErrorCode(null);
+        job.setErrorMessage(null);
+        job.setStatus(JobStatus.REVIEW_REQUIRED);
+        completeAttempt(job, "REVIEW_REQUIRED", null, null, false);
+        Job savedJob = jobRepository.save(job);
+        if (outbox != null) outbox.createTerminalEvent(savedJob, null);
+        publish(savedJob);
+        return savedJob;
+    }
+
+    @Transactional
     public Job failJobSystem(UUID id, String code, String safeMessage) {
         Job job = jobRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Run not found"));
         if (job.isTerminal()) return job;

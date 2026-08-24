@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1",
+  "slug": "resize",
+  "version": "2.0.0",
+  "displayName": "Image Resize",
+  "description": "Aspect-preserving bounded resize that retains the input format and alpha channel",
+  "category": "transform",
+  "input": {"kind": "image", "mimeTypes": ["image/jpeg", "image/png", "image/webp"], "maxBytes": 50000000, "maxPixels": 40000000, "alphaSupported": true, "animationSupported": false},
+  "output": {"kind": "image", "mimeTypes": ["image/jpeg", "image/png", "image/webp"], "maxBytes": 50000000, "maxPixels": 25000000, "alphaSupported": true, "animationSupported": false},
+  "configSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "maxWidth": {"type": "integer", "minimum": 1, "maximum": 5000},
+      "maxHeight": {"type": "integer", "minimum": 1, "maximum": 5000},
+      "allowUpscale": {"type": "boolean"}
+    }
+  },
+  "limits": {"timeoutSeconds": 30, "memoryMb": 512, "maxOutputBytes": 50000000},
+  "permissions": ["blob.read.input", "blob.write.output"],
+  "status": "PUBLISHED",
+  "releaseNotes": "Adds max-bound configuration, no-upscale default, format preservation, alpha preservation, and strict image safety limits"
+}

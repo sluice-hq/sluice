@@ -35,6 +35,11 @@ public class PipelineEngine {
                         }
                     }
                     listener.afterStep(step, context.getCurrentResource(), metadata, changed);
+                    Object governanceDecision = metadata.get(
+                            com.sluice.api.pipeline.processor.ContentSafetyProcessor.DECISION_FACT);
+                    if ("REVIEW".equals(governanceDecision) || "BLOCK".equals(governanceDecision)) {
+                        return;
+                    }
                 } catch (Exception exception) {
                     listener.onFailure(step, exception);
                     throw exception;

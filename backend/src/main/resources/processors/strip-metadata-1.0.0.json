@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1",
+  "slug": "strip-metadata",
+  "version": "1.0.0",
+  "displayName": "Strip Image Metadata",
+  "description": "Removes EXIF, GPS, camera, comments, and color-profile metadata by decoding pixels and writing a clean image",
+  "category": "metadata",
+  "input": {"kind": "image", "mimeTypes": ["image/jpeg", "image/png", "image/webp"], "maxBytes": 50000000, "maxPixels": 40000000, "alphaSupported": true, "animationSupported": false},
+  "output": {"kind": "image", "mimeTypes": ["image/jpeg", "image/png", "image/webp"], "maxBytes": 50000000, "maxPixels": 40000000, "alphaSupported": true, "animationSupported": false},
+  "configSchema": {"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "additionalProperties": false, "properties": {}},
+  "limits": {"timeoutSeconds": 30, "memoryMb": 512, "maxOutputBytes": 50000000},
+  "permissions": ["blob.read.input", "blob.write.output"],
+  "status": "PUBLISHED",
+  "releaseNotes": "Initial deterministic metadata-removal release; color profiles are removed rather than copied without validation"
+}
