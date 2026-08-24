@@ -19,6 +19,7 @@ import com.sluice.api.pipeline.ProcessorManifestResources;
 
 @Component
 public class MetadataProcessor implements Processor {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MetadataProcessor.class);
 
     @Override
     public ProcessorMetadata getMetadata() {
@@ -41,15 +42,13 @@ public class MetadataProcessor implements Processor {
             if (image != null) {
                 metadata.put("width", image.getWidth());
                 metadata.put("height", image.getHeight());
-                System.out.println("Extracted Metadata for Job " + context.getJob().getId() + 
-                                   ": Size=" + fileSize + " bytes, Dimensions=" + 
-                                   image.getWidth() + "x" + image.getHeight());
+                log.debug("metadata_extracted jobId={} sizeBytes={} width={} height={}",
+                        context.getJob().getId(), fileSize, image.getWidth(), image.getHeight());
             } else {
-                System.out.println("Extracted Metadata for Job " + context.getJob().getId() + 
-                                   ": Size=" + fileSize + " bytes (Not an image)");
+                log.debug("metadata_extracted jobId={} sizeBytes={} image=false", context.getJob().getId(), fileSize);
             }
         } catch (Exception e) {
-            System.err.println("Could not parse image metadata: " + e.getMessage());
+            log.warn("metadata_parse_failed jobId={}", context.getJob().getId(), e);
         }
         
         return new ProcessorResult(null, metadata);

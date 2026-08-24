@@ -65,14 +65,14 @@ export function mapDashboardOverview(dto: DashboardOverview): DashboardOverviewV
       },
       successRate: {
         title: 'Success Rate',
-        value: '--', // Not implemented on backend yet
+        value: `${successRate(dto.completedJobs, dto.failedJobs)}%`,
         trend: '--',
         trendUp: true,
         sparklineData: dto.metrics?.successRateSparkline || [],
       },
       queueDepth: {
         title: 'Queue Depth',
-        value: '--', // Not implemented on backend yet
+        value: dto.queuedJobs?.toString() || '0',
         trend: '--',
         trendUp: false,
         sparklineData: dto.metrics?.queueDepthSparkline || [],
@@ -91,4 +91,9 @@ export function mapDashboardOverview(dto: DashboardOverview): DashboardOverviewV
     recentAssets: dto.recentAssets || [],
     recentJobs: dto.recentJobs || [],
   };
+}
+
+function successRate(completed: number, failed: number): number {
+  const terminal = completed + failed;
+  return terminal === 0 ? 0 : Math.round((completed / terminal) * 100);
 }

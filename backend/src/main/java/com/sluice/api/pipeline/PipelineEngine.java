@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class PipelineEngine {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PipelineEngine.class);
 
     public void execute(Pipeline pipeline, ProcessingContext context) throws Exception {
         execute(pipeline, context, StepExecutionListener.NO_OP);
@@ -55,7 +56,7 @@ public class PipelineEngine {
                 try {
                     resource.cleanup();
                 } catch (Exception e) {
-                    System.err.println("Failed to cleanup resource: " + e.getMessage());
+                    log.warn("pipeline_resource_cleanup_failed", e);
                 }
             }
         }

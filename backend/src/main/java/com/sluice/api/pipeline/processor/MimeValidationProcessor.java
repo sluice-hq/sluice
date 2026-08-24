@@ -19,6 +19,7 @@ import com.sluice.api.pipeline.ProcessorManifestResources;
 
 @Component
 public class MimeValidationProcessor implements Processor {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MimeValidationProcessor.class);
 
     @Override
     public ProcessorMetadata getMetadata() {
@@ -46,7 +47,7 @@ public class MimeValidationProcessor implements Processor {
             String mimeType = URLConnection.guessContentTypeFromStream(bis);
             
             if (mimeType == null) {
-                System.err.println("Could not determine MIME type for Job " + context.getJob().getId());
+                log.warn("mime_detection_failed jobId={}", context.getJob().getId());
                 throw new Exception("Unknown MIME type");
             }
             
@@ -54,11 +55,11 @@ public class MimeValidationProcessor implements Processor {
                 .anyMatch(allowed -> mimeType.startsWith(allowed.replace("*", "")));
 
             if (!isValid) {
-                System.err.println("Invalid MIME type: " + mimeType + " for Job " + context.getJob().getId());
+                log.warn("mime_validation_failed jobId={} detectedMimeType={}", context.getJob().getId(), mimeType);
                 throw new Exception("Invalid MIME type: " + mimeType + ". Allowed types: " + allowedTypes);
             }
             
-            System.out.println("Validated MIME type for Job " + context.getJob().getId() + ": " + mimeType);
+            log.debug("mime_validated jobId={} detectedMimeType={}", context.getJob().getId(), mimeType);
             return new ProcessorResult(null, Map.of("validatedMimeType", mimeType));
         }
     }

@@ -17,6 +17,7 @@ import com.sluice.api.pipeline.ProcessorManifestResources;
 
 @Component
 public class ChecksumProcessor implements Processor {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ChecksumProcessor.class);
 
     @Override
     public ProcessorMetadata getMetadata() {
@@ -50,7 +51,7 @@ public class ChecksumProcessor implements Processor {
         }
         String checksum = hexString.toString();
         
-        System.out.println("Computed SHA-256 Checksum for Job " + context.getJob().getId() + ": " + checksum);
+        log.debug("checksum_computed jobId={} checksum={}", context.getJob().getId(), checksum);
         return new ProcessorResult(null, Map.of("checksum", checksum));
     }
 }

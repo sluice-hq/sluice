@@ -29,6 +29,7 @@ public class DashboardService {
         long totalJobs = jobRepository.countByProjectId(projectId);
         
         long runningJobs = 0;
+        long queuedJobs = 0;
         long completedJobs = 0;
         long failedJobs = 0;
         
@@ -38,9 +39,9 @@ public class DashboardService {
             long count = ((Number) row[1]).longValue();
             switch (status) {
                 case RUNNING -> runningJobs = count;
+                case QUEUED, RETRY_WAIT -> queuedJobs += count;
                 case COMPLETED -> completedJobs = count;
                 case FAILED -> failedJobs = count;
-                case QUEUED -> {} // do nothing, not tracked in overview numbers yet
                 default -> {}
             }
         }
@@ -71,6 +72,7 @@ public class DashboardService {
                 ))
                 .collect(Collectors.toList());
 
-        return new DashboardResponse(totalAssets, totalJobs, runningJobs, completedJobs, failedJobs, recentAssets, recentJobs);
+        return new DashboardResponse(totalAssets, totalJobs, runningJobs, queuedJobs, completedJobs, failedJobs,
+                recentAssets, recentJobs);
     }
 }

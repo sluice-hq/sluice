@@ -15,6 +15,11 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
       case 'PROCESSING':
       case 'RUNNING':
         return { color: 'bg-blue-500/10 text-blue-400 border-blue-500/20 shadow-[inset_0_0_8px_rgba(59,130,246,0.1)]', icon: Loader2 };
+      case 'QUEUED':
+      case 'RETRY_WAIT':
+        return { color: 'bg-amber-500/10 text-amber-400 border-amber-500/20', icon: Clock };
+      case 'REVIEW_REQUIRED':
+        return { color: 'bg-orange-500/10 text-orange-400 border-orange-500/20', icon: Clock };
       case 'COMPLETED':
         return { color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[inset_0_0_8px_rgba(16,185,129,0.1)]', icon: CheckCircle2 };
       case 'FAILED':

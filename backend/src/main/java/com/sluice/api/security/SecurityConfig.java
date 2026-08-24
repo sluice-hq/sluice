@@ -31,15 +31,18 @@ public class SecurityConfig {
     private final ProjectMemberRepository projectMemberRepository;
     private final ApiKeyRepository apiKeyRepository;
     private final List<String> allowedOrigins;
+    private final boolean publicPrometheus;
 
     public SecurityConfig(JwtService jwtService, ProjectMemberRepository projectMemberRepository,
                           ApiKeyRepository apiKeyRepository,
-                          @Value("${sluice.cors.allowed-origins:http://localhost:3000}") String allowedOrigins) {
+                          @Value("${sluice.cors.allowed-origins:http://localhost:3000}") String allowedOrigins,
+                          @Value("${sluice.actuator.public-prometheus:false}") boolean publicPrometheus) {
         this.jwtService = jwtService;
         this.projectMemberRepository = projectMemberRepository;
         this.apiKeyRepository = apiKeyRepository;
         this.allowedOrigins = List.of(allowedOrigins.split(",")).stream().map(String::trim)
                 .filter(origin -> !origin.isEmpty()).toList();
+        this.publicPrometheus = publicPrometheus;
     }
 
     @Bean
@@ -60,10 +63,11 @@ public class SecurityConfig {
             // Add both filters. They will selectively authenticate based on the presence of headers.
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(apiKeyAuthFilter, JwtAuthenticationFilter.class)
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/login", "/api/v1/auth/signup").permitAll()
-                .anyRequest().authenticated()
-            );
+            .authorizeHttpRequests(authorize -> {
+                authorize.requestMatchers("/api/v1/auth/login", "/api/v1/auth/signup", "/actuator/health", "/actuator/info").permitAll();
+                if (publicPrometheus) authorize.requestMatchers("/actuator/prometheus").permitAll();
+                authorize.anyRequest().authenticated();
+            });
 
         return http.build();
     }

@@ -15,6 +15,7 @@ import java.util.UUID;
 @Service
 @Profile("!test")
 public class AzureBlobStorageService implements StorageService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AzureBlobStorageService.class);
 
     private final BlobServiceClient blobServiceClient;
     private final String containerName;
@@ -111,7 +112,7 @@ public class AzureBlobStorageService implements StorageService {
             BlobClient blobClient = containerClient.getBlobClient(blobName);
             blobClient.deleteIfExists();
         } catch (Exception e) {
-            System.err.println("Failed to delete blob from URL: " + fileUrl + " - " + e.getMessage());
+            log.error("blob_delete_failed storageUrl={}", fileUrl, e);
         }
     }
 

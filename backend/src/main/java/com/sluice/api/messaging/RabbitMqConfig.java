@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class RabbitMqConfig {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RabbitMqConfig.class);
 
     public static final String QUEUE_NAME = "asset.processing.queue";
     public static final String EXCHANGE_NAME = "asset.exchange";
@@ -74,7 +75,7 @@ public class RabbitMqConfig {
                 jobService.failJobSystem(jobMsg.getJobId(), "broker_retry_exhausted",
                         "Broker delivery retry limit was reached");
             } catch (Exception e) {
-                System.err.println("Failed to parse message in recoverer: " + e.getMessage());
+                log.error("rabbit_message_recovery_failed", e);
             }
             throw new org.springframework.amqp.AmqpRejectAndDontRequeueException(cause);
         };

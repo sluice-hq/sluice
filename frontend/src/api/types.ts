@@ -25,7 +25,7 @@ export interface Asset {
 export interface Job {
   id: string;
   assetId: string;
-  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  status: 'QUEUED' | 'RUNNING' | 'RETRY_WAIT' | 'REVIEW_REQUIRED' | 'COMPLETED' | 'FAILED';
   createdAt: string;
   updatedAt: string;
 }
@@ -34,6 +34,7 @@ export interface DashboardOverview {
   totalAssets: number;
   totalJobs: number;
   runningJobs: number;
+  queuedJobs: number;
   completedJobs: number;
   failedJobs: number;
   recentAssets: Asset[];
@@ -82,4 +83,25 @@ export interface PublishedPipeline {
   versionId: string;
   versionNumber: number;
   expectedInputMimeType: string;
+}
+
+export interface RunDetails {
+  id: string;
+  status: string;
+  pipeline: { slug: string; version: number };
+  inputAssetId: string;
+  steps: Array<{
+    id: string;
+    stepId: string;
+    processor: string;
+    version: string;
+    status: string;
+    durationMs: number | null;
+    inputBytes: number | null;
+    outputBytes: number | null;
+    error: { code: string; message: string } | null;
+  }>;
+  outputs: Asset[];
+  metrics: { queueWaitMs: number | null; processingMs: number | null; inputBytes: number | null; outputBytes: number | null; bytesSaved: number | null; compressionRatio: number | null };
+  governance: { decision: 'ALLOW' | 'REVIEW' | 'BLOCK'; policyVersion: string; provider: string; modelVersion: string; categoryScores: unknown; reasonCodes: unknown } | null;
 }

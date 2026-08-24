@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { getJob } from '@/api/jobs';
+import { getRun } from '@/api/runs';
 import { StatusBadge } from '@/components/domain/StatusBadge';
 import { EmptyState } from '@/components/domain/EmptyState';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,11 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
       const status = query.state.data?.status;
       return (status === 'COMPLETED' || status === 'FAILED') ? false : 2000;
     },
+  });
+  const { data: run } = useQuery({
+    queryKey: ['run', resolvedParams.id],
+    queryFn: () => getRun(resolvedParams.id),
+    refetchInterval: job && !['QUEUED', 'RUNNING', 'RETRY_WAIT'].includes(job.status) ? false : 2000,
   });
 
   useJobEvents(job?.id);
@@ -91,17 +97,21 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
           
-          {/* Pipeline execution logs will go here in the future */}
-          <div className="bg-gray-900 rounded-lg p-6 font-mono text-sm text-gray-300 shadow-inner">
-            <p className="text-gray-500 mb-4">{'// Execution Logs'}</p>
-            <p className="text-green-400">{new Date(job.createdAt).toISOString()} - Job created</p>
-            {job.status !== 'QUEUED' && (
-              <p className="text-green-400">{new Date(job.updatedAt).toISOString()} - Job status changed to {job.status}</p>
-            )}
-            {(job.status === 'RUNNING' || job.status === 'QUEUED') && (
-              <p className="text-yellow-400 animate-pulse mt-2">Waiting for worker...</p>
-            )}
-          </div>
+          {run && <div className="grid gap-6 lg:grid-cols-2">
+            <section className="rounded-lg border bg-white p-6 shadow-sm">
+              <h3 className="font-semibold">Pipeline execution</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{run.pipeline.slug} · v{run.pipeline.version}</p>
+              <div className="mt-4 space-y-2">
+                {run.steps.map((step) => <div key={step.id} className="flex items-center justify-between rounded border p-3 text-sm">
+                  <span>{step.stepId} · {step.processor}@{step.version}</span><StatusBadge status={step.status} />
+                </div>)}
+              </div>
+            </section>
+            <section className="rounded-lg border bg-white p-6 shadow-sm">
+              <h3 className="font-semibold">Governance</h3>
+              {run.governance ? <div className="mt-3 space-y-2 text-sm"><p><span className="font-medium">Decision:</span> {run.governance.decision}</p><p><span className="font-medium">Provider:</span> {run.governance.provider}</p><p><span className="font-medium">Model:</span> {run.governance.modelVersion}</p><p><span className="font-medium">Reasons:</span> {Array.isArray(run.governance.reasonCodes) ? run.governance.reasonCodes.join(', ') : 'Recorded'}</p></div> : <p className="mt-3 text-sm text-muted-foreground">No governance decision was recorded for this run.</p>}
+            </section>
+          </div>}
         </div>
       ) : (
         <EmptyState title="Job Not Found" description="The requested job does not exist." />

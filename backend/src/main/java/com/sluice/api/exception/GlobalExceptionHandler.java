@@ -15,6 +15,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import com.sluice.api.pipeline.validation.ProcessorConfigurationException;
 import com.sluice.api.pipeline.service.PipelineValidationException;
 import com.sluice.api.idempotency.service.IdempotencyConflictException;
+import com.sluice.api.config.MediaSafetyException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -40,6 +41,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ProblemDetail handleMaxSizeException(MaxUploadSizeExceededException exc) {
         return problem(HttpStatus.CONTENT_TOO_LARGE, "File size exceeds the configured server limit.", "payload_too_large");
+    }
+
+    @ExceptionHandler(MediaSafetyException.class)
+    public ProblemDetail handleMediaSafety(MediaSafetyException exc) {
+        return problem(exc.status(), exc.getMessage(), exc.code());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
