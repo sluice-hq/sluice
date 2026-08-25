@@ -5,9 +5,7 @@ import com.sluice.api.asset.repository.AssetRepository;
 import com.sluice.api.auth.domain.ProjectContext;
 import com.sluice.api.job.domain.Job;
 import com.sluice.api.job.domain.JobStatus;
-import com.sluice.api.job.service.JobService;
-import com.sluice.api.outbox.domain.OutboxEvent;
-import com.sluice.api.outbox.service.OutboxService;
+import com.sluice.api.run.service.RunService;
 import com.sluice.api.storage.StorageService;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +20,7 @@ import static org.mockito.Mockito.when;
 class AssetServiceTest {
 
     @Test
-    void createsTheQueueOutboxEventInsideTheUploadTransaction() {
+    void delegatesLegacyUploadRunCreationToTheDurableRunService() {
         UUID projectId = UUID.randomUUID();
         UUID assetId = UUID.randomUUID();
         UUID pipelineId = UUID.randomUUID();
@@ -35,18 +33,16 @@ class AssetServiceTest {
 
         StorageService storage = mock(StorageService.class);
         AssetRepository assets = mock(AssetRepository.class);
-        JobService jobs = mock(JobService.class);
-        OutboxService outbox = mock(OutboxService.class);
+        MediaContentVerifier verifier = mock(MediaContentVerifier.class);
+        RunService runs = mock(RunService.class);
         when(assets.findByIdAndProjectId(assetId, projectId)).thenReturn(Optional.of(asset));
         when(assets.save(asset)).thenReturn(asset);
         when(storage.fileExists("blob-url")).thenReturn(true);
         when(storage.getFileSize("blob-url")).thenReturn(10L);
-        when(jobs.createJob(assetId, pipelineId, context)).thenReturn(job);
-        when(outbox.createRunQueuedEvent(job)).thenReturn(
-                new OutboxEvent(UUID.randomUUID(), projectId, "run.queued", "JOB", jobId, "{}"));
+        when(runs.createLegacy(assetId, pipelineId, context)).thenReturn(job);
 
-        new AssetService(storage, assets, jobs, outbox).completeUpload(assetId, pipelineId, context);
+        new AssetService(storage, assets, verifier, runs).completeUpload(assetId, pipelineId, context);
 
-        verify(outbox).createRunQueuedEvent(job);
+        verify(runs).createLegacy(assetId, pipelineId, context);
     }
 }

@@ -8,14 +8,15 @@ import { useQuery } from '@tanstack/react-query';
 import { LayoutDashboard, FileVideo, Activity, Play, Shield, Settings, LogOut, Boxes } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import { csrfFetch } from '@/lib/csrf';
 
 const navigation = [
   { name: 'Overview', href: '/', icon: LayoutDashboard },
   { name: 'Assets', href: '/assets', icon: FileVideo },
-  { name: 'Jobs', href: '/jobs', icon: Activity },
+  { name: 'Runs', href: '/jobs', icon: Activity },
   { name: 'Pipelines', href: '/pipelines', icon: Play },
   { name: 'Processor Market', href: '/processors', icon: Boxes },
-  { name: 'Governance', href: '/governance', icon: Shield, disabled: true },
+  { name: 'Governance', href: '/governance', icon: Shield },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
@@ -43,14 +44,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (isLoading || !session) return <div className="min-h-screen grid place-items-center bg-background text-muted-foreground">Loading Sluice…</div>;
 
   async function selectProject(projectId: string) {
-    await fetch('/api/session/project', {
+    await csrfFetch('/api/session/project', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }),
     });
     window.location.reload();
   }
 
   async function logout() {
-    await fetch('/api/session/logout', { method: 'POST' });
+    await csrfFetch('/api/session/logout', { method: 'POST' });
     router.replace('/login'); router.refresh();
   }
 
@@ -71,13 +72,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 return (
                   <Link
                     key={item.name}
-                    href={item.disabled ? '#' : item.href}
+                    href={item.href}
                     className={cn(
                       'group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors',
                       isActive
                         ? 'bg-primary text-primary-foreground'
                         : 'text-sidebar-foreground hover:text-white',
-                      item.disabled && 'opacity-40 cursor-not-allowed pointer-events-none'
                     )}
                   >
                     <item.icon
@@ -88,11 +88,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       aria-hidden="true"
                     />
                     {item.name}
-                    {item.disabled && (
-                      <span className="ml-auto inline-block py-0.5 px-2 text-[10px] font-medium tracking-wide text-white/50 bg-white/5 rounded-full border border-white/10">
-                        Soon
-                      </span>
-                    )}
                   </Link>
                 );
               })}
@@ -138,30 +133,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {/* Page Title (injected by page.tsx normally, but we keep header flexible) */}
           </div>
           <div className="flex items-center gap-6">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              <input type="text" placeholder="Search assets, jobs, pipelines..." className="bg-card border border-border text-sm rounded-md pl-10 pr-12 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary w-[300px] text-white" />
-              <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-                <span className="text-xs text-muted-foreground bg-white/5 px-1.5 rounded border border-white/10 font-mono">⌘K</span>
-              </div>
-            </div>
-
-            <button className="relative text-muted-foreground hover:text-white transition-colors">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-[9px] font-bold text-white rounded-full flex items-center justify-center">3</span>
-            </button>
-
-            <Link href="/assets/upload" className="bg-primary text-primary-foreground px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-[0_0_15px_rgba(0,144,255,0.3)]">
+            <Link href="/pipelines" className="bg-primary text-primary-foreground px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-[0_0_15px_rgba(0,144,255,0.3)]">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
-              Upload Asset
+              Build Pipeline
             </Link>
           </div>
         </div>

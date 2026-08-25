@@ -102,6 +102,18 @@ public class RunService {
         return job;
     }
 
+    /** Keeps deprecated upload-and-run endpoints durable while new clients use separate uploads and runs. */
+    @Transactional
+    public Job createLegacy(UUID assetId, UUID pipelineId, ProjectContext context) {
+        PipelineVersion version = pipelines.getLatestPublishedVersion(pipelineId, context)
+                .orElseThrow(() -> new IllegalArgumentException("No published version found for pipeline: " + pipelineId));
+        Job job = jobs.createJobForVersion(assetId, version, context);
+        createPlannedSteps(job, version.getDefinition());
+        OutboxEvent event = outbox.createRunQueuedEvent(job);
+        outbox.publishAfterCommit(event, new JobMessage(job.getId(), job.getAssetId(), org.slf4j.MDC.get("requestId")));
+        return job;
+    }
+
     @Transactional(readOnly = true)
     public Page<RunResponse> list(ProjectContext context, Pageable pageable) {
         return jobRepository.findAllByProjectId(context.getProjectId(), pageable).map(job -> toResponse(job, context));

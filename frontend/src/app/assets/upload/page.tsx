@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { getPublishedPipelines } from '@/api/pipelines';
+import { startRun } from '@/api/runs';
 
 type UploadStep = 'IDLE' | 'REQUESTING' | 'UPLOADING' | 'VERIFYING' | 'COMPLETED' | 'ERROR';
 
@@ -18,7 +19,7 @@ export default function UploadPage() {
   const [step, setStep] = useState<UploadStep>('IDLE');
   const [error, setError] = useState<string | null>(null);
   const [assetId, setAssetId] = useState<string | null>(null);
-  const [pipelineId, setPipelineId] = useState('');
+  const [pipelineSlug, setPipelineSlug] = useState('');
   const { data: pipelines = [], isLoading: pipelinesLoading, error: pipelinesError } = useQuery({
     queryKey: ['pipelines', 'published'],
     queryFn: getPublishedPipelines,
@@ -42,7 +43,7 @@ export default function UploadPage() {
   };
 
   const handleUpload = async () => {
-    if (!file || !pipelineId) return;
+    if (!file || !pipelineSlug) return;
     
     try {
       setStep('REQUESTING');
@@ -75,7 +76,8 @@ export default function UploadPage() {
       setStep('VERIFYING');
       
       // Step 3: Complete upload in Sluice
-      await completeUpload(newAssetId, pipelineId);
+      await completeUpload(newAssetId);
+      await startRun(pipelineSlug, newAssetId);
       
       setStep('COMPLETED');
     } catch (err: unknown) {
@@ -96,8 +98,8 @@ export default function UploadPage() {
       </Link>
 
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Upload Asset</h2>
-        <p className="text-muted-foreground mt-1">Upload a new media file to the platform directly via Azure SAS.</p>
+        <h2 className="text-2xl font-bold tracking-tight">Test a pipeline</h2>
+        <p className="text-muted-foreground mt-1">Manually upload media through Azure SAS to verify a published pipeline before integrating the API.</p>
       </div>
 
       <div className="bg-card border border-border rounded-xl p-8 shadow-sm">
@@ -193,15 +195,15 @@ export default function UploadPage() {
                   <label htmlFor="pipeline" className="text-sm font-medium">Processing pipeline</label>
                   <select
                     id="pipeline"
-                    value={pipelineId}
-                    onChange={(event) => setPipelineId(event.target.value)}
+                    value={pipelineSlug}
+                    onChange={(event) => setPipelineSlug(event.target.value)}
                     disabled={isUploading || pipelinesLoading}
                     className="w-full h-10 rounded-md border border-border bg-background px-3 text-sm disabled:opacity-50"
                     required
                   >
                     <option value="">{pipelinesLoading ? 'Loading pipelines…' : 'Select a published pipeline'}</option>
                     {pipelines.map((pipeline) => (
-                      <option key={pipeline.id} value={pipeline.id}>
+                      <option key={pipeline.id} value={pipeline.slug}>
                         {pipeline.name} (v{pipeline.versionNumber}, {pipeline.expectedInputMimeType})
                       </option>
                     ))}
@@ -218,7 +220,7 @@ export default function UploadPage() {
                   <Button variant="outline" onClick={() => router.back()} disabled={isUploading}>
                     Cancel
                   </Button>
-                  <Button onClick={handleUpload} disabled={isUploading || !pipelineId}>
+                  <Button onClick={handleUpload} disabled={isUploading || !pipelineSlug}>
                     {isUploading ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { API_URL, PROJECT_COOKIE, SESSION_COOKIE, readBackendError, serverAuthHeaders, sessionCookieOptions } from '@/lib/server-session';
+import { API_URL, CSRF_COOKIE, PROJECT_COOKIE, SESSION_COOKIE, csrfCookieOptions, newCsrfToken, readBackendError, serverAuthHeaders, sessionCookieOptions } from '@/lib/server-session';
 
 export async function GET() {
   const cookieStore = await cookies();
@@ -21,6 +21,9 @@ export async function GET() {
   const result = NextResponse.json({ ...body, selectedProjectId });
   if (selectedProjectId !== current && selectedProjectId) {
     result.cookies.set(PROJECT_COOKIE, selectedProjectId, sessionCookieOptions);
+  }
+  if (!cookieStore.get(CSRF_COOKIE)?.value) {
+    result.cookies.set(CSRF_COOKIE, newCsrfToken(), csrfCookieOptions);
   }
   return result;
 }

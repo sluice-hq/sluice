@@ -1,6 +1,7 @@
 package com.sluice.api.pipeline.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sluice.api.auth.domain.ProjectContext;
 import com.sluice.api.pipeline.service.PipelineService;
 import com.sluice.api.pipeline.service.PipelineValidationReport;
@@ -14,14 +15,18 @@ import java.util.List;
 @RequestMapping("/api/v1/pipelines")
 public class PipelineController {
     private final PipelineService pipelines;
+    private final ObjectMapper objectMapper;
 
-    public PipelineController(PipelineService pipelines) { this.pipelines = pipelines; }
+    public PipelineController(PipelineService pipelines, ObjectMapper objectMapper) {
+        this.pipelines = pipelines;
+        this.objectMapper = objectMapper;
+    }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public PipelineService.PipelineDetail create(@RequestBody CreateRequest request,
                                                  @AuthenticationPrincipal ProjectContext context) {
-        return pipelines.createPipeline(request.name(), request.description(), request.definition(), context);
+        return pipelines.createPipeline(request.name(), request.description(), jsonTree(request.definition()), context);
     }
 
     @GetMapping
@@ -55,14 +60,14 @@ public class PipelineController {
     public PipelineService.PipelineVersionView updateDraft(@PathVariable String slug,
                                                            @RequestBody DraftRequest request,
                                                            @AuthenticationPrincipal ProjectContext context) {
-        return pipelines.updateDraft(slug, request.revision(), request.definition(), context);
+        return pipelines.updateDraft(slug, request.revision(), jsonTree(request.definition()), context);
     }
 
     @PostMapping("/{slug}/validate")
     public PipelineValidationReport validate(@PathVariable String slug,
                                              @RequestBody(required = false) ValidateRequest request,
                                              @AuthenticationPrincipal ProjectContext context) {
-        return pipelines.validateDraft(slug, request == null ? null : request.definition(), context);
+        return pipelines.validateDraft(slug, request == null ? null : jsonTree(request.definition()), context);
     }
 
     @PostMapping("/{slug}/publish")
@@ -78,9 +83,13 @@ public class PipelineController {
         return pipelines.moveAlias(slug, alias, request.versionNumber(), context);
     }
 
-    public record CreateRequest(String name, String description, JsonNode definition) {}
-    public record DraftRequest(int revision, JsonNode definition) {}
-    public record ValidateRequest(JsonNode definition) {}
+    private JsonNode jsonTree(Object value) {
+        return value == null ? null : objectMapper.valueToTree(value);
+    }
+
+    public record CreateRequest(String name, String description, Object definition) {}
+    public record DraftRequest(int revision, Object definition) {}
+    public record ValidateRequest(Object definition) {}
     public record RevisionRequest(int revision) {}
     public record AliasRequest(int versionNumber) {}
 }

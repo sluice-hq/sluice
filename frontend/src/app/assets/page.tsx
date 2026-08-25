@@ -35,7 +35,7 @@ export default function AssetsPage() {
         <Link href="/assets/upload">
           <Button className="w-full sm:w-auto">
             <Upload className="w-4 h-4 mr-2" />
-            Upload Asset
+            Test a pipeline
           </Button>
         </Link>
       </div>

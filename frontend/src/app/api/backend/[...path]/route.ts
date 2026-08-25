@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { API_URL, serverAuthHeaders } from '@/lib/server-session';
+import { API_URL, hasValidCsrfToken, serverAuthHeaders } from '@/lib/server-session';
 
 type RouteContext = { params: Promise<{ path: string[] }> };
 
 async function proxy(request: NextRequest, context: RouteContext) {
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !hasValidCsrfToken(request)) {
+    return NextResponse.json(
+      { status: 403, code: 'csrf_rejected', detail: 'The request is missing valid CSRF protection.' },
+      { status: 403, headers: { 'content-type': 'application/problem+json' } },
+    );
+  }
+
   const { path } = await context.params;
   const target = `${API_URL}/${path.join('/')}${request.nextUrl.search}`;
   const headers = new Headers(await serverAuthHeaders());

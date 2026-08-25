@@ -60,6 +60,7 @@ export interface UploadUrlResponse {
 
 export interface PublishedPipeline {
   id: string;
+  slug: string;
   name: string;
   description: string | null;
   versionId: string;
@@ -86,4 +87,6 @@ export interface RunDetails {
   outputs: Asset[];
   metrics: { queueWaitMs: number | null; processingMs: number | null; inputBytes: number | null; outputBytes: number | null; bytesSaved: number | null; compressionRatio: number | null };
   governance: { decision: 'ALLOW' | 'REVIEW' | 'BLOCK'; policyVersion: string; provider: string; modelVersion: string; categoryScores: unknown; reasonCodes: unknown } | null;
+  createdAt: string;
+  updatedAt: string;
 }

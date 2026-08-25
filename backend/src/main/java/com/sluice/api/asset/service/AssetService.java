@@ -4,8 +4,7 @@ import com.sluice.api.asset.domain.Asset;
 import com.sluice.api.asset.dto.UploadAssetResponse;
 import com.sluice.api.asset.repository.AssetRepository;
 import com.sluice.api.job.domain.Job;
-import com.sluice.api.job.service.JobService;
-import com.sluice.api.outbox.service.OutboxService;
+import com.sluice.api.run.service.RunService;
 import com.sluice.api.storage.StorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,23 +24,15 @@ public class AssetService {
 
     private final StorageService storageService;
     private final AssetRepository assetRepository;
-    private final JobService jobService;
-    private final OutboxService outboxService;
     private final MediaContentVerifier mediaContentVerifier;
+    private final RunService runService;
 
-    @org.springframework.beans.factory.annotation.Autowired
-    public AssetService(StorageService storageService, AssetRepository assetRepository, JobService jobService,
-                        OutboxService outboxService, MediaContentVerifier mediaContentVerifier) {
+    public AssetService(StorageService storageService, AssetRepository assetRepository,
+                        MediaContentVerifier mediaContentVerifier, RunService runService) {
         this.storageService = storageService;
         this.assetRepository = assetRepository;
-        this.jobService = jobService;
-        this.outboxService = outboxService;
         this.mediaContentVerifier = mediaContentVerifier;
-    }
-
-    public AssetService(StorageService storageService, AssetRepository assetRepository, JobService jobService,
-                        OutboxService outboxService) {
-        this(storageService, assetRepository, jobService, outboxService, null);
+        this.runService = runService;
     }
 
     public Page<Asset> getAssets(ProjectContext context, Pageable pageable) {
@@ -77,8 +68,7 @@ public class AssetService {
             // The save operation is transactional by default in Spring Data JPA
             Asset savedAsset = assetRepository.save(asset);
             
-            Job job = jobService.createJob(savedAsset.getId(), pipelineId, context);
-            outboxService.createRunQueuedEvent(job);
+            Job job = runService.createLegacy(savedAsset.getId(), pipelineId, context);
             
             return new UploadAssetResponse(
                     savedAsset.getId(),
@@ -153,8 +143,7 @@ public class AssetService {
         asset.setUploadStatus(Asset.UploadStatus.COMPLETED);
         Asset savedAsset = assetRepository.save(asset);
         
-        Job job = jobService.createJob(savedAsset.getId(), pipelineId, context);
-        outboxService.createRunQueuedEvent(job);
+        Job job = runService.createLegacy(savedAsset.getId(), pipelineId, context);
         
         return new UploadAssetResponse(
                 asset.getId(),

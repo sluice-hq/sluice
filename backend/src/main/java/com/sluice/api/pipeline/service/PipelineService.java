@@ -185,7 +185,7 @@ public class PipelineService {
         return pipelines.findByProjectId(context.getProjectId()).stream()
                 .map(pipeline -> aliases.findByPipelineIdAndAlias(pipeline.getId(), "stable")
                         .map(PipelineAlias::getPipelineVersion)
-                        .map(version -> new PublishedPipeline(pipeline.getId(), pipeline.getName(), pipeline.getDescription(),
+                        .map(version -> new PublishedPipeline(pipeline.getId(), pipeline.getSlug(), pipeline.getName(), pipeline.getDescription(),
                                 version.getId(), version.getVersionNumber(), version.getExpectedInputMimeType()))
                         .orElse(null))
                 .filter(Objects::nonNull).toList();
@@ -241,6 +241,6 @@ public class PipelineService {
                                       JsonNode definition, JsonNode validation, JsonNode resolvedInputContract,
                                       JsonNode resolvedOutputContract, Instant createdAt, Instant publishedAt) {}
     public record PipelineAliasView(String alias, int versionNumber) {}
-    public record PublishedPipeline(UUID id, String name, String description, UUID versionId,
+    public record PublishedPipeline(UUID id, String slug, String name, String description, UUID versionId,
                                     int versionNumber, String expectedInputMimeType) {}
 }

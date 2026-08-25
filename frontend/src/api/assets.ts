@@ -10,14 +10,15 @@ export async function getAsset(id: string): Promise<Asset> {
 }
 
 export async function requestUploadUrl(request: UploadUrlRequest): Promise<UploadUrlResponse> {
-  return fetchApi<UploadUrlResponse>('/assets/upload-url', {
+  return fetchApi<UploadUrlResponse>('/uploads', {
     method: 'POST',
     body: JSON.stringify(request),
   });
 }
 
-export async function completeUpload(assetId: string, pipelineId: string): Promise<unknown> {
-  return fetchApi<unknown>(`/assets/${assetId}/complete?pipelineId=${encodeURIComponent(pipelineId)}`, {
+export async function completeUpload(assetId: string): Promise<unknown> {
+  return fetchApi<unknown>(`/uploads/${assetId}/complete`, {
     method: 'POST',
+    headers: { 'Idempotency-Key': crypto.randomUUID() },
   });
 }

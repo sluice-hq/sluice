@@ -37,7 +37,7 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
         <Link href="/jobs">
           <Button variant="ghost" size="sm" className="-ml-4 text-muted-foreground">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Jobs
+            Back to Runs
           </Button>
         </Link>
         <EmptyState title="Error Loading Job" description={error.message} />
@@ -50,7 +50,7 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
       <Link href="/jobs">
         <Button variant="ghost" size="sm" className="-ml-4 text-muted-foreground">
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Jobs
+          Back to Runs
         </Button>
       </Link>
 
@@ -62,7 +62,7 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
             <div>
               <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                 <Activity className="w-6 h-6 text-gray-500" />
-                Job Details
+                Run Details
               </h2>
               <p className="text-sm font-mono text-muted-foreground mt-2">{job.id}</p>
             </div>
@@ -106,6 +106,15 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
                   <span>{step.stepId} · {step.processor}@{step.version}</span><StatusBadge status={step.status} />
                 </div>)}
               </div>
+            </section>
+            <section className="rounded-lg border bg-white p-6 shadow-sm">
+              <h3 className="font-semibold">Outputs and compression</h3>
+              {run.outputs.length ? <div className="mt-3 space-y-2 text-sm">
+                {run.outputs.map((output) => <Link key={output.id} href={`/assets/${output.id}`} className="block rounded border p-3 hover:border-primary">
+                  <span className="font-medium">{output.filename}</span><span className="ml-2 text-muted-foreground">{output.contentType} · {output.size.toLocaleString()} bytes</span>
+                </Link>)}
+                <p className="text-muted-foreground">Saved {run.metrics.bytesSaved?.toLocaleString() ?? '—'} bytes · ratio {run.metrics.compressionRatio ?? '—'}</p>
+              </div> : <p className="mt-3 text-sm text-muted-foreground">No normal output was produced.</p>}
             </section>
             <section className="rounded-lg border bg-white p-6 shadow-sm">
               <h3 className="font-semibold">Governance</h3>

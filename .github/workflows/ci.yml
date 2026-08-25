@@ -19,7 +19,7 @@ jobs:
   verify:
     name: Verify backend and frontend
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
@@ -46,6 +46,10 @@ jobs:
         working-directory: backend
         run: ./gradlew test --console=plain
 
+      - name: Run real broker and storage integration test
+        working-directory: backend
+        run: ./gradlew externalIntegrationTest --console=plain
+
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
@@ -57,3 +61,46 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+      - name: Install Chromium for the browser test
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Start the local product stack
+        shell: bash
+        run: |
+          docker compose up -d --wait postgres rabbitmq azurite
+          (cd backend && ./gradlew bootRun --console=plain > ../backend-ci.log 2>&1) &
+          echo $! > backend-ci.pid
+          (cd frontend && npm run start > ../frontend-ci.log 2>&1) &
+          echo $! > frontend-ci.pid
+          for attempt in {1..90}; do
+            if curl --fail --silent http://localhost:8080/actuator/health >/dev/null \
+              && curl --fail --silent http://localhost:3000/login >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          tail -n 80 backend-ci.log || true
+          tail -n 80 frontend-ci.log || true
+          exit 1
+
+      - name: Run browser golden path
+        working-directory: frontend
+        run: npm run test:e2e
+
+      - name: Run API-first smoke path
+        shell: pwsh
+        run: ./scripts/demo-local.ps1
+
+      - name: Stop the local product stack
+        if: always()
+        shell: bash
+        run: |
+          if [ -f frontend-ci.pid ]; then kill "$(cat frontend-ci.pid)" || true; fi
+          if [ -f backend-ci.pid ]; then kill "$(cat backend-ci.pid)" || true; fi
+          if [ "${{ job.status }}" != "success" ]; then
+            tail -n 80 backend-ci.log || true
+            tail -n 80 frontend-ci.log || true
+          fi
+          docker compose down -v
