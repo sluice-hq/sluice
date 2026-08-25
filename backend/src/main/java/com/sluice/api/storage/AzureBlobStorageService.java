@@ -3,6 +3,7 @@ package com.sluice.api.storage;
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClient;
+import com.sluice.api.observability.SluiceMetrics;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ public class AzureBlobStorageService implements StorageService {
     private final long downloadSasExpiryHours;
     private final boolean configureCors;
     private final String corsAllowedOrigins;
+    private final SluiceMetrics metrics;
     private BlobContainerClient containerClient;
 
     public AzureBlobStorageService(
@@ -31,13 +33,15 @@ public class AzureBlobStorageService implements StorageService {
             @Value("${azure.storage.sas.upload-expiry-hours:1}") long uploadSasExpiryHours,
             @Value("${azure.storage.sas.download-expiry-hours:24}") long downloadSasExpiryHours,
             @Value("${azure.storage.configure-cors:false}") boolean configureCors,
-            @Value("${azure.storage.cors.allowed-origins:}") String corsAllowedOrigins) {
+            @Value("${azure.storage.cors.allowed-origins:}") String corsAllowedOrigins,
+            SluiceMetrics metrics) {
         this.blobServiceClient = blobServiceClient;
         this.containerName = containerName;
         this.uploadSasExpiryHours = uploadSasExpiryHours;
         this.downloadSasExpiryHours = downloadSasExpiryHours;
         this.configureCors = configureCors;
         this.corsAllowedOrigins = corsAllowedOrigins;
+        this.metrics = metrics;
     }
 
     @PostConstruct
@@ -89,16 +93,18 @@ public class AzureBlobStorageService implements StorageService {
     @Override
     public String uploadFileAt(String objectName, String contentType, java.io.InputStream inputStream, long size)
             throws IOException {
-        BlobClient blobClient = containerClient.getBlobClient(objectName);
-        blobClient.upload(inputStream, size, true);
-        
-        com.azure.storage.blob.models.BlobHttpHeaders headers = new com.azure.storage.blob.models.BlobHttpHeaders();
-        if (contentType != null) {
-            headers.setContentType(contentType);
-            blobClient.setHttpHeaders(headers);
-        }
-        
-        return blobClient.getBlobUrl();
+        return observe("upload", () -> {
+            BlobClient blobClient = containerClient.getBlobClient(objectName);
+            blobClient.upload(inputStream, size, true);
+
+            com.azure.storage.blob.models.BlobHttpHeaders headers = new com.azure.storage.blob.models.BlobHttpHeaders();
+            if (contentType != null) {
+                headers.setContentType(contentType);
+                blobClient.setHttpHeaders(headers);
+            }
+
+            return blobClient.getBlobUrl();
+        });
     }
 
     @Override
@@ -107,10 +113,12 @@ public class AzureBlobStorageService implements StorageService {
             return;
         }
         try {
-            String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-            String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
-            BlobClient blobClient = containerClient.getBlobClient(blobName);
-            blobClient.deleteIfExists();
+            observe("delete", () -> {
+                String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+                String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
+                containerClient.getBlobClient(blobName).deleteIfExists();
+                return null;
+            });
         } catch (Exception e) {
             log.error("blob_delete_failed storageUrl={}", fileUrl, e);
         }
@@ -121,26 +129,28 @@ public class AzureBlobStorageService implements StorageService {
         if (fileUrl == null || fileUrl.isBlank()) {
             throw new IllegalArgumentException("File URL cannot be null or empty");
         }
-        String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-        String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
-        BlobClient blobClient = containerClient.getBlobClient(blobName);
-        
-        java.nio.file.Path tempFile = null;
-        try {
-            tempFile = java.nio.file.Files.createTempFile("sluice-input-", ".bin");
-            blobClient.downloadToFile(tempFile.toString(), true);
-            String contentType = blobClient.getProperties().getContentType();
-            return new com.sluice.api.pipeline.FileMediaResource(tempFile.toFile(), contentType);
-        } catch (Exception e) {
-            if (tempFile != null) {
-                try {
-                    java.nio.file.Files.deleteIfExists(tempFile);
-                } catch (java.io.IOException ignored) {
-                    // Preserve the original download failure.
+        return observe("download", () -> {
+            String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+            String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
+            BlobClient blobClient = containerClient.getBlobClient(blobName);
+
+            java.nio.file.Path tempFile = null;
+            try {
+                tempFile = java.nio.file.Files.createTempFile("sluice-input-", ".bin");
+                blobClient.downloadToFile(tempFile.toString(), true);
+                String contentType = blobClient.getProperties().getContentType();
+                return new com.sluice.api.pipeline.FileMediaResource(tempFile.toFile(), contentType);
+            } catch (Exception e) {
+                if (tempFile != null) {
+                    try {
+                        java.nio.file.Files.deleteIfExists(tempFile);
+                    } catch (java.io.IOException ignored) {
+                        // Preserve the original download failure.
+                    }
                 }
+                throw new RuntimeException("Failed to download blob for processing", e);
             }
-            throw new RuntimeException("Failed to download blob for processing", e);
-        }
+        });
     }
 
     @Override
@@ -186,10 +196,11 @@ public class AzureBlobStorageService implements StorageService {
         if (fileUrl == null || fileUrl.isBlank()) {
             return false;
         }
-        String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-        String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
-        BlobClient blobClient = containerClient.getBlobClient(blobName);
-        return blobClient.exists();
+        return observe("exists", () -> {
+            String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+            String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
+            return containerClient.getBlobClient(blobName).exists();
+        });
     }
 
     @Override
@@ -197,12 +208,24 @@ public class AzureBlobStorageService implements StorageService {
         if (fileUrl == null || fileUrl.isBlank()) {
             throw new IllegalArgumentException("File URL cannot be null or empty");
         }
-        String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
-        String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
-        BlobClient blobClient = containerClient.getBlobClient(blobName);
-        if (blobClient.exists()) {
-            return blobClient.getProperties().getBlobSize();
+        return observe("properties", () -> {
+            String encodedName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
+            String blobName = java.net.URLDecoder.decode(encodedName, java.nio.charset.StandardCharsets.UTF_8);
+            BlobClient blobClient = containerClient.getBlobClient(blobName);
+            return blobClient.exists() ? blobClient.getProperties().getBlobSize() : -1;
+        });
+    }
+
+    private <T> T observe(String operation, java.util.function.Supplier<T> action) {
+        long started = System.nanoTime();
+        String outcome = "success";
+        try {
+            return action.get();
+        } catch (RuntimeException exception) {
+            outcome = "failure";
+            throw exception;
+        } finally {
+            metrics.storage(operation, outcome, System.nanoTime() - started);
         }
-        return -1;
     }
 }

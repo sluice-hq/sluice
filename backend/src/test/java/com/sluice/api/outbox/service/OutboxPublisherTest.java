@@ -5,6 +5,7 @@ import com.sluice.api.messaging.RunQueuePublisher;
 import com.sluice.api.messaging.dto.JobMessage;
 import com.sluice.api.outbox.domain.OutboxEvent;
 import com.sluice.api.outbox.repository.OutboxEventRepository;
+import com.sluice.api.observability.SluiceMetrics;
 import com.sluice.api.webhook.service.WebhookDeliveryService;
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +27,7 @@ class OutboxPublisherTest {
         when(events.lockNextBatch(10)).thenReturn(List.of(event));
         doThrow(new IllegalStateException("broker offline")).doNothing().when(queue).publish(any(JobMessage.class));
         OutboxPublisher publisher = new OutboxPublisher(events, queue, mock(WebhookDeliveryService.class),
-                new ObjectMapper(), 10);
+                new ObjectMapper(), mock(SluiceMetrics.class), 10);
 
         assertEquals(1, publisher.publishBatch());
         assertEquals("PENDING", event.getStatus());

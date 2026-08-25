@@ -1,6 +1,8 @@
 package com.sluice.api.asset.controller;
 
 import com.sluice.api.asset.dto.UploadAssetResponse;
+import com.sluice.api.asset.dto.DownloadUrlResponse;
+import com.sluice.api.asset.dto.UploadUrlResponse;
 import com.sluice.api.asset.service.AssetService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -75,7 +77,8 @@ public class AssetController {
      */
     @Deprecated
     @PostMapping
-    public ResponseEntity<?> uploadAsset(
+    @ResponseStatus(HttpStatus.CREATED)
+    public ResponseEntity<UploadAssetResponse> uploadAsset(
             @RequestParam("file") MultipartFile file, 
             @RequestParam("pipelineId") java.util.UUID pipelineId,
             @AuthenticationPrincipal ProjectContext context) {
@@ -86,7 +89,7 @@ public class AssetController {
     }
 
     @PostMapping("/upload-url")
-    public ResponseEntity<?> requestUploadUrl(
+    public ResponseEntity<UploadUrlResponse> requestUploadUrl(
             @RequestBody com.sluice.api.asset.dto.UploadUrlRequest request,
             @AuthenticationPrincipal ProjectContext context) {
         if (request == null) throw new IllegalArgumentException("Upload request is required");
@@ -98,7 +101,7 @@ public class AssetController {
     }
 
     @PostMapping("/{assetId}/complete")
-    public ResponseEntity<?> completeUpload(
+    public ResponseEntity<UploadAssetResponse> completeUpload(
             @PathVariable java.util.UUID assetId, 
             @RequestParam("pipelineId") java.util.UUID pipelineId,
             @AuthenticationPrincipal ProjectContext context) {
@@ -106,13 +109,13 @@ public class AssetController {
         return ResponseEntity.ok(response);
     }
     @GetMapping("/{id}/download")
-    public ResponseEntity<?> getDownloadUrl(
+    public ResponseEntity<DownloadUrlResponse> getDownloadUrl(
             @PathVariable java.util.UUID id,
             @AuthenticationPrincipal ProjectContext context) {
         return assetService.getAsset(id, context)
                 .map(asset -> {
                     String downloadUrl = storageService.generateDownloadUrl(asset.getStorageUrl());
-                    return ResponseEntity.ok(java.util.Map.of("downloadUrl", downloadUrl));
+                    return ResponseEntity.ok(new DownloadUrlResponse(downloadUrl));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }

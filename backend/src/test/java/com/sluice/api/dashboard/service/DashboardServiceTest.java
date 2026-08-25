@@ -5,6 +5,7 @@ import com.sluice.api.auth.domain.ProjectContext;
 import com.sluice.api.dashboard.dto.DashboardResponse;
 import com.sluice.api.job.domain.JobStatus;
 import com.sluice.api.job.repository.JobRepository;
+import com.sluice.api.observability.DependencyHealthService;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Pageable;
 
@@ -24,6 +25,8 @@ class DashboardServiceTest {
         UUID projectId = UUID.randomUUID();
         AssetRepository assets = mock(AssetRepository.class);
         JobRepository jobs = mock(JobRepository.class);
+        DependencyHealthService health = mock(DependencyHealthService.class);
+        when(health.current()).thenReturn(List.of());
         when(assets.countByProjectId(projectId)).thenReturn(3L);
         when(jobs.countByProjectId(projectId)).thenReturn(4L);
         when(jobs.countJobsByStatusAndProjectId(projectId))
@@ -33,7 +36,7 @@ class DashboardServiceTest {
         when(jobs.findAllByProjectId(org.mockito.ArgumentMatchers.eq(projectId), any(Pageable.class)))
                 .thenReturn(org.springframework.data.domain.Page.empty());
 
-        DashboardResponse response = new DashboardService(assets, jobs)
+        DashboardResponse response = new DashboardService(assets, jobs, health)
                 .getDashboardOverview(new ProjectContext(projectId, null, true));
 
         assertEquals(3, response.getTotalAssets());

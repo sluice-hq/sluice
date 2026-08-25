@@ -7,6 +7,7 @@ import java.util.UUID;
 
 public interface WebhookDeliveryRepository extends JpaRepository<WebhookDelivery, UUID> {
     boolean existsByEventId(UUID eventId);
+    long countByStatus(String status);
     List<WebhookDelivery> findByEndpointIdAndProjectIdOrderByCreatedAtDesc(UUID endpointId, UUID projectId);
 
     @org.springframework.data.jpa.repository.Query(value = """

@@ -5,22 +5,7 @@ import { Asset, DashboardOverview, Job } from '@/api/types';
 export interface TrendMetric {
   title: string;
   value: string;
-  trend: string;
-  trendUp: boolean;
-  sparklineData: number[];
-}
-
-export interface ThroughputData {
-  timestamp: string;
-  completed: number;
-  running: number;
-  failed: number;
-}
-
-export interface PipelineStage {
-  name: string;
-  assetsProcessed: number;
-  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  description: string;
 }
 
 export interface PlatformService {
@@ -37,8 +22,6 @@ export interface DashboardOverviewViewModel {
     queueDepth: TrendMetric;
     failedToday: TrendMetric;
   };
-  throughput: ThroughputData[];
-  pipelineActivity: PipelineStage[];
   systemHealth: PlatformService[];
   recentAssets: Asset[];
   recentJobs: Job[];
@@ -52,42 +35,30 @@ export function mapDashboardOverview(dto: DashboardOverview): DashboardOverviewV
       assets: {
         title: 'Assets',
         value: dto.totalAssets?.toLocaleString() || '0',
-        trend: '--',
-        trendUp: true,
-        sparklineData: dto.metrics?.assetsSparkline || [],
+        description: 'Stored in this project',
       },
       jobsRunning: {
         title: 'Jobs Running',
         value: dto.runningJobs?.toString() || '0',
-        trend: '--',
-        trendUp: true,
-        sparklineData: dto.metrics?.jobsSparkline || [],
+        description: 'Currently processing',
       },
       successRate: {
         title: 'Success Rate',
         value: `${successRate(dto.completedJobs, dto.failedJobs)}%`,
-        trend: '--',
-        trendUp: true,
-        sparklineData: dto.metrics?.successRateSparkline || [],
+        description: 'Across terminal runs',
       },
       queueDepth: {
         title: 'Queue Depth',
         value: dto.queuedJobs?.toString() || '0',
-        trend: '--',
-        trendUp: false,
-        sparklineData: dto.metrics?.queueDepthSparkline || [],
+        description: 'Queued or waiting to retry',
       },
       failedToday: {
-        title: 'Failed Today',
+        title: 'Failed Runs',
         value: dto.failedJobs?.toString() || '0',
-        trend: '--',
-        trendUp: false,
-        sparklineData: dto.metrics?.failedSparkline || [],
+        description: 'Across this project',
       }
     },
-    throughput: dto.metrics?.throughput || [],
-    pipelineActivity: dto.metrics?.pipelineActivity || [],
-    systemHealth: dto.metrics?.systemHealth || [],
+    systemHealth: dto.systemHealth || [],
     recentAssets: dto.recentAssets || [],
     recentJobs: dto.recentJobs || [],
   };

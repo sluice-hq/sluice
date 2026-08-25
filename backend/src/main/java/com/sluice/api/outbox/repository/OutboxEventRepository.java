@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.UUID;
 
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> {
+    long countByStatus(String status);
+
     @org.springframework.data.jpa.repository.Query(value = """
             SELECT * FROM outbox_events
             WHERE status = 'PENDING' AND next_attempt_at <= CURRENT_TIMESTAMP

@@ -3,6 +3,7 @@ package com.sluice.api.run.controller;
 import com.sluice.api.auth.domain.ProjectContext;
 import com.sluice.api.run.dto.CreateRunRequest;
 import com.sluice.api.run.dto.RunResponse;
+import com.sluice.api.asset.dto.AssetResponse;
 import com.sluice.api.run.service.RunService;
 import com.sluice.api.job.service.JobEventService;
 import org.springframework.data.domain.Page;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.UUID;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/runs")
@@ -33,6 +35,7 @@ public class RunController {
     }
 
     @PostMapping
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.ACCEPTED)
     public ResponseEntity<RunResponse> create(@RequestBody CreateRunRequest request,
                                               @RequestHeader(value = "Idempotency-Key", required = false) String key,
                                               @AuthenticationPrincipal ProjectContext context) {
@@ -52,8 +55,8 @@ public class RunController {
     }
 
     @GetMapping("/{id}/outputs")
-    public ResponseEntity<?> outputs(@PathVariable UUID id,
-                                     @AuthenticationPrincipal ProjectContext context) {
+    public ResponseEntity<List<AssetResponse>> outputs(@PathVariable UUID id,
+                                                       @AuthenticationPrincipal ProjectContext context) {
         if (runs.get(id, context).isEmpty()) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(runs.outputs(id, context));
     }

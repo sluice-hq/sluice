@@ -14,6 +14,7 @@ public class DashboardResponse {
     
     private List<AssetResponse> recentAssets;
     private List<JobResponse> recentJobs;
+    private List<DependencyHealth> systemHealth;
 
     public DashboardResponse(long totalAssets, long totalJobs, long runningJobs, long completedJobs, long failedJobs, List<AssetResponse> recentAssets, List<JobResponse> recentJobs) {
         this(totalAssets, totalJobs, runningJobs, 0, completedJobs, failedJobs, recentAssets, recentJobs);
@@ -22,6 +23,13 @@ public class DashboardResponse {
     public DashboardResponse(long totalAssets, long totalJobs, long runningJobs, long queuedJobs,
                               long completedJobs, long failedJobs, List<AssetResponse> recentAssets,
                               List<JobResponse> recentJobs) {
+        this(totalAssets, totalJobs, runningJobs, queuedJobs, completedJobs, failedJobs,
+                recentAssets, recentJobs, List.of());
+    }
+
+    public DashboardResponse(long totalAssets, long totalJobs, long runningJobs, long queuedJobs,
+                             long completedJobs, long failedJobs, List<AssetResponse> recentAssets,
+                             List<JobResponse> recentJobs, List<DependencyHealth> systemHealth) {
         this.totalAssets = totalAssets;
         this.totalJobs = totalJobs;
         this.runningJobs = runningJobs;
@@ -30,6 +38,7 @@ public class DashboardResponse {
         this.failedJobs = failedJobs;
         this.recentAssets = recentAssets;
         this.recentJobs = recentJobs;
+        this.systemHealth = systemHealth;
     }
 
     public long getTotalAssets() { return totalAssets; }
@@ -40,4 +49,7 @@ public class DashboardResponse {
     public long getFailedJobs() { return failedJobs; }
     public List<AssetResponse> getRecentAssets() { return recentAssets; }
     public List<JobResponse> getRecentJobs() { return recentJobs; }
+    public List<DependencyHealth> getSystemHealth() { return systemHealth; }
+
+    public record DependencyHealth(String name, long latencyMs, String status) {}
 }

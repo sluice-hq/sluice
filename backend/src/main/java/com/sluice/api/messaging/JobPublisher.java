@@ -1,6 +1,7 @@
 package com.sluice.api.messaging;
 
 import com.sluice.api.messaging.dto.JobMessage;
+import com.sluice.api.observability.SluiceMetrics;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.AmqpTimeoutException;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
@@ -18,14 +19,27 @@ public class JobPublisher implements RunQueuePublisher {
 
     private final RabbitTemplate rabbitTemplate;
     private final Duration confirmTimeout;
+    private final SluiceMetrics metrics;
 
     public JobPublisher(RabbitTemplate rabbitTemplate,
-                        @Value("${sluice.outbox.publisher-confirm-timeout:5s}") Duration confirmTimeout) {
+                        @Value("${sluice.outbox.publisher-confirm-timeout:5s}") Duration confirmTimeout,
+                        SluiceMetrics metrics) {
         this.rabbitTemplate = rabbitTemplate;
         this.confirmTimeout = confirmTimeout;
+        this.metrics = metrics;
     }
 
     public void publishJob(JobMessage message) {
+        try {
+            publishAndConfirm(message);
+            metrics.queuePublish("confirmed");
+        } catch (RuntimeException exception) {
+            metrics.queuePublish("failed");
+            throw exception;
+        }
+    }
+
+    private void publishAndConfirm(JobMessage message) {
         CorrelationData correlation = new CorrelationData(message.getJobId().toString());
         rabbitTemplate.convertAndSend(
                 RabbitMqConfig.EXCHANGE_NAME, RabbitMqConfig.ROUTING_KEY, message, correlation);
