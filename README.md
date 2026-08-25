@@ -284,7 +284,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The browser test expects the local application to be running. It covers signup validation, the HttpOnly session, CSRF rejection, project creation/selection, one-time API-key reveal and revocation, logout/login failure and success, pipeline JSON publication, test upload, durable run completion, output facts, and governance UI. GitHub Actions runs the backend suite, external integration test, frontend lint/build, browser golden path, and API smoke path in one required check.
+The browser test expects the local application to be running. It covers signup validation, the HttpOnly session, CSRF rejection, project creation/selection, one-time API-key reveal and revocation, logout/login failure and success, pipeline JSON publication, test upload, durable run completion, output facts, and governance UI. GitHub Actions exposes separate `Verify backend` and `Verify frontend` checks that run in parallel. `Verify product golden path` depends on both and then runs the real broker/storage integration, browser golden path, and API smoke path.
 
 `git diff --check` is also expected to pass before a commit.
 
