@@ -1,6 +1,7 @@
 import { Asset, Job } from '@/api/types';
 import { StatusBadge } from './StatusBadge';
 import { FileIcon, FileVideo, FileAudio, FileImage, FileText } from 'lucide-react';
+import Link from 'next/link';
 
 export function RecentAssetsTable({ assets }: { assets: Asset[] }) {
   return (
@@ -10,9 +11,9 @@ export function RecentAssetsTable({ assets }: { assets: Asset[] }) {
           <h3 className="text-lg font-semibold text-white tracking-tight">Recent Assets</h3>
           <p className="text-sm text-muted-foreground">Latest media uploaded for processing</p>
         </div>
-        <button className="text-sm text-primary hover:text-primary/80 font-medium transition-colors">
+        <Link href="/assets" className="text-sm text-primary hover:text-primary/80 font-medium transition-colors">
           View All
-        </button>
+        </Link>
       </div>
       
       <div className="overflow-x-auto flex-1">
@@ -68,9 +69,9 @@ export function RecentJobsTable({ jobs }: { jobs: Job[] }) {
           <h3 className="text-lg font-semibold text-white tracking-tight">Recent Jobs</h3>
           <p className="text-sm text-muted-foreground">Latest pipeline executions</p>
         </div>
-        <button className="text-sm text-primary hover:text-primary/80 font-medium transition-colors">
+        <Link href="/jobs" className="text-sm text-primary hover:text-primary/80 font-medium transition-colors">
           View All
-        </button>
+        </Link>
       </div>
       
       <div className="overflow-x-auto flex-1">

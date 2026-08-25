@@ -40,6 +40,39 @@
       "type": "timeseries",
       "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
       "targets": [{"expr": "sum by (processor, status) (rate(sluice_steps_total[1m]))", "legendFormat": "{{processor}} {{status}}"}]
+    },
+    {
+      "title": "Durable backlog",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+      "targets": [
+        {"expr": "sluice_outbox_pending", "legendFormat": "outbox"},
+        {"expr": "sluice_webhooks_pending", "legendFormat": "webhooks"}
+      ]
+    },
+    {
+      "title": "Dependency health",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+      "targets": [{"expr": "sluice_dependency_health", "legendFormat": "{{dependency}}"}]
+    },
+    {
+      "title": "Queue publishes",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 40},
+      "targets": [{"expr": "sum by (outcome) (rate(sluice_queue_publishes_total[1m]))", "legendFormat": "{{outcome}}"}]
+    },
+    {
+      "title": "Webhook deliveries",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 40},
+      "targets": [{"expr": "sum by (outcome, status_class) (rate(sluice_webhook_delivery_seconds_count[1m]))", "legendFormat": "{{outcome}} {{status_class}}"}]
+    },
+    {
+      "title": "Storage operation latency",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 40},
+      "targets": [{"expr": "sum by (operation) (rate(sluice_storage_operation_seconds_sum[1m])) / sum by (operation) (rate(sluice_storage_operation_seconds_count[1m]))", "legendFormat": "{{operation}}"}]
     }
   ]
 }

@@ -3,6 +3,7 @@ package com.sluice.api.webhook.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sluice.api.outbox.domain.OutboxEvent;
+import com.sluice.api.observability.SluiceMetrics;
 import com.sluice.api.webhook.domain.*;
 import com.sluice.api.webhook.repository.*;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ public class WebhookDeliveryService {
     private final WebhookSigner signer;
     private final WebhookSender sender;
     private final ObjectMapper objectMapper;
+    private final SluiceMetrics metrics;
     private final int batchSize;
     private final int maxAttempts;
 
@@ -30,10 +32,12 @@ public class WebhookDeliveryService {
                                   WebhookDeliveryAttemptRepository attempts,
                                   WebhookEndpointRepository endpoints, WebhookTargetValidator targets,
                                   WebhookSigner signer, WebhookSender sender, ObjectMapper objectMapper,
+                                  SluiceMetrics metrics,
                                   @org.springframework.beans.factory.annotation.Value("${sluice.webhooks.batch-size:20}") int batchSize,
                                   @org.springframework.beans.factory.annotation.Value("${sluice.webhooks.max-attempts:5}") int maxAttempts) {
         this.deliveries=deliveries; this.attempts=attempts; this.endpoints=endpoints; this.targets=targets;
         this.signer=signer; this.sender=sender; this.objectMapper=objectMapper;
+        this.metrics=metrics;
         this.batchSize=Math.max(1, Math.min(100, batchSize)); this.maxAttempts=Math.max(1, Math.min(10, maxAttempts));
     }
 
@@ -89,6 +93,8 @@ public class WebhookDeliveryService {
         deliveries.save(delivery);
         attempts.save(new WebhookDeliveryAttempt(UUID.randomUUID(), delivery.getId(), number, started,
                 Instant.now(), response, outcome, error));
+        metrics.webhookDelivery(outcome.toLowerCase(java.util.Locale.ROOT), response,
+                java.time.Duration.between(started, Instant.now()).toNanos());
     }
 
     private boolean isTransient(int status) {

@@ -1,6 +1,7 @@
 package com.sluice.api.messaging;
 
 import com.sluice.api.messaging.dto.JobMessage;
+import com.sluice.api.observability.SluiceMetrics;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.amqp.AmqpException;
@@ -30,12 +31,14 @@ class JobPublisherTest {
         }).when(template).convertAndSend(eq(RabbitMqConfig.EXCHANGE_NAME),
                 eq(RabbitMqConfig.ROUTING_KEY), any(JobMessage.class), any(CorrelationData.class));
         JobMessage message = new JobMessage(UUID.randomUUID(), UUID.randomUUID());
+        SluiceMetrics metrics = mock(SluiceMetrics.class);
 
-        assertDoesNotThrow(() -> new JobPublisher(template, Duration.ofSeconds(1)).publish(message));
+        assertDoesNotThrow(() -> new JobPublisher(template, Duration.ofSeconds(1), metrics).publish(message));
 
         ArgumentCaptor<CorrelationData> correlation = ArgumentCaptor.forClass(CorrelationData.class);
         verify(template).convertAndSend(eq(RabbitMqConfig.EXCHANGE_NAME),
                 eq(RabbitMqConfig.ROUTING_KEY), eq(message), correlation.capture());
+        verify(metrics).queuePublish("confirmed");
     }
 
     @Test
@@ -48,7 +51,9 @@ class JobPublisherTest {
         }).when(template).convertAndSend(eq(RabbitMqConfig.EXCHANGE_NAME),
                 eq(RabbitMqConfig.ROUTING_KEY), any(JobMessage.class), any(CorrelationData.class));
 
-        assertThrows(AmqpException.class, () -> new JobPublisher(template, Duration.ofSeconds(1))
+        SluiceMetrics metrics = mock(SluiceMetrics.class);
+        assertThrows(AmqpException.class, () -> new JobPublisher(template, Duration.ofSeconds(1), metrics)
                 .publish(new JobMessage(UUID.randomUUID(), UUID.randomUUID())));
+        verify(metrics).queuePublish("failed");
     }
 }

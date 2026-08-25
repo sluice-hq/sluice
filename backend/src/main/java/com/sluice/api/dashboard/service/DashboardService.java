@@ -12,15 +12,19 @@ import org.springframework.data.domain.Sort;
 import java.util.List;
 import java.util.stream.Collectors;
 import com.sluice.api.auth.domain.ProjectContext;
+import com.sluice.api.observability.DependencyHealthService;
 
 @Service
 public class DashboardService {
     private final AssetRepository assetRepository;
     private final JobRepository jobRepository;
+    private final DependencyHealthService dependencyHealth;
 
-    public DashboardService(AssetRepository assetRepository, JobRepository jobRepository) {
+    public DashboardService(AssetRepository assetRepository, JobRepository jobRepository,
+                            DependencyHealthService dependencyHealth) {
         this.assetRepository = assetRepository;
         this.jobRepository = jobRepository;
+        this.dependencyHealth = dependencyHealth;
     }
 
     public DashboardResponse getDashboardOverview(ProjectContext context) {
@@ -73,6 +77,6 @@ public class DashboardService {
                 .collect(Collectors.toList());
 
         return new DashboardResponse(totalAssets, totalJobs, runningJobs, queuedJobs, completedJobs, failedJobs,
-                recentAssets, recentJobs);
+                recentAssets, recentJobs, dependencyHealth.current());
     }
 }

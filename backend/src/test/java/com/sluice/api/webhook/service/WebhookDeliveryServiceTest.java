@@ -3,6 +3,7 @@ package com.sluice.api.webhook.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sluice.api.webhook.domain.*;
 import com.sluice.api.webhook.repository.*;
+import com.sluice.api.observability.SluiceMetrics;
 import org.junit.jupiter.api.Test;
 
 import java.net.InetAddress;
@@ -34,7 +35,7 @@ class WebhookDeliveryServiceTest {
         WebhookTargetValidator targets = new WebhookTargetValidator(
                 ignored -> new InetAddress[]{InetAddress.getByName("203.0.113.10")});
         WebhookDeliveryService service = new WebhookDeliveryService(deliveries, attempts, endpoints, targets,
-                new WebhookSigner(), sender, new ObjectMapper(), 5, 3);
+                new WebhookSigner(), sender, new ObjectMapper(), mock(SluiceMetrics.class), 5, 3);
 
         service.deliverBatch();
         assertEquals("PENDING", delivery.getStatus());

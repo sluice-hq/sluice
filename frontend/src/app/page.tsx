@@ -7,6 +7,7 @@ import { MetricsSkeleton, TableSkeleton } from '@/components/domain/SkeletonLoad
 import { EmptyState } from '@/components/domain/EmptyState';
 import { TrendMetricCard } from '@/components/domain/TrendMetricCard';
 import { RecentAssetsTable, RecentJobsTable } from '@/components/domain/DashboardTables';
+import { SystemHealth } from '@/components/domain/SystemHealth';
 
 export default function OverviewPage() {
   const { data: rawDashboard, isLoading, error } = useQuery({
@@ -56,9 +57,10 @@ export default function OverviewPage() {
             <TrendMetricCard metric={dashboard.kpis.failedToday} />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
             <RecentAssetsTable assets={dashboard.recentAssets} />
             <RecentJobsTable jobs={dashboard.recentJobs} />
+            <SystemHealth services={dashboard.systemHealth} />
           </div>
         </div>
       )}

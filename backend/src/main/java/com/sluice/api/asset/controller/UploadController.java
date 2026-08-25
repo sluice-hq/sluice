@@ -39,6 +39,7 @@ public class UploadController {
     }
 
     @PostMapping
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     public ResponseEntity<UploadUrlResponse> create(@RequestBody UploadUrlRequest request,
                                                     @AuthenticationPrincipal ProjectContext context) {
         validate(request);

@@ -2,7 +2,7 @@
 
 Sluice is an API-first media processing platform. A developer application authenticates with a project API key, uploads media directly to object storage, starts a versioned pipeline run, and reads the durable run result through the API. The Next.js dashboard is the human control plane for projects, keys, assets, jobs, and testing.
 
-This repository is an early, working foundation, not the finished V1. Identity, project isolation, API keys, reusable uploads, slug-based run creation, idempotency, durable asynchronous execution, versioned processor contracts, real bounded image processing, persisted governance decisions, a curated processor market, JSON/Form pipeline authoring, and a dashboard are implemented. Prometheus/Grafana setup and Azure deployment remain planned work.
+This repository is an early, working foundation, not the finished V1. Identity, project isolation, API keys, reusable uploads, slug-based run creation, idempotency, durable asynchronous execution, versioned processor contracts, real bounded image processing, persisted governance decisions, a curated processor market, JSON/Form pipeline authoring, a functional dashboard, and local Prometheus/Grafana monitoring are implemented. Azure deployment remains planned work.
 
 ## What works today
 
@@ -27,9 +27,9 @@ The following are intentionally not claimed as complete yet:
 - Step records persist outcomes, timings, errors, MIME/byte facts, processor metadata, output assets, and attempt history.
 - WebP uses pinned `com.github.usefulness:webp-imageio:0.11.0`, verifies encode/decode capability at startup, defaults to quality 82, and fails closed if the native codec cannot load.
 - Governance uses a deterministic local provider by default. Production selects the Azure Content Safety adapter with `SLUICE_GOVERNANCE_PROVIDER=azure`, `AZURE_CONTENT_SAFETY_ENDPOINT`, and `AZURE_CONTENT_SAFETY_API_KEY`.
-- Dashboard search, notifications, and dependency health details remain outside the current operational surface; dashboard counts and asset/job pagination are backed by API data.
-- Prometheus is available at `http://localhost:9090` and Grafana at `http://localhost:3001` after `docker compose up`; Grafana is populated from the API's `/actuator/prometheus` HTTP request metrics.
-- Authenticated API clients can inspect the generated route index at `GET /api/v1/openapi.json`.
+- Dashboard counts, recent assets/jobs, pagination, and the cached PostgreSQL/RabbitMQ/Blob readiness snapshot are backed by API data. Search and notifications remain outside V1.
+- Prometheus is available at `http://localhost:9090` and Grafana at `http://localhost:3001` after `docker compose up`; the provisioned dashboard covers HTTP traffic, runs, processors, governance, durable backlogs, queue publishing, Blob operations, webhooks, and dependency health.
+- Authenticated API clients can inspect the generated OpenAPI 3 contract, including request/response schemas and authentication schemes, at `GET /api/v1/openapi.json`.
 - Azure resources and deployment automation are not in this branch yet.
 - Arbitrary custom processor code is outside V1 for safety reasons.
 
@@ -60,7 +60,7 @@ flowchart LR
 | Media bytes | Azurite | Private Azure Blob Storage |
 | Work queue | RabbitMQ | Azure Service Bus |
 | Secrets | Environment variables | Key Vault and Managed Identity |
-| Telemetry | Actuator foundation | Azure Monitor/Application Insights, with Prometheus/Grafana planned |
+| Telemetry | Actuator, Prometheus, and Grafana | Azure Monitor/Application Insights, retaining the same domain signals |
 
 The API creates state and queues work. Workers perform media processing. Project IDs are enforced in the authentication context and repository queries. The browser never receives the dashboard JWT; the Next.js backend-for-frontend stores it in an HttpOnly cookie.
 
@@ -286,8 +286,8 @@ SDD.md      Local architectural reference, ignored by Git
 The remaining V1 path is:
 
 1. Separate upload/run APIs with durable step data and webhooks.
-2. Product surface, fixed API/media safety limits, and operational metrics over the implemented processing/governance core.
-3. Complete dashboard, Prometheus/Grafana operations, and local product gate.
+2. Product surface, fixed API/media safety limits, generated OpenAPI, and operational metrics over the implemented processing/governance core. *(Implemented)*
+3. Run the clean-checkout local product gate and browser golden path.
 4. Terraform, Azure Container Apps, Service Bus, managed PostgreSQL/Blob, Key Vault, API Management, and Azure telemetry.
 
 Azure deployment is part of the final demo, but it has not been implemented on this branch. Read the local `SDD.md` for the dependency-ordered ticket plan and current acceptance gates.
