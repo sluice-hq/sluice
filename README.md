@@ -1,6 +1,6 @@
 # Sluice
 
-Sluice is an API-first media processing platform. A developer application authenticates with a project API key, uploads media directly to object storage, starts a versioned pipeline run, and reads the durable run result through the API. The Next.js dashboard is the human control plane for projects, keys, assets, jobs, and testing.
+Sluice is an API-first media processing platform. A developer application authenticates with a project API key, uploads media directly to object storage, starts a versioned pipeline run, and reads the durable run result through the API. The Next.js dashboard is the human control plane for projects, keys, assets, runs, governance, and testing.
 
 This repository is an early, working foundation, not the finished V1. Identity, project isolation, API keys, reusable uploads, slug-based run creation, idempotency, durable asynchronous execution, versioned processor contracts, real bounded image processing, persisted governance decisions, a curated processor market, JSON/Form pipeline authoring, a functional dashboard, and local Prometheus/Grafana monitoring are implemented. Azure deployment remains planned work.
 
@@ -16,14 +16,16 @@ This repository is an early, working foundation, not the finished V1. Identity, 
 - Immutable pipeline slug/alias/version resolution, planned `StepRun` records, and a persisted queue outbox for each run.
 - RabbitMQ-backed asynchronous jobs with worker processing, retries, recovery scans, and SSE job events.
 - Versioned pipeline authoring with canonical JSON/Form editing, processor-version validation, immutable publishing, stable aliases, and history.
-- Dashboard pages for overview, assets, jobs, upload testing, login/signup, projects, API keys, pipelines, and the processor market.
+- Dashboard pages for overview, assets, runs, governance, pipeline testing, login/signup, projects, API keys, pipelines, and the processor market.
+- Double-submit CSRF protection on every authenticated state-changing dashboard proxy request.
+- A one-command local launcher, an API-first smoke demo, a real RabbitMQ/Azurite integration test, and a Playwright browser golden path.
 - RFC-style problem responses for validation, authentication, authorization, and database conflicts.
 
 ## Current limitations
 
 The following are intentionally not claimed as complete yet:
 
-- The old `/assets/{assetId}/complete?pipelineId=...` endpoint still exists for compatibility; new integrations should use separate `/uploads` and `/runs` endpoints.
+- The old `/assets/{assetId}/complete?pipelineId=...` endpoint remains verified for compatibility; the dashboard and new integrations use separate `/uploads` and `/runs` endpoints.
 - Step records persist outcomes, timings, errors, MIME/byte facts, processor metadata, output assets, and attempt history.
 - WebP uses pinned `com.github.usefulness:webp-imageio:0.11.0`, verifies encode/decode capability at startup, defaults to quality 82, and fails closed if the native codec cannot load.
 - Governance uses a deterministic local provider by default. Production selects the Azure Content Safety adapter with `SLUICE_GOVERNANCE_PROVIDER=azure`, `AZURE_CONTENT_SAFETY_ENDPOINT`, and `AZURE_CONTENT_SAFETY_API_KEY`.
@@ -91,7 +93,19 @@ If Testcontainers reports that it cannot find a Docker environment, start Docker
 
 ## Start the local application
 
-From the repository root, start local infrastructure:
+From the repository root, start the complete local stack with one command:
+
+```powershell
+.\scripts\start-local.ps1
+```
+
+This starts Docker infrastructure plus the backend and frontend, waits for readiness, and writes process output under the ignored `.sluice/logs` directory. Stop it without deleting local Docker volumes:
+
+```powershell
+.\scripts\stop-local.ps1
+```
+
+To run each layer interactively instead, start local infrastructure:
 
 ```powershell
 docker compose up -d
@@ -113,6 +127,14 @@ npm run dev
 ```
 
 Open [http://localhost:3000/signup](http://localhost:3000/signup), create an account and project, then open Settings to create an API key. The backend listens on [http://localhost:8080](http://localhost:8080). RabbitMQ management is at [http://localhost:15672](http://localhost:15672).
+
+After the application is ready, exercise the complete API-first flow with the committed deterministic fixture:
+
+```powershell
+.\scripts\demo-local.ps1
+```
+
+The script creates an isolated demo account and key, publishes `demo-webp`, uploads the PNG fixture directly to Azurite, starts a durable run through RabbitMQ, verifies the ALLOW governance result and WebP output, downloads that output, and prints a concise JSON result. It does not reveal the generated API key.
 
 Stop the local services while retaining their Docker volumes:
 
@@ -243,22 +265,26 @@ Backend tests must be run from `backend`:
 .\gradlew.bat test --rerun-tasks --console=plain
 ```
 
-The default suite uses Testcontainers PostgreSQL and the `test` profile. It disables RabbitMQ listener startup, scheduled job recovery, and real Azure Blob initialization. The current suite contains 57 tests and should finish with zero failures.
+The default suite uses Testcontainers PostgreSQL and the `test` profile. It disables RabbitMQ listener startup, scheduled job recovery, and real Azure Blob initialization. The current suite contains 89 tests and should finish with zero failures.
 
-The separate task is reserved for tests tagged `external-integration`:
+The separate task runs the tagged real-infrastructure flow using disposable PostgreSQL, RabbitMQ, and Azurite containers:
 
 ```powershell
 .\gradlew.bat externalIntegrationTest --console=plain
 ```
 
-It currently has no tagged broker/storage tests; that coverage is planned for the product verification workstream.
+It verifies signup and key creation, canonical pipeline publication, direct Blob upload, outbox/RabbitMQ delivery, worker execution, governance persistence, WebP output, and output download.
 
 Frontend checks must be run from `frontend`:
 
 ```powershell
 npm run lint
 npm run build
+npx playwright install chromium
+npm run test:e2e
 ```
+
+The browser test expects the local application to be running. It covers signup validation, the HttpOnly session, CSRF rejection, project creation/selection, one-time API-key reveal and revocation, logout/login failure and success, pipeline JSON publication, test upload, durable run completion, output facts, and governance UI. GitHub Actions exposes separate `Verify backend` and `Verify frontend` checks that run in parallel. `Verify product golden path` depends on both and then runs the real broker/storage integration, browser golden path, and API smoke path.
 
 `git diff --check` is also expected to pass before a commit.
 
@@ -276,6 +302,7 @@ SDD.md      Local architectural reference, ignored by Git
 
 - Every tenant resource is scoped to a project.
 - Human JWTs and the selected project are stored server-side in HttpOnly cookies by the Next.js BFF.
+- Authenticated BFF mutations require a random `X-Sluice-CSRF` value matching the SameSite CSRF cookie; missing or mismatched values fail with `403 csrf_rejected`.
 - API keys are high-entropy, revealed once, hashed at rest, project-scoped, and revocable.
 - Default tests use an isolated database rather than developer data.
 - Blob containers are private and upload/download access uses short-lived SAS URLs.
@@ -287,7 +314,7 @@ The remaining V1 path is:
 
 1. Separate upload/run APIs with durable step data and webhooks.
 2. Product surface, fixed API/media safety limits, generated OpenAPI, and operational metrics over the implemented processing/governance core. *(Implemented)*
-3. Run the clean-checkout local product gate and browser golden path.
-4. Terraform, Azure Container Apps, Service Bus, managed PostgreSQL/Blob, Key Vault, API Management, and Azure telemetry.
+3. Run the clean-checkout local product gate and browser golden path. *(Implemented locally; hosted CI confirmation follows this branch push.)*
+4. Terraform, Azure Container Apps, Service Bus, managed PostgreSQL/Blob, Key Vault, API Management, and Azure telemetry. *(Next)*
 
 Azure deployment is part of the final demo, but it has not been implemented on this branch. Read the local `SDD.md` for the dependency-ordered ticket plan and current acceptance gates.

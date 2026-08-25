@@ -1,3 +1,5 @@
+import { csrfHeaders } from '@/lib/csrf';
+
 export const BASE_URL = '/api/backend';
 
 export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -6,6 +8,7 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...csrfHeaders(options.method),
       ...options.headers,
     },
   });

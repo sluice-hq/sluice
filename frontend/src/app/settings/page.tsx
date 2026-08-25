@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { createApiKey, createProject, listApiKeys, revokeApiKey, type ApiKeySummary } from '@/api/identity';
+import { csrfFetch } from '@/lib/csrf';
 
 interface Session {
   user: { email: string };
@@ -25,7 +26,7 @@ export default function SettingsPage() {
   async function addProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
     const project = await createProject(String(data.get('name')));
-    await fetch('/api/session/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id }) });
+    await csrfFetch('/api/session/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: project.id }) });
     form.reset(); await queryClient.invalidateQueries({ queryKey: ['session'] }); window.location.reload();
   }
 
@@ -50,13 +51,13 @@ export default function SettingsPage() {
         <div key={project.id} className="flex justify-between rounded-lg border border-border px-4 py-3">
           <span>{project.name}</span><span className="text-xs text-muted-foreground">{project.role}{project.id === projectId ? ' · selected' : ''}</span>
         </div>)}</div>
-      <form onSubmit={addProject} className="flex gap-2"><Input name="name" placeholder="New project name" maxLength={100} required /><Button>Create project</Button></form>
+      <form onSubmit={addProject} className="flex gap-2"><Input name="name" placeholder="New project name" maxLength={100} required /><Button type="submit">Create project</Button></form>
     </section>
 
     <section className="rounded-xl border border-border bg-card p-6 space-y-4">
       <div><h2 className="text-lg font-semibold">API keys</h2><p className="text-sm text-muted-foreground">Use these from your applications. Only hashes are stored by Sluice.</p></div>
       {revealedKey && <div className="rounded-lg border border-primary/40 bg-primary/10 p-4 space-y-2"><p className="text-sm">{message}</p><div className="flex gap-2"><Input readOnly value={revealedKey} /><Button type="button" onClick={() => navigator.clipboard.writeText(revealedKey)}>Copy</Button></div></div>}
-      <form onSubmit={addKey} className="flex gap-2"><Input name="name" placeholder="Key name, e.g. storefront-dev" maxLength={100} required /><Button>Create API key</Button></form>
+      <form onSubmit={addKey} className="flex gap-2"><Input name="name" placeholder="Key name, e.g. storefront-dev" maxLength={100} required /><Button type="submit">Create API key</Button></form>
       <div className="divide-y divide-border">{keys.map((key) => <div key={key.id} className="flex items-center justify-between py-3">
         <div><p className="font-medium">{key.name}</p><p className="text-xs text-muted-foreground">Created {new Date(key.createdAt).toLocaleDateString()} · {key.lastUsedAt ? `last used ${new Date(key.lastUsedAt).toLocaleString()}` : 'never used'}</p></div>
         {key.revokedAt ? <span className="text-xs text-muted-foreground">Revoked</span> : <Button variant="destructive" onClick={() => revoke(key.id)}>Revoke</Button>}

@@ -52,6 +52,7 @@ hs_err_pid*
 /coverage/
 /test-results/
 /playwright-report/
+/.sluice/
 
 # Terraform local state and generated data
 **/.terraform/

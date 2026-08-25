@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { API_URL, PROJECT_COOKIE, SESSION_COOKIE, readBackendError, sessionCookieOptions } from '@/lib/server-session';
+import { API_URL, CSRF_COOKIE, PROJECT_COOKIE, SESSION_COOKIE, csrfCookieOptions, newCsrfToken, readBackendError, sessionCookieOptions } from '@/lib/server-session';
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     const { token, ...safeBody } = body;
     const result = NextResponse.json(safeBody);
     result.cookies.set(SESSION_COOKIE, token, sessionCookieOptions);
+    result.cookies.set(CSRF_COOKIE, newCsrfToken(), csrfCookieOptions);
     if (typeof body.selectedProjectId === 'string') {
       result.cookies.set(PROJECT_COOKIE, body.selectedProjectId, sessionCookieOptions);
     }

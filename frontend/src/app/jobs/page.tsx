@@ -27,17 +27,17 @@ export default function JobsPage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <Activity className="w-6 h-6 text-gray-500" />
-          Jobs
+          Runs
         </h2>
-        <p className="text-muted-foreground mt-1">Monitor background processing tasks across the platform.</p>
+        <p className="text-muted-foreground mt-1">Inspect durable pipeline executions, step results, and outputs.</p>
       </div>
 
       {isLoading ? (
         <TableSkeleton />
       ) : !pageData?.content?.length ? (
         <EmptyState 
-          title="No jobs found" 
-          description="Jobs are created automatically when you upload an asset." 
+          title="No runs found"
+          description="Runs are created by the developer API or the pipeline test console."
           action={
             <Link href="/assets/upload">
               <Button variant="outline">Upload an asset</Button>
@@ -49,7 +49,7 @@ export default function JobsPage() {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-muted-foreground uppercase bg-white/5 border-b border-white/5">
               <tr>
-                <th className="px-6 py-4 font-medium tracking-wider">Job ID</th>
+                <th className="px-6 py-4 font-medium tracking-wider">Run ID</th>
                 <th className="px-6 py-4 font-medium tracking-wider">Asset ID</th>
                 <th className="px-6 py-4 font-medium tracking-wider">Created At</th>
                 <th className="px-6 py-4 font-medium tracking-wider">Updated At</th>
@@ -75,7 +75,7 @@ export default function JobsPage() {
             </tbody>
           </table>
           <div className="px-6 py-4 border-t border-white/5 bg-black/20 text-xs text-muted-foreground flex justify-between items-center">
-            <span>Showing {pageData.numberOfElements} of {pageData.totalElements} jobs</span>
+            <span>Showing {pageData.numberOfElements} of {pageData.totalElements} runs</span>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled={pageData.first} onClick={() => setPage((current) => current - 1)} className="border-white/10 bg-white/5 text-muted-foreground">Previous</Button>
               <Button variant="outline" size="sm" disabled={pageData.last} onClick={() => setPage((current) => current + 1)} className="border-white/10 bg-white/5 text-muted-foreground">Next</Button>

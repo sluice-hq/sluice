@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { API_URL, PROJECT_COOKIE, SESSION_COOKIE, readBackendError, sessionCookieOptions } from '@/lib/server-session';
+import { API_URL, CSRF_COOKIE, PROJECT_COOKIE, SESSION_COOKIE, csrfCookieOptions, newCsrfToken, readBackendError, sessionCookieOptions } from '@/lib/server-session';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
     const result = NextResponse.json(safeBody, { status: 201 });
     result.cookies.set(SESSION_COOKIE, token, sessionCookieOptions);
     result.cookies.set(PROJECT_COOKIE, body.selectedProjectId, sessionCookieOptions);
+    result.cookies.set(CSRF_COOKIE, newCsrfToken(), csrfCookieOptions);
     return result;
   } catch {
     return NextResponse.json({ detail: 'The account service is unavailable. Please try again.' }, { status: 503 });

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { API_URL, PROJECT_COOKIE, readBackendError, serverAuthHeaders, sessionCookieOptions } from '@/lib/server-session';
+import { API_URL, PROJECT_COOKIE, hasValidCsrfToken, readBackendError, serverAuthHeaders, sessionCookieOptions } from '@/lib/server-session';
 
 export async function POST(request: NextRequest) {
+  if (!hasValidCsrfToken(request)) {
+    return NextResponse.json({ status: 403, code: 'csrf_rejected', detail: 'The request is missing valid CSRF protection.' }, { status: 403 });
+  }
   const { projectId } = await request.json();
   const response = await fetch(`${API_URL}/projects`, {
     headers: await serverAuthHeaders(),

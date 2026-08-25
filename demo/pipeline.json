@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1",
+  "slug": "demo-webp",
+  "input": {
+    "kind": "image",
+    "mimeTypes": ["image/png"],
+    "maxBytes": 50000000,
+    "maxPixels": 40000000
+  },
+  "steps": [
+    {
+      "id": "govern",
+      "processor": "governance.content-safety",
+      "version": "1.0.0",
+      "config": {"reviewThreshold": 4, "blockThreshold": 6}
+    },
+    {
+      "id": "resize",
+      "processor": "resize",
+      "version": "2.0.0",
+      "config": {"maxWidth": 1200, "maxHeight": 1200, "allowUpscale": false}
+    },
+    {
+      "id": "encode",
+      "processor": "webp",
+      "version": "2.0.0",
+      "config": {"quality": 82}
+    }
+  ],
+  "limits": {
+    "maxSteps": 10,
+    "timeoutSeconds": 90,
+    "maxOutputBytes": 50000000
+  }
+}
