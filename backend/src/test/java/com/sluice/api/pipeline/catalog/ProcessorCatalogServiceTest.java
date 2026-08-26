@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -102,5 +103,32 @@ class ProcessorCatalogServiceTest {
         when(registry.find("checksum", "1.0.0")).thenReturn(Optional.empty());
 
         assertThrows(ProcessorCatalogMismatchException.class, service::synchronizeAndAudit);
+    }
+
+    @Test
+    void marketIncludesDeprecatedHistoryInSemanticVersionOrder() throws Exception {
+        ProcessorManifest base = ProcessorManifestResources.load("checksum-1.0.0.json");
+        ProcessorDefinition definition = new ProcessorDefinition(UUID.randomUUID(), base, "Sluice", "PUBLIC");
+        ProcessorVersion release = release(definition, base, "1.0.0", "PUBLISHED");
+        ProcessorVersion newerPreRelease = release(definition, base, "1.0.0-rc.10", "DEPRECATED");
+        ProcessorVersion olderPreRelease = release(definition, base, "1.0.0-rc.2", "DEPRECATED");
+        when(versions.findByLifecycleStatusIn(List.of("PUBLISHED", "DEPRECATED")))
+                .thenReturn(List.of(olderPreRelease, release, newerPreRelease));
+
+        var market = service.listMarketReleases();
+
+        assertEquals(List.of("1.0.0", "1.0.0-rc.10", "1.0.0-rc.2"),
+                market.stream().map(item -> item.manifest().version()).toList());
+        assertEquals(List.of("PUBLISHED", "DEPRECATED", "DEPRECATED"),
+                market.stream().map(ProcessorCatalogService.CatalogRelease::lifecycleStatus).toList());
+    }
+
+    private ProcessorVersion release(ProcessorDefinition definition, ProcessorManifest base,
+                                     String version, String lifecycleStatus) throws Exception {
+        var manifest = objectMapper.valueToTree(base);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) manifest).put("version", version);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) manifest).put("status", lifecycleStatus);
+        return new ProcessorVersion(UUID.randomUUID(), definition, version, lifecycleStatus,
+                "checksum@" + version, "1", manifest, Instant.EPOCH);
     }
 }

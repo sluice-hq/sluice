@@ -19,7 +19,7 @@ class ProcessorControllerTest {
         ProcessorCatalogService catalog = mock(ProcessorCatalogService.class);
         ProcessorManifest manifest = ProcessorManifestResources.load("resize-1.0.0.json");
         when(catalog.getPublished("resize", "1.0.0")).thenReturn(
-                new ProcessorCatalogService.CatalogRelease(manifest, "Sluice", "PUBLIC", Instant.EPOCH));
+                new ProcessorCatalogService.CatalogRelease(manifest, "PUBLISHED", "Sluice", "PUBLIC", Instant.EPOCH));
 
         var response = new ProcessorController(catalog).getVersion("resize", "1.0.0");
 
@@ -32,9 +32,12 @@ class ProcessorControllerTest {
     void listEndpointKeepsReturningAnArrayOfReleases() {
         ProcessorCatalogService catalog = mock(ProcessorCatalogService.class);
         ProcessorManifest manifest = ProcessorManifestResources.load("checksum-1.0.0.json");
-        when(catalog.listPublished()).thenReturn(List.of(
-                new ProcessorCatalogService.CatalogRelease(manifest, "Sluice", "PUBLIC", Instant.EPOCH)));
+        when(catalog.listMarketReleases()).thenReturn(List.of(
+                new ProcessorCatalogService.CatalogRelease(manifest, "DEPRECATED", "Sluice", "PUBLIC", Instant.EPOCH)));
 
-        assertEquals(1, new ProcessorController(catalog).getProcessors().size());
+        var releases = new ProcessorController(catalog).getProcessors();
+
+        assertEquals(1, releases.size());
+        assertEquals("DEPRECATED", releases.get(0).status());
     }
 }

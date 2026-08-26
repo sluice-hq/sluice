@@ -86,6 +86,25 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByRole('heading', { name: 'Platform Overview' })).toBeVisible();
 
+  await page.getByRole('link', { name: 'Processor Market' }).click();
+  await expect(page.getByRole('heading', { name: /Composable media capabilities/i })).toBeVisible();
+  await expect(page.getByRole('article')).toHaveCount(7);
+  const processorMarket = page.getByRole('main');
+  await expect(processorMarket.getByText('Transform', { exact: true })).toBeVisible();
+  await expect(processorMarket.getByText('Optimize', { exact: true })).toBeVisible();
+  await expect(processorMarket.getByText('Privacy', { exact: true })).toBeVisible();
+  await expect(processorMarket.getByText('Governance', { exact: true })).toBeVisible();
+
+  const resizeCard = page.getByRole('article').filter({ hasText: 'Image Resize' });
+  await expect(resizeCard).toContainText('Recommended · v2.0.0');
+  await expect(resizeCard.getByText('Accepts')).toBeVisible();
+  await expect(resizeCard).toContainText('image/jpeg');
+  await expect(resizeCard.getByRole('heading', { name: 'Pipeline step example' })).toBeVisible();
+  await expect(resizeCard.locator('pre')).toContainText('"processor": "resize"');
+  await expect(resizeCard.locator('pre')).toContainText('"config": {}');
+  await resizeCard.getByText('Version history (1)').click();
+  await expect(resizeCard.getByText('v1.0.0', { exact: true })).toBeVisible();
+
   await page.getByRole('link', { name: 'Pipelines' }).click();
   await page.getByLabel('Name').fill(pipelineName);
   await page.getByRole('button', { name: 'JSON', exact: true }).click();
