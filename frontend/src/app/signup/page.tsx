@@ -115,7 +115,7 @@ export default function SignupPage() {
         return;
       }
 
-      router.replace('/');
+      router.replace('/app');
       router.refresh();
     } catch {
       setAlert('We could not reach Sluice. Check your connection and try again.');

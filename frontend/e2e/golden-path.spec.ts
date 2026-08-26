@@ -13,7 +13,10 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   const definition = JSON.parse(readFileSync(resolve(demoDir, 'pipeline.json'), 'utf8'));
   definition.slug = `browser-webp-${suffix}`;
 
-  await page.goto('/signup');
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: /Turn media uploads into/i })).toBeVisible();
+  await page.getByRole('link', { name: 'Create a workspace' }).click();
+  await expect(page).toHaveURL(/\/signup$/);
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByText('Enter your email address.')).toBeVisible();
   await expect(page.getByText('Create a password.')).toBeVisible();
@@ -27,6 +30,7 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'password');
   await page.getByLabel('First project name').fill(projectName);
   await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByRole('heading', { name: 'Platform Overview' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Skip to main content' }).focus();
@@ -79,6 +83,7 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(page.getByText('The email or password is incorrect.')).toBeVisible();
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByRole('heading', { name: 'Platform Overview' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Pipelines' }).click();
