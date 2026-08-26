@@ -55,13 +55,13 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
       </Link>
 
       {isLoading ? (
-        <div className="h-64 bg-white border rounded-md animate-pulse"></div>
+        <div className="h-64 animate-pulse rounded-xl border border-border bg-card"></div>
       ) : job ? (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-lg border shadow-sm">
+          <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-[0_18px_40px_rgb(0_0_0_/_0.16)] sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                <Activity className="w-6 h-6 text-gray-500" />
+                <Activity className="size-6 text-primary" />
                 Run Details
               </h2>
               <p className="text-sm font-mono text-muted-foreground mt-2">{job.id}</p>
@@ -70,35 +70,35 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-lg border shadow-sm flex items-start gap-4">
-               <FileVideo className="w-5 h-5 text-gray-400 mt-0.5" />
+            <div className="flex items-start gap-4 rounded-xl border border-border bg-card p-6 shadow-[0_12px_30px_rgb(0_0_0_/_0.12)]">
+               <FileVideo className="mt-0.5 size-5 text-muted-foreground" />
                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Asset</h3>
-                  <Link href={`/assets/${job.assetId}`} className="text-blue-600 hover:underline font-mono text-sm mt-1 inline-block">
+                  <h3 className="text-sm font-medium text-muted-foreground">Asset</h3>
+                  <Link href={`/assets/${job.assetId}`} className="mt-1 inline-block font-mono text-sm text-primary hover:underline">
                     {job.assetId.substring(0, 8)}...
                   </Link>
                </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border shadow-sm flex items-start gap-4">
-               <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
+            <div className="flex items-start gap-4 rounded-xl border border-border bg-card p-6 shadow-[0_12px_30px_rgb(0_0_0_/_0.12)]">
+               <Calendar className="mt-0.5 size-5 text-muted-foreground" />
                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Created At</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground">Created At</h3>
                   <p className="text-sm font-semibold mt-1">{new Date(job.createdAt).toLocaleString()}</p>
                </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg border shadow-sm flex items-start gap-4">
-               <Clock className="w-5 h-5 text-gray-400 mt-0.5" />
+            <div className="flex items-start gap-4 rounded-xl border border-border bg-card p-6 shadow-[0_12px_30px_rgb(0_0_0_/_0.12)]">
+               <Clock className="mt-0.5 size-5 text-muted-foreground" />
                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Last Updated</h3>
+                  <h3 className="text-sm font-medium text-muted-foreground">Last Updated</h3>
                   <p className="text-sm font-semibold mt-1">{new Date(job.updatedAt).toLocaleString()}</p>
                </div>
             </div>
           </div>
           
           {run && <div className="grid gap-6 lg:grid-cols-2">
-            <section className="rounded-lg border bg-white p-6 shadow-sm">
+            <section className="rounded-xl border border-border bg-card p-6 shadow-[0_12px_30px_rgb(0_0_0_/_0.12)]">
               <h3 className="font-semibold">Pipeline execution</h3>
               <p className="mt-1 text-sm text-muted-foreground">{run.pipeline.slug} · v{run.pipeline.version}</p>
               <div className="mt-4 space-y-2">
@@ -107,7 +107,7 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
                 </div>)}
               </div>
             </section>
-            <section className="rounded-lg border bg-white p-6 shadow-sm">
+            <section className="rounded-xl border border-border bg-card p-6 shadow-[0_12px_30px_rgb(0_0_0_/_0.12)]">
               <h3 className="font-semibold">Outputs and compression</h3>
               {run.outputs.length ? <div className="mt-3 space-y-2 text-sm">
                 {run.outputs.map((output) => <Link key={output.id} href={`/assets/${output.id}`} className="block rounded border p-3 hover:border-primary">
@@ -116,7 +116,7 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
                 <p className="text-muted-foreground">Saved {run.metrics.bytesSaved?.toLocaleString() ?? '—'} bytes · ratio {run.metrics.compressionRatio ?? '—'}</p>
               </div> : <p className="mt-3 text-sm text-muted-foreground">No normal output was produced.</p>}
             </section>
-            <section className="rounded-lg border bg-white p-6 shadow-sm">
+            <section className="rounded-xl border border-border bg-card p-6 shadow-[0_12px_30px_rgb(0_0_0_/_0.12)]">
               <h3 className="font-semibold">Governance</h3>
               {run.governance ? <div className="mt-3 space-y-2 text-sm"><p><span className="font-medium">Decision:</span> {run.governance.decision}</p><p><span className="font-medium">Provider:</span> {run.governance.provider}</p><p><span className="font-medium">Model:</span> {run.governance.modelVersion}</p><p><span className="font-medium">Reasons:</span> {Array.isArray(run.governance.reasonCodes) ? run.governance.reasonCodes.join(', ') : 'Recorded'}</p></div> : <p className="mt-3 text-sm text-muted-foreground">No governance decision was recorded for this run.</p>}
             </section>

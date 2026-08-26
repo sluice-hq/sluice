@@ -5,6 +5,7 @@ import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AuthShell, PasswordInput } from '@/components/auth/AuthShell';
 
 type LoginFields = {
   email: string;
@@ -107,15 +108,15 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthCard title="Welcome back" subtitle="Sign in to manage your media pipelines.">
-      <form noValidate onSubmit={submit} className="mt-8 space-y-5">
+    <AuthShell eyebrow="WELCOME BACK" title="Sign in to Sluice" subtitle="Manage your media pipelines, runs, and developer access in one place.">
+      <form noValidate onSubmit={submit} className="mt-9 space-y-5">
         {alert && (
           <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
             {alert}
           </div>
         )}
 
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <label htmlFor="email" className="text-sm font-medium">Email address</label>
           <Input
             id="email"
@@ -126,45 +127,31 @@ export default function LoginPage() {
             aria-invalid={Boolean(fieldErrors.email)}
             aria-describedby={fieldErrors.email ? 'email-help email-error' : 'email-help'}
             onChange={() => clearFieldError('email')}
+            className="h-11"
           />
           <p id="email-help" className="text-xs text-muted-foreground">Use the email associated with your Sluice account.</p>
           {fieldErrors.email && <p id="email-error" className="text-sm text-destructive">{fieldErrors.email}</p>}
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <label htmlFor="password" className="text-sm font-medium">Password</label>
-          <Input
+          <PasswordInput
             id="password"
-            name="password"
-            type="password"
             autoComplete="current-password"
             maxLength={128}
-            aria-invalid={Boolean(fieldErrors.password)}
-            aria-describedby={fieldErrors.password ? 'password-help password-error' : 'password-help'}
+            invalid={Boolean(fieldErrors.password)}
+            describedBy={fieldErrors.password ? 'password-help password-error' : 'password-help'}
             onChange={() => clearFieldError('password')}
           />
           <p id="password-help" className="text-xs text-muted-foreground">Passwords are case-sensitive.</p>
           {fieldErrors.password && <p id="password-error" className="text-sm text-destructive">{fieldErrors.password}</p>}
         </div>
 
-        <Button type="submit" className="h-10 w-full" disabled={busy} aria-busy={busy}>
+        <Button type="submit" className="h-11 w-full text-sm font-semibold" disabled={busy} aria-busy={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </Button>
         <p className="text-center text-sm text-muted-foreground">New to Sluice? <Link className="text-primary underline-offset-4 hover:underline" href="/signup">Create an account</Link></p>
       </form>
-    </AuthCard>
-  );
-}
-
-function AuthCard({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-  return (
-    <main className="grid min-h-screen place-items-center bg-background p-6 sm:p-8">
-      <section aria-labelledby="auth-heading" className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl sm:p-8">
-        <p className="text-sm font-medium text-primary">Sluice developer platform</p>
-        <h1 id="auth-heading" className="mt-2 text-3xl font-bold tracking-tight">{title}</h1>
-        <p className="mt-2 text-muted-foreground">{subtitle}</p>
-        {children}
-      </section>
-    </main>
+    </AuthShell>
   );
 }

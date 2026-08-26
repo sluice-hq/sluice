@@ -1,14 +1,24 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { LayoutDashboard, FileVideo, Activity, Play, Shield, Settings, LogOut, Boxes } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  Activity,
+  Boxes,
+  FileVideo,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Play,
+  Settings,
+  Shield,
+  X,
+} from 'lucide-react';
 import { csrfFetch } from '@/lib/csrf';
+import { cn } from '@/lib/utils';
 
 const navigation = [
   { name: 'Overview', href: '/', icon: LayoutDashboard },
@@ -23,6 +33,7 @@ const navigation = [
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const publicRoute = pathname === '/login' || pathname === '/signup';
   const { data: session, isLoading, isError } = useQuery<Session>({
     queryKey: ['session'],
@@ -41,112 +52,154 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, [isError, publicRoute, router]);
 
   if (publicRoute) return children;
-  if (isLoading || !session) return <div className="min-h-screen grid place-items-center bg-background text-muted-foreground">Loading Sluice…</div>;
+  if (isLoading || !session) {
+    return <div className="grid min-h-screen place-items-center bg-background text-sm text-muted-foreground">Loading Sluice…</div>;
+  }
+
+  const selectedProject = session.projects.find((project) => project.id === session.selectedProjectId);
 
   async function selectProject(projectId: string) {
     await csrfFetch('/api/session/project', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId }),
     });
     window.location.reload();
   }
 
   async function logout() {
     await csrfFetch('/api/session/logout', { method: 'POST' });
-    router.replace('/login'); router.refresh();
+    router.replace('/login');
+    router.refresh();
   }
 
+  const navigationItems = navigation.map((item) => {
+    const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/');
+    return (
+      <Link
+        key={item.name}
+        href={item.href}
+        onClick={() => setMobileMenuOpen(false)}
+        className={cn(
+          'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
+          isActive
+            ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_8px_24px_rgb(35_149_255_/_0.22)]'
+            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+        )}
+      >
+        <item.icon className="size-4 shrink-0" aria-hidden="true" />
+        {item.name}
+      </Link>
+    );
+  });
+
   return (
-    <div className="flex h-screen bg-background text-foreground antialiased selection:bg-primary/30">
-      {/* Sidebar with Glassmorphism */}
-      <div className="hidden md:flex md:w-[228px] md:flex-col md:fixed md:inset-y-0 z-20">
-        <div className="flex-1 flex flex-col min-h-0 bg-sidebar border-r border-sidebar-border">
-          <div className="flex items-center h-40 flex-shrink-0 px-6 border-b border-sidebar-border overflow-hidden">
-            <div className="w-32 h-32 flex items-center justify-center flex-shrink-0 ml-5 z-10">
-              <Image src="/logo-3.png" alt="Sluice Logo" width={128} height={128} className="w-full h-full object-contain" priority />
-            </div>
-          </div>
-          <div className="flex-1 flex flex-col overflow-y-auto">
-            <nav className="flex-1 px-4 py-6 space-y-1">
-              {navigation.map((item) => {
-                const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/');
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={cn(
-                      'group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors',
-                      isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-sidebar-foreground hover:text-white',
-                    )}
-                  >
-                    <item.icon
-                      className={cn(
-                        'mr-3 flex-shrink-0 h-5 w-5',
-                        isActive ? 'text-primary-foreground' : 'text-sidebar-foreground/70 group-hover:text-white'
-                      )}
-                      aria-hidden="true"
-                    />
-                    {item.name}
-                  </Link>
-                );
-              })}
-            </nav>
-            {/* User Profile */}
-            <div className="p-4 border-t border-sidebar-border mt-auto">
-              <select value={session.selectedProjectId || ''} onChange={(event) => selectProject(event.target.value)}
-                className="mb-4 w-full rounded-md border border-sidebar-border bg-sidebar px-2 py-2 text-xs text-white">
-                {session.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-              </select>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
-                  {session.user.email.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-sm font-medium text-white truncate">{session.user.email}</span>
-                  <span className="text-xs text-muted-foreground">{session.projects.find((project) => project.id === session.selectedProjectId)?.role}</span>
-                </div>
-                <button onClick={logout} title="Sign out" className="text-muted-foreground hover:text-white"><LogOut className="h-4 w-4" /></button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/30">
+      <a
+        href="#main-content"
+        className="sr-only fixed left-4 top-4 z-50 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg focus:not-sr-only focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background"
+      >
+        Skip to main content
+      </a>
+      <aside className="fixed inset-y-0 z-30 hidden w-60 flex-col border-r border-sidebar-border bg-sidebar md:flex">
+        <Brand />
+        <nav aria-label="Main navigation" className="flex-1 space-y-1 overflow-y-auto px-3 py-5">
+          {navigationItems}
+        </nav>
+        <SessionPanel session={session} selectedProject={selectedProject} onProjectChange={selectProject} onLogout={logout} />
+      </aside>
 
-      {/* Main Content Area */}
-      <div className="flex flex-col flex-1 md:pl-64 h-screen relative">
-
-        {/* Mobile TopNav */}
-        <div className="sticky top-0 z-30 flex-shrink-0 flex h-40 bg-sidebar border-b border-sidebar-border md:hidden overflow-hidden">
-          <div className="flex-1 flex justify-between px-4">
-            <div className="flex-1 flex items-center">
-              <div className="w-32 h-32 flex items-center justify-center flex-shrink-0 z-10 ml-2">
-                <Image src="/logo-3.png" alt="Sluice Logo" width={128} height={128} className="w-full h-full object-contain" priority />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Desktop TopNav */}
-        <div className="hidden md:flex items-center justify-between h-16 px-8 border-b border-border bg-background z-10 sticky top-0">
-          <div className="flex-1 flex items-center">
-            {/* Page Title (injected by page.tsx normally, but we keep header flexible) */}
-          </div>
-          <div className="flex items-center gap-6">
-            <Link href="/pipelines" className="bg-primary text-primary-foreground px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-primary/90 transition-colors shadow-[0_0_15px_rgba(0,144,255,0.3)]">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
-              Build Pipeline
+      <div className="min-h-screen md:pl-60">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border/80 bg-background/90 px-4 backdrop-blur-xl md:px-8">
+          <Link href="/" className="flex items-center gap-2 md:hidden" aria-label="Sluice overview">
+            <Image src="/logo-3.png" alt="" width={32} height={32} className="size-8 object-contain" priority />
+            <span className="font-semibold tracking-tight">Sluice</span>
+          </Link>
+          <div className="hidden flex-1 md:block" />
+          <div className="flex items-center gap-2">
+            <Link
+              href="/pipelines"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-[0_8px_22px_rgb(35_149_255_/_0.26)] transition-colors hover:bg-primary/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:px-3.5"
+            >
+              <Play className="size-4" aria-hidden="true" />
+              <span className="sm:hidden">Build</span>
+              <span className="hidden sm:inline">Build pipeline</span>
             </Link>
+            <button
+              type="button"
+              className="inline-grid size-10 place-items-center rounded-lg border border-border bg-card text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden"
+              aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen((open) => !open)}
+            >
+              {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+            </button>
           </div>
-        </div>
+        </header>
 
-        <main className="flex-1 overflow-y-auto z-10 bg-background">
-          <div className="max-w-[1500px] mx-auto py-8 px-4 sm:px-6 md:px-8">
-            {children}
+        {mobileMenuOpen && (
+          <div className="fixed inset-x-0 top-16 z-20 border-b border-border bg-sidebar px-4 pb-4 pt-3 shadow-2xl md:hidden">
+            <nav aria-label="Mobile navigation" className="space-y-1">{navigationItems}</nav>
+            <SessionPanel session={session} selectedProject={selectedProject} onProjectChange={selectProject} onLogout={logout} compact />
           </div>
-        </main>
+        )}
+
+        <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1500px] px-4 py-6 focus:outline-none sm:px-6 md:px-8 md:py-8">{children}</main>
+      </div>
+    </div>
+  );
+}
+
+function Brand() {
+  return (
+    <Link href="/" className="flex h-20 items-center gap-3 border-b border-sidebar-border px-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring">
+      <Image src="/logo-3.png" alt="" width={42} height={42} className="size-10 object-contain" priority />
+      <span className="text-lg font-semibold tracking-tight text-foreground">Sluice</span>
+    </Link>
+  );
+}
+
+function SessionPanel({
+  session,
+  selectedProject,
+  onProjectChange,
+  onLogout,
+  compact = false,
+}: {
+  session: Session;
+  selectedProject?: Session['projects'][number];
+  onProjectChange: (projectId: string) => Promise<void>;
+  onLogout: () => Promise<void>;
+  compact?: boolean;
+}) {
+  return (
+    <div className={cn('border-sidebar-border', compact ? 'mt-4 border-t pt-4' : 'border-t p-4')}>
+      <label className="sr-only" htmlFor={compact ? 'mobile-project' : 'desktop-project'}>Selected project</label>
+      <select
+        id={compact ? 'mobile-project' : 'desktop-project'}
+        value={session.selectedProjectId || ''}
+        onChange={(event) => onProjectChange(event.target.value)}
+        className="w-full rounded-lg border border-sidebar-border bg-background px-3 py-2 text-sm text-foreground shadow-sm outline-none transition-colors focus:border-sidebar-ring focus:ring-2 focus:ring-sidebar-ring/30"
+      >
+        {session.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+      </select>
+      <div className="mt-3 flex items-center gap-3">
+        <div className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+          {session.user.email.slice(0, 2).toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-foreground">{session.user.email}</p>
+          <p className="text-xs text-muted-foreground">{selectedProject?.role ?? 'Member'}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onLogout}
+          title="Sign out"
+          className="grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+        >
+          <LogOut className="size-4" aria-hidden="true" />
+          <span className="sr-only">Sign out</span>
+        </button>
       </div>
     </div>
   );
