@@ -20,10 +20,31 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(page.getByText('Name your first project.')).toBeVisible();
 
   await page.getByLabel('Email address').fill(email);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Show password' }).click();
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'text');
+  await page.getByRole('button', { name: 'Hide password' }).click();
+  await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'password');
   await page.getByLabel('First project name').fill(projectName);
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('heading', { name: 'Platform Overview' })).toBeVisible();
+
+  await page.getByRole('link', { name: 'Skip to main content' }).focus();
+  await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#main-content')).toBeFocused();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole('link', { name: 'Build' })).toBeVisible();
+  await page.getByRole('button', { name: 'Open navigation menu' }).click();
+  const mobileNavigation = page.getByRole('navigation', { name: 'Mobile navigation' });
+  await expect(mobileNavigation.getByRole('link')).toHaveCount(7);
+  await expect(mobileNavigation.getByRole('link', { name: 'Pipelines' })).toBeVisible();
+  await expect(page.locator('#mobile-project')).toBeVisible();
+  await expect(page.getByText(email).last()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign out' }).last()).toBeVisible();
+  await page.getByRole('button', { name: 'Close navigation menu' }).click();
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   const cookies = await context.cookies();
   expect(cookies.find((cookie) => cookie.name === 'sluice_session')?.httpOnly).toBe(true);
@@ -51,12 +72,12 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(page.getByText('Revoked')).toBeVisible();
 
   await page.getByTitle('Sign out').click();
-  await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sign in to Sluice' })).toBeVisible();
   await page.getByLabel('Email address').fill(email);
-  await page.getByLabel('Password').fill('wrong-password');
+  await page.getByLabel('Password', { exact: true }).fill('wrong-password');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByText('The email or password is incorrect.')).toBeVisible();
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('heading', { name: 'Platform Overview' })).toBeVisible();
 

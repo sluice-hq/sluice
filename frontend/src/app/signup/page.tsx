@@ -5,6 +5,7 @@ import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AuthShell, PasswordInput } from '@/components/auth/AuthShell';
 
 type SignupFields = {
   email: string;
@@ -124,20 +125,15 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-background p-6 sm:p-8">
-      <section aria-labelledby="signup-heading" className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl sm:p-8">
-        <p className="text-sm font-medium text-primary">Sluice developer platform</p>
-        <h1 id="signup-heading" className="mt-2 text-3xl font-bold tracking-tight">Create your workspace</h1>
-        <p className="mt-2 text-muted-foreground">Start with a project for your media-processing API and pipelines.</p>
-
-        <form noValidate onSubmit={submit} className="mt-8 space-y-5">
+    <AuthShell eyebrow="START BUILDING" title="Create your workspace" subtitle="Set up your first project for media-processing APIs and pipelines.">
+        <form noValidate onSubmit={submit} className="mt-9 space-y-5">
           {alert && (
             <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
               {alert}
             </div>
           )}
 
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium">Email address</label>
             <Input
               id="email"
@@ -148,29 +144,28 @@ export default function SignupPage() {
               aria-invalid={Boolean(fieldErrors.email)}
               aria-describedby={fieldErrors.email ? 'email-help email-error' : 'email-help'}
               onChange={() => clearFieldError('email')}
+              className="h-11"
             />
-            <p id="email-help" className="text-xs text-muted-foreground">Use an address you can access for account recovery.</p>
+            <p id="email-help" className="text-xs text-muted-foreground">Use an address you can access for account updates.</p>
             {fieldErrors.email && <p id="email-error" className="text-sm text-destructive">{fieldErrors.email}</p>}
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <label htmlFor="password" className="text-sm font-medium">Password</label>
-            <Input
+            <PasswordInput
               id="password"
-              name="password"
-              type="password"
               autoComplete="new-password"
               minLength={12}
               maxLength={128}
-              aria-invalid={Boolean(fieldErrors.password)}
-              aria-describedby={fieldErrors.password ? 'password-help password-error' : 'password-help'}
+              invalid={Boolean(fieldErrors.password)}
+              describedBy={fieldErrors.password ? 'password-help password-error' : 'password-help'}
               onChange={() => clearFieldError('password')}
             />
             <p id="password-help" className="text-xs text-muted-foreground">Use 12 to 128 characters.</p>
             {fieldErrors.password && <p id="password-error" className="text-sm text-destructive">{fieldErrors.password}</p>}
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <label htmlFor="projectName" className="text-sm font-medium">First project name</label>
             <Input
               id="projectName"
@@ -180,17 +175,17 @@ export default function SignupPage() {
               aria-invalid={Boolean(fieldErrors.projectName)}
               aria-describedby={fieldErrors.projectName ? 'project-name-help project-name-error' : 'project-name-help'}
               onChange={() => clearFieldError('projectName')}
+              className="h-11"
             />
             <p id="project-name-help" className="text-xs text-muted-foreground">You can create more projects later. Use up to 100 characters.</p>
             {fieldErrors.projectName && <p id="project-name-error" className="text-sm text-destructive">{fieldErrors.projectName}</p>}
           </div>
 
-          <Button type="submit" className="h-10 w-full" disabled={busy} aria-busy={busy}>
+          <Button type="submit" className="h-11 w-full text-sm font-semibold" disabled={busy} aria-busy={busy}>
             {busy ? 'Creating account…' : 'Create account'}
           </Button>
           <p className="text-center text-sm text-muted-foreground">Already registered? <Link className="text-primary underline-offset-4 hover:underline" href="/login">Sign in</Link></p>
         </form>
-      </section>
-    </main>
+    </AuthShell>
   );
 }
