@@ -16,6 +16,9 @@ public interface ProcessorVersionRepository extends JpaRepository<ProcessorVersi
     List<ProcessorVersion> findByLifecycleStatusOrderByDefinitionSlugAscSemanticVersionDesc(String lifecycleStatus);
 
     @EntityGraph(attributePaths = "definition")
+    List<ProcessorVersion> findByLifecycleStatusIn(List<String> lifecycleStatuses);
+
+    @EntityGraph(attributePaths = "definition")
     List<ProcessorVersion> findByDefinitionSlugAndLifecycleStatusOrderBySemanticVersionDesc(
             String slug, String lifecycleStatus);
 }

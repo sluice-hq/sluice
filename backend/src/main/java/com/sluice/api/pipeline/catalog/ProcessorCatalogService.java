@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sluice.api.pipeline.ProcessorManifest;
 import com.sluice.api.pipeline.ProcessorRegistry;
+import com.sluice.api.pipeline.SemanticVersions;
 import com.sluice.api.pipeline.catalog.domain.ProcessorDefinition;
 import com.sluice.api.pipeline.catalog.domain.ProcessorVersion;
 import com.sluice.api.pipeline.catalog.repository.ProcessorDefinitionRepository;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Comparator;
 import java.util.UUID;
 
 @Service
@@ -66,13 +68,19 @@ public class ProcessorCatalogService {
     @Transactional(readOnly = true)
     public List<CatalogRelease> listPublished() {
         return versionRepository.findByLifecycleStatusOrderByDefinitionSlugAscSemanticVersionDesc("PUBLISHED")
-                .stream().map(this::toRelease).toList();
+                .stream().sorted(releaseOrder()).map(this::toRelease).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CatalogRelease> listMarketReleases() {
+        return versionRepository.findByLifecycleStatusIn(List.of("PUBLISHED", "DEPRECATED"))
+                .stream().sorted(releaseOrder()).map(this::toRelease).toList();
     }
 
     @Transactional(readOnly = true)
     public List<CatalogRelease> listPublished(String slug) {
         return versionRepository.findByDefinitionSlugAndLifecycleStatusOrderBySemanticVersionDesc(slug, "PUBLISHED")
-                .stream().map(this::toRelease).toList();
+                .stream().sorted(releaseOrder()).map(this::toRelease).toList();
     }
 
     @Transactional(readOnly = true)
@@ -86,12 +94,18 @@ public class ProcessorCatalogService {
     private CatalogRelease toRelease(ProcessorVersion persisted) {
         try {
             ProcessorManifest manifest = objectMapper.treeToValue(persisted.getManifest(), ProcessorManifest.class);
-            return new CatalogRelease(manifest, persisted.getDefinition().getPublisher(),
+            return new CatalogRelease(manifest, persisted.getLifecycleStatus(), persisted.getDefinition().getPublisher(),
                     persisted.getDefinition().getVisibility(), persisted.getPublishedAt());
         } catch (JsonProcessingException exception) {
             throw new ProcessorCatalogMismatchException(
                     "Persisted processor manifest cannot be read: " + persisted.getImplementationKey());
         }
+    }
+
+    private Comparator<ProcessorVersion> releaseOrder() {
+        return Comparator.comparing((ProcessorVersion release) -> release.getDefinition().getSlug())
+                .thenComparing(ProcessorVersion::getSemanticVersion,
+                        (left, right) -> SemanticVersions.compare(right, left));
     }
 
     private void assertMatches(ProcessorVersion persisted, ProcessorManifest implementation) {
@@ -108,7 +122,7 @@ public class ProcessorCatalogService {
         }
     }
 
-    public record CatalogRelease(ProcessorManifest manifest, String publisher, String visibility,
+    public record CatalogRelease(ProcessorManifest manifest, String lifecycleStatus, String publisher, String visibility,
                                  Instant publishedAt) {
     }
 }

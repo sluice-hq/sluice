@@ -23,7 +23,7 @@ public class ProcessorController {
 
     @GetMapping
     public List<ProcessorDto> getProcessors() {
-        return catalogService.listPublished().stream().map(ProcessorDto::from).toList();
+        return catalogService.listMarketReleases().stream().map(ProcessorDto::from).toList();
     }
 
     @GetMapping("/{slug}/versions/{version}")
@@ -46,7 +46,7 @@ public class ProcessorController {
             return new ProcessorDto(m.slug(), m.version(), m.displayName(), m.description(), m.category(),
                     MediaContractDto.from(m.input()), MediaContractDto.from(m.output()),
                     new ProcessorLimitsDto(m.limits().timeoutSeconds(), m.limits().memoryMb(), m.limits().maxOutputBytes()),
-                    m.configSchema(), m.permissions(), m.status(), m.releaseNotes(), release.publisher(),
+                    m.configSchema(), m.permissions(), release.lifecycleStatus(), m.releaseNotes(), release.publisher(),
                     release.visibility(), release.publishedAt());
         }
     }
