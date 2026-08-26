@@ -21,7 +21,7 @@ import { csrfFetch } from '@/lib/csrf';
 import { cn } from '@/lib/utils';
 
 const navigation = [
-  { name: 'Overview', href: '/', icon: LayoutDashboard },
+  { name: 'Overview', href: '/app', icon: LayoutDashboard },
   { name: 'Assets', href: '/assets', icon: FileVideo },
   { name: 'Runs', href: '/jobs', icon: Activity },
   { name: 'Pipelines', href: '/pipelines', icon: Play },
@@ -34,7 +34,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const publicRoute = pathname === '/login' || pathname === '/signup';
+  const publicRoute = pathname === '/' || pathname === '/login' || pathname === '/signup';
   const { data: session, isLoading, isError } = useQuery<Session>({
     queryKey: ['session'],
     queryFn: async () => {
@@ -111,7 +111,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="min-h-screen md:pl-60">
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border/80 bg-background/90 px-4 backdrop-blur-xl md:px-8">
-          <Link href="/" className="flex items-center gap-2 md:hidden" aria-label="Sluice overview">
+          <Link href="/app" className="flex items-center gap-2 md:hidden" aria-label="Sluice overview">
             <Image src="/logo-3.png" alt="" width={32} height={32} className="size-8 object-contain" priority />
             <span className="font-semibold tracking-tight">Sluice</span>
           </Link>
@@ -152,7 +152,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
 function Brand() {
   return (
-    <Link href="/" className="flex h-20 items-center gap-3 border-b border-sidebar-border px-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring">
+    <Link href="/app" className="flex h-20 items-center gap-3 border-b border-sidebar-border px-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring">
       <Image src="/logo-3.png" alt="" width={42} height={42} className="size-10 object-contain" priority />
       <span className="text-lg font-semibold tracking-tight text-foreground">Sluice</span>
     </Link>

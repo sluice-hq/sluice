@@ -7,8 +7,8 @@ import AppShell from '@/components/layout/AppShell';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Sluice Dashboard',
-  description: 'Cloud-native media infrastructure platform',
+  title: { default: 'Sluice | Media infrastructure for developers', template: '%s | Sluice' },
+  description: 'Versioned, observable, policy-checked media pipelines for developer applications.',
 };
 
 export default function RootLayout({
