@@ -2,7 +2,7 @@
 
 Sluice is an API-first media processing platform. A developer application authenticates with a project API key, uploads media directly to object storage, starts a versioned pipeline run, and reads the durable run result through the API. The Next.js dashboard is the human control plane for projects, keys, assets, runs, governance, and testing.
 
-This repository is an early, working foundation, not the finished V1. Identity, project isolation, API keys, reusable uploads, slug-based run creation, idempotency, durable asynchronous execution, versioned processor contracts, real bounded image processing, persisted governance decisions, a curated processor market, guided canonical JSON/Form pipeline authoring, a responsive developer dashboard, and local Prometheus/Grafana monitoring are implemented. Onboarding, operational UX completion, and Azure deployment remain planned work.
+This repository is an early, working foundation, not the finished V1. Identity, project isolation, API keys, reusable uploads, slug-based run creation, idempotency, durable asynchronous execution, versioned processor contracts, real bounded image processing, persisted governance decisions, a curated processor market, guided canonical JSON/Form pipeline authoring, first-run onboarding, API Quick Start, a responsive developer dashboard, and local Prometheus/Grafana monitoring are implemented. Operational UX completion and Azure deployment remain planned work.
 
 ## What works today
 
@@ -16,6 +16,7 @@ This repository is an early, working foundation, not the finished V1. Identity, 
 - Immutable pipeline slug/alias/version resolution, durable `StepRun` records, and a persisted queue outbox for each run.
 - RabbitMQ-backed asynchronous jobs with worker processing, retries, recovery scans, and SSE job events.
 - Versioned pipeline authoring with synchronized canonical JSON/Form editing, starter templates, schema-aware controls, processor-version validation, immutable publishing, stable aliases, and history.
+- A project-backed first-run checklist and API Quick Start with selected-project context, a server-runtime public API origin, authenticated OpenAPI access, and copyable cURL, JavaScript, and Python flows covering uploads, runs, output download, and signed webhooks.
 - A responsive dashboard shell with keyboard skip navigation, mobile project/session controls, and pages for overview, assets, runs, governance, pipeline testing, login/signup, projects, API keys, pipelines, and the processor market.
 - Double-submit CSRF protection on every authenticated state-changing dashboard proxy request.
 - A one-command local launcher, an API-first smoke demo, a real RabbitMQ/Azurite integration test, and a Playwright browser golden path covering auth/session, password visibility, skip navigation, and mobile controls.
@@ -31,7 +32,7 @@ The following are intentionally not claimed as complete yet:
 - Governance uses a deterministic local provider by default. Production selects the Azure Content Safety adapter with `SLUICE_GOVERNANCE_PROVIDER=azure`, `AZURE_CONTENT_SAFETY_ENDPOINT`, and `AZURE_CONTENT_SAFETY_API_KEY`.
 - Dashboard counts, recent assets/jobs, pagination, and the cached PostgreSQL/RabbitMQ/Blob readiness snapshot are backed by API data. Search and notifications remain outside V1.
 - Prometheus is available at `http://localhost:9090` and Grafana at `http://localhost:3001` after `docker compose up`; the provisioned dashboard covers HTTP traffic, runs, processors, governance, durable backlogs, queue publishing, Blob operations, webhooks, and dependency health.
-- Authenticated API clients can inspect the generated OpenAPI 3 contract, including request/response schemas and authentication schemes, at `GET /api/v1/openapi.json`.
+- Authenticated API clients can inspect the generated OpenAPI 3 contract at `GET /api/v1/openapi.json`; signed-in dashboard users open it through `/api/backend/openapi.json`, which keeps their HttpOnly credential server-side.
 - Azure resources and deployment automation are not in this branch yet.
 - Arbitrary custom processor code is outside V1 for safety reasons.
 
@@ -93,6 +94,8 @@ If Testcontainers reports that it cannot find a Docker environment, start Docker
 
 ## Start the local application
 
+The committed [`.env.example`](.env.example) is a safe configuration reference with placeholders only. Local development works with the defaults already aligned between Spring and Docker Compose, so do not copy placeholder secrets into a working environment. When overriding configuration, export the required values in the process that starts the backend. For the Next.js dashboard, set `API_BASE_URL` to the backend URL used by the server-side proxy and `SLUICE_PUBLIC_API_BASE_URL` to the browser-reachable API origin shown by API Quick Start. Both are server runtime settings. `NEXT_PUBLIC_API_BASE_URL` remains a backward-compatible fallback for existing deployments, but new configuration should use `SLUICE_PUBLIC_API_BASE_URL` so changing the displayed public API origin does not require a frontend rebuild.
+
 From the repository root, start the complete local stack with one command:
 
 ```powershell
@@ -126,7 +129,7 @@ npm ci
 npm run dev
 ```
 
-Open [http://localhost:3000/signup](http://localhost:3000/signup), create an account and project, then open Settings to create an API key. The backend listens on [http://localhost:8080](http://localhost:8080). RabbitMQ management is at [http://localhost:15672](http://localhost:15672).
+Open [http://localhost:3000/signup](http://localhost:3000/signup), create an account and project, then follow the live first-run checklist. API Quick Start uses the selected project and configured public API base URL to generate copyable cURL, JavaScript, and Python flows. The backend listens on [http://localhost:8080](http://localhost:8080). RabbitMQ management is at [http://localhost:15672](http://localhost:15672).
 
 After the application is ready, exercise the complete API-first flow with the committed deterministic fixture:
 
@@ -192,14 +195,17 @@ All paths below include the `/api/v1` prefix.
 | `GET` | `/jobs`, `/jobs/{id}` | List or inspect jobs |
 | `GET` | `/jobs/{id}/events` | Subscribe to authenticated SSE job events |
 | `GET` | `/dashboard` | Read the current dashboard overview |
+| `POST` | `/webhook-endpoints` | Register a public HTTPS callback and reveal its Base64 signing secret once |
+| `GET` | `/webhook-endpoints/{id}/deliveries` | Inspect persisted terminal delivery attempts |
 
 The preferred flow completes the upload first, then starts one or more runs:
 
 1. `POST /uploads` with `{filename, contentType, size}`.
 2. PUT the bytes to the returned SAS URL.
 3. `POST /uploads/{assetId}/complete`.
-4. `POST /runs` with `{pipeline: "product-images", alias: "stable", inputAssetId: "..."}`.
-5. Poll `GET /runs/{id}` or subscribe to `GET /runs/{id}/events`.
+4. Optionally `POST /webhook-endpoints`, store the returned secret securely, and add `callback.webhookEndpointId` to the run request.
+5. `POST /runs` with `{pipeline: "product-images", alias: "stable", inputAssetId: "..."}`.
+6. Poll `GET /runs/{id}`, subscribe to `GET /runs/{id}/events`, or verify the signed terminal webhook over the exact `timestamp.payload` bytes.
 
 ### API key upload example
 
@@ -254,8 +260,11 @@ Local defaults are defined in `backend/src/main/resources/application.properties
 | `SLUICE_JWT_SECRET` | JWT signing secret | Development-only fallback |
 | `SPRING_PROFILES_ACTIVE` | Activate production-required settings | Set to `production` in Azure |
 | `API_BASE_URL` | Backend URL used by the Next.js BFF | `http://localhost:8080/api/v1` |
+| `SLUICE_PUBLIC_API_BASE_URL` | Browser-reachable API URL returned to Quick Start from server runtime configuration | `http://localhost:8080/api/v1` |
+| `NEXT_PUBLIC_API_BASE_URL` | Deprecated fallback for the Quick Start public API URL | Not set |
+| `SLUICE_DASHBOARD_URL` | Playwright dashboard origin | `http://localhost:3000` |
 
-Production must supply a strong JWT secret and managed database, storage, queue, CORS, and API URL settings. `application-production.properties` intentionally has no source-code fallbacks for required database, storage, JWT, and CORS values.
+The root `.env.example` lists the remaining media, processor, governance, storage, and observability overrides accepted by the application. Production must supply a strong JWT secret and managed database, storage, queue, CORS, and API URL settings. `application-production.properties` intentionally has no source-code fallbacks for required database, storage, JWT, and CORS values.
 
 ## Verification
 
@@ -315,7 +324,7 @@ The remaining V1 path is:
 1. Separate upload/run APIs with durable step data and signed terminal webhooks. *(Implemented)*
 2. Product surface, fixed API/media safety limits, generated OpenAPI, and operational metrics over the implemented processing/governance core. *(Implemented)*
 3. Run the clean-checkout local product gate and browser golden path. *(Implemented)*
-4. Product-experience completion: public landing page, processor market, guided pipeline authoring, onboarding/quick start, test-console, run inspection, and finishing UX. *(In progress: responsive shell, authentication, public landing page, processor market, and guided pipeline authoring are implemented; onboarding and operational UX remain.)*
+4. Product-experience completion: public landing page, processor market, guided pipeline authoring, onboarding/quick start, test-console, run inspection, and finishing UX. *(In progress: responsive shell, authentication, public landing page, processor market, guided pipeline authoring, and onboarding/API Quick Start are implemented; operational UX remains.)*
 5. Terraform, Azure Container Apps, Service Bus, managed PostgreSQL/Blob, Key Vault, API Management, and Azure telemetry. *(After product-experience completion)*
 
 Azure deployment is part of the final demo, but it has not been implemented on this branch. Read the local `SDD.md` for the dependency-ordered ticket plan and current acceptance gates.

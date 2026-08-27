@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
+  BookOpen,
   Boxes,
   FileVideo,
   LayoutDashboard,
@@ -27,6 +28,7 @@ const navigation = [
   { name: 'Pipelines', href: '/pipelines', icon: Play },
   { name: 'Processor Market', href: '/processors', icon: Boxes },
   { name: 'Governance', href: '/governance', icon: Shield },
+  { name: 'API Quick Start', href: '/quick-start', icon: BookOpen },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
