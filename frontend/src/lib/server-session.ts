@@ -6,7 +6,17 @@ export const SESSION_COOKIE = 'sluice_session';
 export const PROJECT_COOKIE = 'sluice_project';
 export const CSRF_COOKIE = 'sluice_csrf';
 export const CSRF_HEADER = 'X-Sluice-CSRF';
-export const API_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api/v1';
+const DEFAULT_API_URL = 'http://localhost:8080/api/v1';
+export const API_URL = process.env.API_BASE_URL
+  || process.env.SLUICE_PUBLIC_API_BASE_URL
+  || process.env.NEXT_PUBLIC_API_BASE_URL
+  || DEFAULT_API_URL;
+
+export function getPublicApiUrl(): string {
+  return (process.env.SLUICE_PUBLIC_API_BASE_URL
+    || process.env.NEXT_PUBLIC_API_BASE_URL
+    || DEFAULT_API_URL).replace(/\/+$/, '');
+}
 
 export const sessionCookieOptions = {
   httpOnly: true,

@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 const demoDir = resolve(process.cwd(), '..', 'demo');
 
 test('developer completes the local dashboard golden path', async ({ page, context }) => {
+  test.setTimeout(180_000);
   const suffix = Date.now().toString();
   const email = `browser-${suffix}@example.com`;
   const password = 'browser-password-2026';
@@ -15,6 +16,8 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   definition.slug = `browser-governed-${suffix}`;
 
   await page.goto('/');
+  const anonymousOpenApi = await page.request.get('/api/backend/openapi.json');
+  expect(anonymousOpenApi.status()).toBe(401);
   await expect(page.getByRole('heading', { name: /Turn media uploads into/i })).toBeVisible();
   await page.getByRole('link', { name: 'Create a workspace' }).click();
   await expect(page).toHaveURL(/\/signup$/);
@@ -33,6 +36,11 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByRole('heading', { name: 'Platform Overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Start your first integration' })).toBeVisible();
+  const initialChecklist = page.getByRole('region', { name: 'Start your first integration' });
+  await expect(initialChecklist.getByRole('listitem').filter({ hasText: 'Create an API key' }).getByLabel('Not complete')).toBeVisible();
+  await expect(initialChecklist.getByRole('listitem').filter({ hasText: 'Publish a pipeline' }).getByLabel('Not complete')).toBeVisible();
+  await expect(initialChecklist.getByRole('listitem').filter({ hasText: 'Complete your first run' }).getByLabel('Not complete')).toBeVisible();
 
   await page.getByRole('link', { name: 'Skip to main content' }).focus();
   await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeVisible();
@@ -43,7 +51,7 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(page.getByRole('link', { name: 'Build' })).toBeVisible();
   await page.getByRole('button', { name: 'Open navigation menu' }).click();
   const mobileNavigation = page.getByRole('navigation', { name: 'Mobile navigation' });
-  await expect(mobileNavigation.getByRole('link')).toHaveCount(7);
+  await expect(mobileNavigation.getByRole('link')).toHaveCount(8);
   await expect(mobileNavigation.getByRole('link', { name: 'Pipelines' })).toBeVisible();
   await expect(page.locator('#mobile-project')).toBeVisible();
   await expect(page.getByText(email).last()).toBeVisible();
@@ -72,9 +80,35 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await page.reload();
   await expect(page.locator('input[readonly]')).toHaveCount(0);
   await expect(page.getByText('browser-demo')).toBeVisible();
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Revoke' }).click();
-  await expect(page.getByText('Revoked')).toBeVisible();
+  await page.getByRole('link', { name: 'API Quick Start' }).click();
+  await expect(page.getByRole('heading', { name: 'API Quick Start' })).toBeVisible();
+  await expect(page.getByRole('main').getByText(`Selected ${suffix}`, { exact: true })).toBeVisible();
+  const sessionResponse = await page.request.get('/api/session');
+  expect(sessionResponse.status()).toBe(200);
+  const session = await sessionResponse.json();
+  expect(() => new URL(session.apiBaseUrl)).not.toThrow();
+  expect(session.apiBaseUrl.endsWith('/')).toBe(false);
+  await expect(page.locator('pre')).toContainText(session.apiBaseUrl);
+  await expect(page.getByRole('note')).toContainText('Publish a pipeline');
+  await expect(page.locator('pre')).toContainText('<PUBLISHED_PIPELINE_SLUG>');
+  const openApiLink = page.getByRole('link', { name: /Open generated OpenAPI endpoint/ });
+  await expect(openApiLink).toHaveAttribute('href', '/api/backend/openapi.json');
+  const authenticatedOpenApi = await page.request.get('/api/backend/openapi.json');
+  expect(authenticatedOpenApi.status()).toBe(200);
+  expect((await authenticatedOpenApi.json()).openapi).toMatch(/^3\./);
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.getByRole('button', { name: 'Copy example' }).click();
+  await expect(page.getByRole('status')).toHaveText('cURL example copied.');
+  await expect(page.getByRole('status')).toHaveAttribute('data-copy-status', 'success');
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async () => { throw new Error('Clipboard denied for test'); } },
+    });
+  });
+  await page.getByRole('button', { name: 'Copy example' }).click();
+  await expect(page.getByRole('status')).toHaveText('Copy failed. Select the code and copy it manually.');
+  await expect(page.getByRole('status')).toHaveAttribute('data-copy-status', 'error');
 
   await page.getByTitle('Sign out').click();
   await expect(page.getByRole('heading', { name: 'Sign in to Sluice' })).toBeVisible();
@@ -86,6 +120,11 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByRole('heading', { name: 'Platform Overview' })).toBeVisible();
+  await Promise.all([
+    page.waitForNavigation(),
+    page.locator('#desktop-project').selectOption({ label: `Selected ${suffix}` }),
+  ]);
+  await expect(page.locator('#desktop-project')).toHaveValue(session.selectedProjectId);
 
   await page.getByRole('link', { name: 'Processor Market' }).click();
   await expect(page.getByRole('heading', { name: /Composable media capabilities/i })).toBeVisible();
@@ -117,11 +156,6 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await page.getByLabel('allowedTypes').fill('image/png, image/jpeg');
   await page.getByLabel('quality number').fill('82');
   await expect(page.getByLabel('quality slider')).toHaveValue('82');
-  page.once('dialog', async (dialog) => {
-    expect(dialog.message()).toContain('Discard your unsaved pipeline changes?');
-    await dialog.dismiss();
-  });
-  await page.getByRole('button', { name: 'New pipeline' }).click();
   await expect(page.getByLabel('Name')).toHaveValue(pipelineName);
   await page.getByRole('button', { name: 'JSON', exact: true }).click();
   const guidedDefinition = JSON.parse(await page.getByLabel('Canonical pipeline JSON').inputValue());
@@ -131,12 +165,55 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByRole('status')).toContainText('Draft saved.');
   await expect(page.getByRole('button', { name: 'Publish immutable version' })).toBeEnabled();
+  const savedJson = await page.getByLabel('Canonical pipeline JSON').inputValue();
+  await page.getByLabel('Canonical pipeline JSON').fill(`${savedJson}\n`);
+  const discardDialogPromise = page.waitForEvent('dialog');
+  const newPipelineClick = page.getByRole('button', { name: 'New pipeline' }).click();
+  const discardDialog = await discardDialogPromise;
+  expect(discardDialog.message()).toContain('Discard your unsaved pipeline changes?');
+  await discardDialog.dismiss();
+  await newPipelineClick;
+  await expect(page.getByLabel('Canonical pipeline JSON')).toHaveValue(`${savedJson}\n`);
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByRole('button', { name: 'Publish immutable version' })).toBeEnabled();
   await page.getByRole('button', { name: 'Validate' }).click();
   await expect(page.getByRole('status')).toContainText('ready to publish');
   await page.getByRole('button', { name: 'Publish immutable version' }).click();
   await expect(page.getByRole('alertdialog', { name: 'Confirm pipeline publication' })).toBeVisible();
   await page.getByRole('button', { name: 'Confirm publish' }).click();
   await expect(page.getByRole('status')).toContainText('Published an immutable version');
+
+  const publishedResponse = await page.request.get('/api/backend/pipelines/published');
+  expect(publishedResponse.status()).toBe(200);
+  const publishedPipelines = await publishedResponse.json();
+  expect(publishedPipelines).toHaveLength(1);
+  const publishedSlug = publishedPipelines[0].slug as string;
+  expect(publishedSlug).not.toContain('<');
+
+  await page.goto('/quick-start');
+  await expect(page.getByRole('main').getByText(publishedSlug, { exact: true })).toBeVisible();
+  await expect(page.getByRole('note')).toHaveCount(0);
+  const pipelineStep = page.getByRole('listitem').filter({ hasText: 'Publish a pipeline' });
+  await expect(pipelineStep.getByLabel('Complete')).toBeVisible();
+  await expect(page.locator('pre')).toContainText('/webhook-endpoints');
+  await expect(page.locator('pre')).toContainText('callback:{webhookEndpointId:$webhookEndpointId}');
+  await expect(page.locator('pre')).toContainText(publishedSlug);
+
+  const curlTab = page.getByRole('tab', { name: 'cURL' });
+  await curlTab.focus();
+  await page.keyboard.press('ArrowRight');
+  const javascriptTab = page.getByRole('tab', { name: 'JavaScript' });
+  await expect(javascriptTab).toBeFocused();
+  await expect(javascriptTab).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'example-tab-javascript');
+  await expect(page.locator('pre')).toContainText("callback: { webhookEndpointId: webhook.id }");
+  await expect(page.locator('pre')).toContainText('verifyWebhook');
+  await page.keyboard.press('End');
+  const pythonTab = page.getByRole('tab', { name: 'Python' });
+  await expect(pythonTab).toBeFocused();
+  await expect(page.locator('pre')).toContainText("'callback': {'webhookEndpointId': webhook['id']}");
+  await page.keyboard.press('Home');
+  await expect(curlTab).toBeFocused();
 
   await page.goto('/assets/upload');
   const image = Buffer.from(readFileSync(resolve(demoDir, 'sample.png.base64'), 'utf8').trim(), 'base64');
@@ -161,6 +238,14 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   expect(run.outputs).toHaveLength(1);
   expect(run.outputs[0].contentType).toBe('image/webp');
   await expect(page.getByRole('heading', { name: 'Outputs and compression' })).toBeVisible();
+
+  await expect.poll(async () => {
+    const response = await page.request.get('/api/backend/dashboard');
+    return (await response.json()).completedJobs;
+  }).toBeGreaterThan(0);
+  await page.goto('/app');
+  await expect(page.getByRole('heading', { name: 'Platform Overview' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Start your first integration' })).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Pipelines' }).click();
   await page.getByRole('button', { name: 'New pipeline' }).click();
@@ -195,4 +280,15 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   expect(governedRun.governance.decision).toBe('ALLOW');
   await page.getByRole('link', { name: 'Governance' }).click();
   await expect(page.getByText('ALLOW', { exact: true })).toBeVisible();
+
+  await page.getByRole('link', { name: 'Settings' }).click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Revoke' }).click();
+  await expect(page.getByText('Revoked')).toBeVisible();
+  await page.goto('/app');
+  const resumedChecklist = page.getByRole('region', { name: 'Start your first integration' });
+  await expect(resumedChecklist).toBeVisible();
+  await expect(resumedChecklist.getByRole('listitem').filter({ hasText: 'Create an API key' }).getByLabel('Not complete')).toBeVisible();
+  await expect(resumedChecklist.getByRole('listitem').filter({ hasText: 'Publish a pipeline' }).getByLabel('Complete')).toBeVisible();
+  await expect(resumedChecklist.getByRole('listitem').filter({ hasText: 'Complete your first run' }).getByLabel('Complete')).toBeVisible();
 });

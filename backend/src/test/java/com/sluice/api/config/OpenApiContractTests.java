@@ -53,6 +53,20 @@ class OpenApiContractTests {
                 .path("requestBody").path("content").path("application/json").has("schema"));
         assertTrue(createRun.path("responses").has("202"));
         assertTrue(createRun.path("parameters").toString().contains("projectIdHeader"));
+        JsonNode callbackSchema = schemas.path("CreateRunRequest").path("properties").path("callback");
+        String callbackReference = callbackSchema.path("$ref").asText();
+        assertTrue(callbackReference.startsWith("#/components/schemas/"));
+        String callbackSchemaName = callbackReference.substring(callbackReference.lastIndexOf('/') + 1);
+        assertTrue(schemas.path(callbackSchemaName).path("properties").has("webhookEndpointId"));
+
+        JsonNode createWebhook = document.path("paths").path("/api/v1/webhook-endpoints").path("post");
+        assertTrue(createWebhook.path("requestBody").path("content").path("application/json").has("schema"));
+        assertTrue(createWebhook.path("responses").has("201"));
+        JsonNode webhookResponse = firstResponseSchema(document, "/api/v1/webhook-endpoints", "post", "201");
+        String webhookResponseReference = webhookResponse.path("$ref").asText();
+        assertTrue(webhookResponseReference.endsWith("/WebhookEndpointResponse"));
+        assertTrue(schemas.path("WebhookEndpointResponse").path("properties").has("id"));
+        assertTrue(schemas.path("WebhookEndpointResponse").path("properties").has("secret"));
 
         JsonNode responseContent = document.path("paths").path("/api/v1/runs/{id}").path("get")
                 .path("responses").path("200").path("content");
