@@ -12,7 +12,7 @@ export default function LandingPage() {
   return (
     <main className="min-h-screen overflow-hidden bg-background text-foreground">
       <header className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
-        <Link href="/" className="flex items-center gap-2.5"><Image src="/logo-3.png" alt="" width={40} height={40} className="size-10" priority /><span className="text-xl font-semibold tracking-tight">Sluice</span></Link>
+        <Link href="/" className="flex items-center gap-2.5"><Image src="/logo-4.png" alt="" width={40} height={40} className="size-10" priority /><span className="text-xl font-semibold tracking-tight">Sluice</span></Link>
         <div className="flex items-center gap-3 text-sm font-semibold"><Link href="/login" className="text-muted-foreground hover:text-foreground">Sign in</Link><Link href="/signup" className="rounded-lg bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/85">Start building</Link></div>
       </header>
 

@@ -3,11 +3,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { BASE_URL } from '@/api/client';
 import { Job } from '@/api/types';
 
-export function useJobEvents(jobId: string | undefined) {
+export function useJobEvents(jobId: string | undefined, status?: string) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (!jobId) return;
+    if (!jobId || status === 'COMPLETED' || status === 'FAILED' || status === 'REVIEW_REQUIRED') return;
 
     const controller = new AbortController();
 
@@ -74,5 +74,5 @@ export function useJobEvents(jobId: string | undefined) {
     return () => {
       controller.abort();
     };
-  }, [jobId, queryClient]);
+  }, [jobId, queryClient, status]);
 }

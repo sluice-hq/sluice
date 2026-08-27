@@ -38,6 +38,25 @@ class PipelineValidatorTest {
     }
 
     @Test
+    void acceptsDeprecatedProcessorReleaseWhenItRemainsRegistered() throws Exception {
+        var base = ProcessorManifestResources.load("resize-1.0.0.json");
+        var deprecated = new com.sluice.api.pipeline.ProcessorManifest(
+                base.schemaVersion(), base.slug(), base.version(), base.displayName(), base.description(),
+                base.category(), base.input(), base.output(), base.configSchema(), base.limits(),
+                base.permissions(), "DEPRECATED", "Use resize v2 for new pipelines.");
+        Processor processor = mock(Processor.class);
+        when(processor.getManifest()).thenReturn(deprecated);
+        when(processor.getMetadata()).thenReturn(new ProcessorMetadata("resize", deprecated.input().mimeTypes(),
+                (input, config) -> input, deprecated));
+        when(registry.get("resize", "1.0.0")).thenReturn(processor);
+
+        var report = validator.validateDefinition("product-images", mapper.readTree(definition(
+                "{\"id\":\"resize\",\"processor\":\"resize\",\"version\":\"1.0.0\",\"config\":{\"width\":800}}")));
+
+        assertTrue(report.valid());
+    }
+
+    @Test
     void rejectsFloatingProcessorVersionAndDuplicateStepIds() throws Exception {
         var report = validator.validateDefinition("product-images", mapper.readTree(definition(
                 "{\"id\":\"resize\",\"processor\":\"resize\",\"config\":{}}," +

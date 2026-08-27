@@ -8,6 +8,7 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.Iterator;
@@ -35,10 +36,22 @@ public final class ImageEncoding {
             param.setThreadLevel(0);
             param.setExact(true);
             param.setUseSharpYUV(true);
-            writer.write(null, new IIOImage(image, null, null), param);
+            writer.write(null, new IIOImage(normalizeForWebp(image), null, null), param);
         } finally {
             writer.dispose();
         }
+    }
+
+    private static BufferedImage normalizeForWebp(BufferedImage source) {
+        int type = source.getColorModel().hasAlpha() ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB;
+        BufferedImage normalized = new BufferedImage(source.getWidth(), source.getHeight(), type);
+        Graphics2D graphics = normalized.createGraphics();
+        try {
+            graphics.drawImage(source, 0, 0, null);
+        } finally {
+            graphics.dispose();
+        }
+        return normalized;
     }
 
     public static void writeWithoutMetadata(BufferedImage image, String mimeType, File output) throws Exception {

@@ -68,7 +68,7 @@ function ProcessorCard({ processor, history }: { processor: ProcessorContract; h
     config: configExample(processor),
   }, null, 2);
 
-  return <article className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_16px_48px_rgb(0_0_0_/_0.12)]">
+  return <article id={`processor-${processor.slug}`} className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_16px_48px_rgb(0_0_0_/_0.12)]">
     <div className="border-b border-border bg-gradient-to-r from-primary/10 via-transparent to-transparent p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-2xl"><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-semibold tracking-tight">{processor.displayName}</h2><span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">Recommended · v{processor.version}</span></div>

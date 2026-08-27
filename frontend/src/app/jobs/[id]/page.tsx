@@ -29,7 +29,7 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
     refetchInterval: job && !['QUEUED', 'RUNNING', 'RETRY_WAIT'].includes(job.status) ? false : 2000,
   });
 
-  useJobEvents(job?.id);
+  useJobEvents(job?.id, job?.status);
 
   if (error) {
     return (

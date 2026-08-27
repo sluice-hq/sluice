@@ -10,8 +10,9 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   const password = 'browser-password-2026';
   const projectName = `Browser ${suffix}`;
   const pipelineName = `Browser WebP ${suffix}`;
+  const governancePipelineName = `Browser Governed ${suffix}`;
   const definition = JSON.parse(readFileSync(resolve(demoDir, 'pipeline.json'), 'utf8'));
-  definition.slug = `browser-webp-${suffix}`;
+  definition.slug = `browser-governed-${suffix}`;
 
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /Turn media uploads into/i })).toBeVisible();
@@ -107,14 +108,34 @@ test('developer completes the local dashboard golden path', async ({ page, conte
 
   await page.getByRole('link', { name: 'Pipelines' }).click();
   await page.getByLabel('Name').fill(pipelineName);
+  await page.getByRole('button', { name: 'WebP delivery' }).click();
+  await page.getByLabel('Input MIME types').fill('video/mp4');
+  const compatibilityWarning = page.getByText('This processor cannot accept the preceding output. Reorder the steps or choose a compatible release.', { exact: true });
+  await expect(compatibilityWarning).toBeVisible();
+  await page.getByLabel('Input MIME types').fill('image/png');
+  await expect(compatibilityWarning).toHaveCount(0);
+  await page.getByLabel('allowedTypes').fill('image/png, image/jpeg');
+  await page.getByLabel('quality number').fill('82');
+  await expect(page.getByLabel('quality slider')).toHaveValue('82');
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('Discard your unsaved pipeline changes?');
+    await dialog.dismiss();
+  });
+  await page.getByRole('button', { name: 'New pipeline' }).click();
+  await expect(page.getByLabel('Name')).toHaveValue(pipelineName);
   await page.getByRole('button', { name: 'JSON', exact: true }).click();
-  await page.getByLabel('Canonical pipeline JSON').fill(JSON.stringify(definition, null, 2));
+  const guidedDefinition = JSON.parse(await page.getByLabel('Canonical pipeline JSON').inputValue());
+  expect(guidedDefinition.steps.map((step: { processor: string }) => step.processor)).toEqual(['mime-validation', 'webp']);
+  expect(guidedDefinition.steps[0].config.allowedTypes).toEqual(['image/png', 'image/jpeg']);
+  expect(guidedDefinition.steps[1].config.quality).toBe(82);
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByRole('status')).toContainText('Draft saved.');
   await expect(page.getByRole('button', { name: 'Publish immutable version' })).toBeEnabled();
   await page.getByRole('button', { name: 'Validate' }).click();
   await expect(page.getByRole('status')).toContainText('ready to publish');
   await page.getByRole('button', { name: 'Publish immutable version' }).click();
+  await expect(page.getByRole('alertdialog', { name: 'Confirm pipeline publication' })).toBeVisible();
+  await page.getByRole('button', { name: 'Confirm publish' }).click();
   await expect(page.getByRole('status')).toContainText('Published an immutable version');
 
   await page.goto('/assets/upload');
@@ -139,9 +160,39 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   const run = await runResponse.json();
   expect(run.outputs).toHaveLength(1);
   expect(run.outputs[0].contentType).toBe('image/webp');
-  expect(run.governance.decision).toBe('ALLOW');
   await expect(page.getByRole('heading', { name: 'Outputs and compression' })).toBeVisible();
 
+  await page.getByRole('link', { name: 'Pipelines' }).click();
+  await page.getByRole('button', { name: 'New pipeline' }).click();
+  await page.getByLabel('Name').fill(governancePipelineName);
+  await page.getByRole('button', { name: 'JSON', exact: true }).click();
+  await page.getByLabel('Canonical pipeline JSON').fill(JSON.stringify(definition, null, 2));
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByRole('status')).toContainText('Draft saved.');
+  await page.getByRole('button', { name: 'Validate' }).click();
+  await expect(page.getByRole('status')).toContainText('ready to publish');
+  await page.getByRole('button', { name: 'Publish immutable version' }).click();
+  await page.getByRole('button', { name: 'Confirm publish' }).click();
+
+  await page.goto('/assets/upload');
+  await page.locator('#file-upload').setInputFiles({ name: 'browser-governed.png', mimeType: 'image/png', buffer: image });
+  const governancePipelineOption = page.getByLabel('Processing pipeline').locator('option', { hasText: governancePipelineName });
+  await page.getByLabel('Processing pipeline').selectOption(await governancePipelineOption.getAttribute('value') ?? '');
+  await page.getByRole('button', { name: 'Start Upload' }).click();
+  await expect(page.getByRole('heading', { name: 'Upload Successful' })).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole('link', { name: 'Runs' }).click();
+  const governedRunLink = page.locator('tbody a').first();
+  await expect(governedRunLink).toBeVisible({ timeout: 30_000 });
+  await governedRunLink.click();
+  await page.waitForURL(/\/jobs\/[0-9a-f-]{36}$/);
+  const governedRunId = page.url().split('/').pop()!;
+  await expect.poll(async () => {
+    const response = await page.request.get(`/api/backend/runs/${governedRunId}`);
+    return (await response.json()).status;
+  }, { timeout: 120_000 }).toBe('COMPLETED');
+  const governedRun = await (await page.request.get(`/api/backend/runs/${governedRunId}`)).json();
+  expect(governedRun.governance.decision).toBe('ALLOW');
   await page.getByRole('link', { name: 'Governance' }).click();
   await expect(page.getByText('ALLOW', { exact: true })).toBeVisible();
 });

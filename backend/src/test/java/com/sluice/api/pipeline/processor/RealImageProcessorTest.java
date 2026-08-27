@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -65,6 +66,23 @@ class RealImageProcessorTest {
         } finally {
             firstOutput.cleanup();
             secondOutput.cleanup();
+        }
+    }
+
+    @Test
+    void twoComponentPngEncodesToWebp() throws Exception {
+        Path input = temporaryDirectory.resolve("demo.png");
+        Files.write(input, Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="));
+        ProcessingContext context = context(input, "image/png");
+        ProcessorResult encoded = new WebpProcessor(guard()).process(context,
+                mapper.readTree("{\"quality\":82}"));
+        FileMediaResource webpOutput = (FileMediaResource) encoded.getNewResource().orElseThrow();
+        try {
+            assertEquals("image/webp", webpOutput.getContentType());
+            assertNotNull(ImageIO.read(webpOutput.getFile()));
+        } finally {
+            webpOutput.cleanup();
         }
     }
 

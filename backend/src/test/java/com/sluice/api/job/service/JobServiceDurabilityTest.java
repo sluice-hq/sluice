@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,6 +22,26 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class JobServiceDurabilityTest {
+    @Test
+    void requeueingADueRetryCreatesANewQueueOutboxEvent() {
+        Job retry = new Job(UUID.randomUUID(), UUID.randomUUID(), JobStatus.RETRY_WAIT,
+                Instant.now(), Instant.now(), UUID.randomUUID());
+        retry.setNextRetryAt(Instant.now().minus(1, ChronoUnit.SECONDS));
+        JobRepository jobs = mock(JobRepository.class);
+        OutboxService outbox = mock(OutboxService.class);
+        when(jobs.findByStatusAndNextRetryAtBeforeOrderByNextRetryAtAsc(
+                eq(JobStatus.RETRY_WAIT), any(), any())).thenReturn(List.of(retry));
+        when(jobs.save(retry)).thenReturn(retry);
+        JobService service = new JobService(jobs, mock(ApplicationEventPublisher.class),
+                mock(PipelineService.class), mock(AssetRepository.class),
+                mock(RunAttemptRepository.class), outbox);
+
+        assertEquals(1, service.requeueDueRetries(25));
+        assertEquals(JobStatus.QUEUED, retry.getStatus());
+        assertNull(retry.getNextRetryAt());
+        verify(outbox).createRunQueuedEvent(retry);
+    }
+
     @Test
     void onlyTheAtomicQueuedClaimCreatesAnAttempt() {
         UUID id = UUID.randomUUID();
