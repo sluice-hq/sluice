@@ -30,6 +30,7 @@ public class JobService {
     private final RunAttemptRepository attempts;
     private final OutboxService outbox;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public JobService(JobRepository jobRepository, ApplicationEventPublisher eventPublisher,
                       com.sluice.api.pipeline.service.PipelineService pipelineService,
                       AssetRepository assetRepository, RunAttemptRepository attempts, OutboxService outbox) {
@@ -41,7 +42,6 @@ public class JobService {
         this.outbox = outbox;
     }
 
-    @org.springframework.beans.factory.annotation.Autowired
     public JobService(JobRepository jobRepository, ApplicationEventPublisher eventPublisher,
                       com.sluice.api.pipeline.service.PipelineService pipelineService,
                       AssetRepository assetRepository) {

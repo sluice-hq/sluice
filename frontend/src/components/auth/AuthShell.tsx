@@ -22,7 +22,7 @@ export function AuthShell({
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgb(35_149_255_/_0.16),transparent_28rem)]" />
       <section className="relative hidden border-r border-border/70 px-10 py-10 lg:flex lg:flex-col xl:px-[10vw]">
         <Link href="/" className="flex w-fit items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <Image src="/logo-3.png" alt="" width={44} height={44} className="size-11 object-contain" priority />
+          <Image src="/logo-4.png" alt="" width={44} height={44} className="size-11 object-contain" priority />
           <span className="text-xl font-semibold tracking-tight">Sluice</span>
         </Link>
         <div className="my-auto max-w-xl pb-14 pt-24">
@@ -48,7 +48,7 @@ export function AuthShell({
       <section className="relative flex items-center justify-center px-5 py-8 sm:px-8 lg:px-12">
         <div className="w-full max-w-md">
           <Link href="/" className="mb-12 flex items-center gap-2 lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <Image src="/logo-3.png" alt="" width={36} height={36} className="size-9 object-contain" priority />
+            <Image src="/logo-4.png" alt="" width={36} height={36} className="size-9 object-contain" priority />
             <span className="text-lg font-semibold tracking-tight">Sluice</span>
           </Link>
           <p className="text-sm font-semibold text-primary">{eyebrow}</p>

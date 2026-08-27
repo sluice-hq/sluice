@@ -112,7 +112,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen md:pl-60">
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border/80 bg-background/90 px-4 backdrop-blur-xl md:px-8">
           <Link href="/app" className="flex items-center gap-2 md:hidden" aria-label="Sluice overview">
-            <Image src="/logo-3.png" alt="" width={32} height={32} className="size-8 object-contain" priority />
+            <Image src="/logo-4.png" alt="" width={32} height={32} className="size-8 object-contain" priority />
             <span className="font-semibold tracking-tight">Sluice</span>
           </Link>
           <div className="hidden flex-1 md:block" />
@@ -153,7 +153,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 function Brand() {
   return (
     <Link href="/app" className="flex h-20 items-center gap-3 border-b border-sidebar-border px-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring">
-      <Image src="/logo-3.png" alt="" width={42} height={42} className="size-10 object-contain" priority />
+      <Image src="/logo-4.png" alt="" width={42} height={42} className="size-10 object-contain" priority />
       <span className="text-lg font-semibold tracking-tight text-foreground">Sluice</span>
     </Link>
   );

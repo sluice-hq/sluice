@@ -2,7 +2,7 @@
 
 Sluice is an API-first media processing platform. A developer application authenticates with a project API key, uploads media directly to object storage, starts a versioned pipeline run, and reads the durable run result through the API. The Next.js dashboard is the human control plane for projects, keys, assets, runs, governance, and testing.
 
-This repository is an early, working foundation, not the finished V1. Identity, project isolation, API keys, reusable uploads, slug-based run creation, idempotency, durable asynchronous execution, versioned processor contracts, real bounded image processing, persisted governance decisions, a curated processor market, JSON/Form pipeline authoring, a responsive developer dashboard, and local Prometheus/Grafana monitoring are implemented. Product-experience completion and Azure deployment remain planned work.
+This repository is an early, working foundation, not the finished V1. Identity, project isolation, API keys, reusable uploads, slug-based run creation, idempotency, durable asynchronous execution, versioned processor contracts, real bounded image processing, persisted governance decisions, a curated processor market, guided canonical JSON/Form pipeline authoring, a responsive developer dashboard, and local Prometheus/Grafana monitoring are implemented. Onboarding, operational UX completion, and Azure deployment remain planned work.
 
 ## What works today
 
@@ -13,9 +13,9 @@ This repository is an early, working foundation, not the finished V1. Identity, 
 - Direct Azure Blob/Azurite upload URLs, upload completion checks, and short-lived download URLs.
 - Reusable `POST /uploads` and `POST /runs` APIs. Upload completion is separate from processing, so one asset can be run through multiple pipelines.
 - Idempotency-key replay protection for run creation and upload completion, with conflicting key reuse rejected.
-- Immutable pipeline slug/alias/version resolution, planned `StepRun` records, and a persisted queue outbox for each run.
+- Immutable pipeline slug/alias/version resolution, durable `StepRun` records, and a persisted queue outbox for each run.
 - RabbitMQ-backed asynchronous jobs with worker processing, retries, recovery scans, and SSE job events.
-- Versioned pipeline authoring with canonical JSON/Form editing, processor-version validation, immutable publishing, stable aliases, and history.
+- Versioned pipeline authoring with synchronized canonical JSON/Form editing, starter templates, schema-aware controls, processor-version validation, immutable publishing, stable aliases, and history.
 - A responsive dashboard shell with keyboard skip navigation, mobile project/session controls, and pages for overview, assets, runs, governance, pipeline testing, login/signup, projects, API keys, pipelines, and the processor market.
 - Double-submit CSRF protection on every authenticated state-changing dashboard proxy request.
 - A one-command local launcher, an API-first smoke demo, a real RabbitMQ/Azurite integration test, and a Playwright browser golden path covering auth/session, password visibility, skip navigation, and mobile controls.
@@ -170,7 +170,7 @@ All paths below include the `/api/v1` prefix.
 | `GET/POST` | `/projects` | List or create projects |
 | `GET/POST` | `/projects/{id}/api-keys` | List key metadata or create/reveal a key |
 | `DELETE` | `/projects/{id}/api-keys/{keyId}` | Revoke a key |
-| `GET` | `/processors` | List published processor releases and their contracts |
+| `GET` | `/processors` | List published processors plus deprecated release history and their contracts |
 | `GET/POST` | `/pipelines` | List or create project pipelines |
 | `GET` | `/pipelines/published` | List published pipelines available to the project |
 | `GET` | `/pipelines/{slug}` | Read a pipeline draft, aliases, and current state |
@@ -265,7 +265,7 @@ Backend tests must be run from `backend`:
 .\gradlew.bat test --rerun-tasks --console=plain
 ```
 
-The default suite uses Testcontainers PostgreSQL and the `test` profile. It disables RabbitMQ listener startup, scheduled job recovery, and real Azure Blob initialization. The current suite contains 89 tests and should finish with zero failures.
+The default suite uses Testcontainers PostgreSQL and the `test` profile. It disables RabbitMQ listener startup, scheduled job recovery, and real Azure Blob initialization. It should finish with zero failures.
 
 The separate task runs the tagged real-infrastructure flow using disposable PostgreSQL, RabbitMQ, and Azurite containers:
 
@@ -315,7 +315,7 @@ The remaining V1 path is:
 1. Separate upload/run APIs with durable step data and signed terminal webhooks. *(Implemented)*
 2. Product surface, fixed API/media safety limits, generated OpenAPI, and operational metrics over the implemented processing/governance core. *(Implemented)*
 3. Run the clean-checkout local product gate and browser golden path. *(Implemented)*
-4. Product-experience completion: public landing page, processor market, guided pipeline authoring, onboarding/quick start, test-console, run inspection, and finishing UX. *(In progress: responsive shell and authentication are implemented; landing page is next.)*
+4. Product-experience completion: public landing page, processor market, guided pipeline authoring, onboarding/quick start, test-console, run inspection, and finishing UX. *(In progress: responsive shell, authentication, public landing page, processor market, and guided pipeline authoring are implemented; onboarding and operational UX remain.)*
 5. Terraform, Azure Container Apps, Service Bus, managed PostgreSQL/Blob, Key Vault, API Management, and Azure telemetry. *(After product-experience completion)*
 
 Azure deployment is part of the final demo, but it has not been implemented on this branch. Read the local `SDD.md` for the dependency-ordered ticket plan and current acceptance gates.
