@@ -55,6 +55,8 @@ export function useJobEvents(jobId: string | undefined, status?: string) {
             });
 
             queryClient.invalidateQueries({ queryKey: ['jobs'] });
+            queryClient.invalidateQueries({ queryKey: ['runs'] });
+            queryClient.invalidateQueries({ queryKey: ['run', eventJobId] });
             queryClient.invalidateQueries({ queryKey: ['dashboard'] });
             queryClient.invalidateQueries({ queryKey: ['assets'] });
 

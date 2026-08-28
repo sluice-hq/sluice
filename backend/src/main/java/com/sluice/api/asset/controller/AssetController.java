@@ -42,15 +42,7 @@ public class AssetController {
     public ResponseEntity<Page<AssetResponse>> getAssets(
             @AuthenticationPrincipal ProjectContext context,
             Pageable pageable) {
-        Page<AssetResponse> assets = assetService.getAssets(context, pageable).map(asset -> new AssetResponse(
-                asset.getId(),
-                asset.getFilename(),
-                asset.getSize(),
-                asset.getContentType(),
-                asset.getStorageUrl(),
-                asset.getUploadStatus().name(),
-                asset.getCreatedAt()
-        ));
+        Page<AssetResponse> assets = assetService.getAssets(context, pageable).map(AssetResponse::from);
         return ResponseEntity.ok(assets);
     }
 
@@ -59,15 +51,7 @@ public class AssetController {
             @PathVariable java.util.UUID id,
             @AuthenticationPrincipal ProjectContext context) {
         return assetService.getAsset(id, context)
-                .map(asset -> new AssetResponse(
-                        asset.getId(),
-                        asset.getFilename(),
-                        asset.getSize(),
-                        asset.getContentType(),
-                        asset.getStorageUrl(),
-                        asset.getUploadStatus().name(),
-                        asset.getCreatedAt()
-                ))
+                .map(AssetResponse::from)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -114,6 +98,9 @@ public class AssetController {
             @AuthenticationPrincipal ProjectContext context) {
         return assetService.getAsset(id, context)
                 .map(asset -> {
+                    if (asset.getUploadStatus() != com.sluice.api.asset.domain.Asset.UploadStatus.COMPLETED) {
+                        throw new IllegalStateException("Asset is not ready for download");
+                    }
                     String downloadUrl = storageService.generateDownloadUrl(asset.getStorageUrl());
                     return ResponseEntity.ok(new DownloadUrlResponse(downloadUrl));
                 })

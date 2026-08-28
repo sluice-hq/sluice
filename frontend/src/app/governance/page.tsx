@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Shield } from 'lucide-react';
 import { getRuns } from '@/api/runs';
+import type { RunDetails } from '@/api/types';
 import { EmptyState } from '@/components/domain/EmptyState';
 import { StatusBadge } from '@/components/domain/StatusBadge';
 import { TableSkeleton } from '@/components/domain/SkeletonLoader';
@@ -14,7 +15,10 @@ export default function GovernancePage() {
     queryFn: () => getRuns(0, 100),
     refetchInterval: 5000,
   });
-  const decisions = data?.content.filter((run) => run.governance) ?? [];
+  const decisions = data?.content.filter((run): run is RunDetails & {
+    pipeline: NonNullable<RunDetails['pipeline']>;
+    governance: NonNullable<RunDetails['governance']>;
+  } => run.governance != null && run.pipeline != null) ?? [];
 
   return <div className="space-y-6">
     <header>

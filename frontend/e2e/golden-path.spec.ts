@@ -255,6 +255,10 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   const run = await runResponse.json();
   expect(run.outputs).toHaveLength(1);
   expect(run.outputs[0].contentType).toBe('image/webp');
+  expect(run.outputs[0].storageUrl).toBeUndefined();
+  await expect(page.getByText(`exact version v${run.pipeline.version}`)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Step details' })).toBeVisible();
+  await expect(page.getByText('Queue wait', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Outputs and compression' })).toBeVisible();
   const downloadOutput = page.getByRole('link', { name: 'Download output' });
   await expect(downloadOutput).toBeVisible({ timeout: 120_000 });
@@ -266,6 +270,13 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   const downloadedPath = await outputDownload.path();
   expect(downloadedPath).not.toBeNull();
   expect(readFileSync(downloadedPath!).length).toBeGreaterThan(0);
+
+  await page.getByRole('link', { name: `View ${run.outputs[0].filename}` }).click();
+  await expect(page.getByRole('heading', { name: 'Image preview' })).toBeVisible();
+  const preview = page.getByAltText(`Preview of ${run.outputs[0].filename}`);
+  await expect(preview).toHaveAttribute('src', `/api/downloads/assets/${run.outputs[0].id}?inline=1`);
+  await expect(page.getByRole('link', { name: `Download ${run.outputs[0].filename}` })).toHaveAttribute('href', `/api/downloads/assets/${run.outputs[0].id}`);
+  await page.goBack();
 
   await expect.poll(async () => {
     const response = await page.request.get('/api/backend/dashboard');
@@ -306,6 +317,11 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   }, { timeout: 120_000 }).toBe('COMPLETED');
   const governedRun = await (await page.request.get(`/api/backend/runs/${governedRunId}`)).json();
   expect(governedRun.governance.decision).toBe('ALLOW');
+  await expect(page.getByRole('heading', { name: 'Governance' })).toBeVisible();
+  await expect(page.getByText('Policy version', { exact: true })).toBeVisible();
+  await expect(page.getByText('Provider', { exact: true })).toBeVisible();
+  await expect(page.getByText('Categories', { exact: true })).toBeVisible();
+  await expect(page.getByText('Reasons', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Governance' }).click();
   await expect(page.getByText('ALLOW', { exact: true })).toBeVisible();
 

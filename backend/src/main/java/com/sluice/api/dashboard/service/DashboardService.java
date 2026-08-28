@@ -53,15 +53,7 @@ public class DashboardService {
         List<AssetResponse> recentAssets = assetRepository.findAllByProjectId(
                         projectId, PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")))
                 .stream()
-                .map(asset -> new AssetResponse(
-                        asset.getId(),
-                        asset.getFilename(),
-                        asset.getSize(),
-                        asset.getContentType(),
-                        asset.getStorageUrl(),
-                        asset.getUploadStatus().name(),
-                        asset.getCreatedAt()
-                ))
+                .map(AssetResponse::from)
                 .collect(Collectors.toList());
 
         List<JobResponse> recentJobs = jobRepository.findAllByProjectId(

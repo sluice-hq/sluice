@@ -3,12 +3,12 @@ import { API_URL, readBackendError, serverAuthHeaders } from '@/lib/server-sessi
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-function attachmentHeader(filename: string): string {
+function contentDisposition(filename: string, inline: boolean): string {
   const fallback = filename.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 180) || 'sluice-output';
-  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+  return `${inline ? 'inline' : 'attachment'}; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(request: Request, context: RouteContext) {
   const { id } = await context.params;
   const auth = await serverAuthHeaders();
   const [assetResponse, linkResponse] = await Promise.all([
@@ -28,11 +28,13 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!downloadResponse.ok || !downloadResponse.body) {
     return NextResponse.json({ detail: 'The output could not be downloaded from storage.' }, { status: 502 });
   }
+  const inline = new URL(request.url).searchParams.get('inline') === '1'
+    && typeof asset.contentType === 'string' && asset.contentType.toLowerCase().startsWith('image/');
   return new NextResponse(downloadResponse.body, {
     status: 200,
     headers: {
       'cache-control': 'private, no-store',
-      'content-disposition': attachmentHeader(asset.filename),
+      'content-disposition': contentDisposition(asset.filename, inline),
       'content-type': typeof asset.contentType === 'string'
         ? asset.contentType
         : downloadResponse.headers.get('content-type') || 'application/octet-stream',

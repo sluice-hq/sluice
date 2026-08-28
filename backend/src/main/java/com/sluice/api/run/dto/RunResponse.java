@@ -24,17 +24,17 @@ public record RunResponse(UUID id, String status, PipelineReference pipeline, UU
         this(id, status, pipeline, inputAssetId, steps, outputs, createdAt, updatedAt,
                 new Metrics(null, null, null, null, null, null), null, List.of());
     }
-    public record PipelineReference(String slug, int version) {}
+    public record PipelineReference(String slug, Integer version) {}
 
     public record StepResponse(UUID id, String stepId, String processor, String version, String status,
-                               Instant createdAt, Instant updatedAt, int attempt, Instant startedAt,
+                               Instant createdAt, Instant updatedAt, Integer attempt, Instant startedAt,
                                Instant completedAt, Long durationMs, Long inputBytes, Long outputBytes,
                                String inputMimeType, String outputMimeType, com.fasterxml.jackson.databind.JsonNode metadata,
                                UUID outputAssetId, ErrorResponse error) {
         public static StepResponse from(StepRun step) {
             return new StepResponse(step.getId(), step.getStepId(), step.getProcessorSlug(),
                     step.getProcessorVersion(), step.getStatus(), step.getCreatedAt(), step.getUpdatedAt(),
-                    step.getAttemptNumber(), step.getStartedAt(), step.getCompletedAt(), step.getDurationMs(),
+                    step.getAttemptNumber() == 0 ? null : step.getAttemptNumber(), step.getStartedAt(), step.getCompletedAt(), step.getDurationMs(),
                     step.getInputBytes(), step.getOutputBytes(), step.getInputMimeType(), step.getOutputMimeType(),
                     step.getMetadata(), step.getOutputAssetId(), step.getErrorCode() == null ? null
                     : new ErrorResponse(step.getErrorCode(), step.getErrorMessage()));
