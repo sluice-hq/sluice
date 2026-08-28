@@ -31,9 +31,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
 
 @Service
 public class RunService {
+    public record RunFilters(com.sluice.api.job.domain.JobStatus status, String pipeline, Instant from,
+                             Instant to, com.sluice.api.governance.GovernanceDecisionValue decision) {
+        public static RunFilters empty() { return new RunFilters(null, null, null, null, null); }
+    }
     private final JobService jobs;
     private final JobRepository jobRepository;
     private final AssetRepository assets;
@@ -116,7 +121,19 @@ public class RunService {
 
     @Transactional(readOnly = true)
     public Page<RunResponse> list(ProjectContext context, Pageable pageable) {
-        return jobRepository.findAllByProjectId(context.getProjectId(), pageable).map(job -> toResponse(job, context));
+        return list(context, pageable, RunFilters.empty());
+    }
+
+    @Transactional(readOnly = true)
+    public Page<RunResponse> list(ProjectContext context, Pageable pageable, RunFilters filters) {
+        return jobRepository.searchRuns(
+                context.getProjectId(),
+                filters.status() != null, filters.status() == null ? com.sluice.api.job.domain.JobStatus.QUEUED : filters.status(),
+                filters.pipeline() != null, filters.pipeline() == null ? "" : filters.pipeline(),
+                filters.from() != null, filters.from() == null ? Instant.EPOCH : filters.from(),
+                filters.to() != null, filters.to() == null ? Instant.EPOCH : filters.to(),
+                filters.decision() != null, filters.decision() == null ? com.sluice.api.governance.GovernanceDecisionValue.ALLOW : filters.decision(),
+                pageable).map(job -> toResponse(job, context));
     }
 
     @Transactional(readOnly = true)
