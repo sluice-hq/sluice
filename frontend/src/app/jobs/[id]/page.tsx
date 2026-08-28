@@ -35,7 +35,11 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
   const { data: run } = useQuery({
     queryKey: ['run', resolvedParams.id],
     queryFn: () => getRun(resolvedParams.id),
-    refetchInterval: job && !['QUEUED', 'RUNNING', 'RETRY_WAIT'].includes(job.status) ? false : 2000,
+    refetchInterval: (query) => {
+      const currentRun = query.state.data;
+      if (currentRun?.status === 'FAILED' || currentRun?.status === 'REVIEW_REQUIRED') return false;
+      return currentRun?.status === 'COMPLETED' && currentRun.outputs.length > 0 ? false : 2000;
+    },
   });
 
   useJobEvents(job?.id, job?.status);

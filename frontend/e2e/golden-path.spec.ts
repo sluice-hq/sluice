@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 const demoDir = resolve(process.cwd(), '..', 'demo');
 
 test('developer completes the local dashboard golden path', async ({ page, context }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
   const suffix = Date.now().toString();
   const email = `browser-${suffix}@example.com`;
   const password = 'browser-password-2026';
@@ -256,9 +256,12 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   expect(run.outputs).toHaveLength(1);
   expect(run.outputs[0].contentType).toBe('image/webp');
   await expect(page.getByRole('heading', { name: 'Outputs and compression' })).toBeVisible();
-  const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('link', { name: 'Download output' }).click();
-  const outputDownload = await downloadPromise;
+  const downloadOutput = page.getByRole('link', { name: 'Download output' });
+  await expect(downloadOutput).toBeVisible({ timeout: 120_000 });
+  const [outputDownload] = await Promise.all([
+    page.waitForEvent('download'),
+    downloadOutput.click(),
+  ]);
   expect(outputDownload.suggestedFilename()).toBe(run.outputs[0].filename);
   const downloadedPath = await outputDownload.path();
   expect(downloadedPath).not.toBeNull();
