@@ -35,5 +35,54 @@ export const publishPipeline = (slug: string, revision: number) =>
   fetchApi<PipelineVersion>(`/pipelines/${slug}/publish`, { method: 'POST', body: JSON.stringify({ revision }) });
 
 export async function getPublishedPipelines(): Promise<PublishedPipeline[]> {
-  return fetchApi<PublishedPipeline[]>('/pipelines/published');
+  const response = await fetchApi<unknown>('/pipelines/published');
+  if (!Array.isArray(response)) return [];
+  return response.flatMap((value) => normalizePublishedPipeline(value));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stringArray(value: unknown): string[] | null {
+  return Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === 'string' && item.trim())
+    ? value.map((item) => item.toLowerCase())
+    : null;
+}
+
+function normalizePublishedPipeline(value: unknown): PublishedPipeline[] {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.slug !== 'string'
+    || typeof value.name !== 'string' || typeof value.versionId !== 'string'
+    || typeof value.versionNumber !== 'number') return [];
+
+  const contract = isRecord(value.inputContract) ? value.inputContract : {};
+  const constraints = isRecord(value.uploadConstraints) ? value.uploadConstraints : {};
+  const mimeTypes = stringArray(contract.mimeTypes);
+  const allowedContentTypes = stringArray(constraints.allowedContentTypes);
+  const contractMaxBytes = typeof contract.maxBytes === 'number' && Number.isFinite(contract.maxBytes)
+    && contract.maxBytes > 0 ? contract.maxBytes : 0;
+  const globalMaxBytes = typeof constraints.maxBytes === 'number' && Number.isFinite(constraints.maxBytes)
+    && constraints.maxBytes > 0 ? constraints.maxBytes : 0;
+  const contractUsable = Boolean(mimeTypes && allowedContentTypes && contractMaxBytes && globalMaxBytes);
+
+  return [{
+    id: value.id,
+    slug: value.slug,
+    name: value.name,
+    description: typeof value.description === 'string' ? value.description : null,
+    versionId: value.versionId,
+    versionNumber: value.versionNumber,
+    expectedInputMimeType: typeof value.expectedInputMimeType === 'string' ? value.expectedInputMimeType : '*/*',
+    inputContract: {
+      kind: typeof contract.kind === 'string' ? contract.kind : 'unknown',
+      mimeTypes: mimeTypes ?? [],
+      maxBytes: contractMaxBytes,
+      maxPixels: typeof contract.maxPixels === 'number' && Number.isFinite(contract.maxPixels) && contract.maxPixels > 0 ? contract.maxPixels : 0,
+      alphaSupported: contract.alphaSupported === true,
+      animationSupported: contract.animationSupported === true,
+    },
+    uploadConstraints: { maxBytes: globalMaxBytes, allowedContentTypes: allowedContentTypes ?? [] },
+    contractUsable,
+    contractIssue: contractUsable ? null : 'This published version has no usable resolved input contract. Republish it before testing files.',
+  }];
 }

@@ -107,7 +107,8 @@ class LocalGoldenPathExternalIntegrationTests {
         send("POST", api("/pipelines/external-webp/publish"), withJson(apiKey),
                 "{\"revision\":" + revision + "}", 200);
 
-        JsonNode upload = json(send("POST", api("/uploads"), withJson(apiKey),
+        JsonNode upload = json(send("POST", api("/uploads"),
+                with(withJson(apiKey), "Idempotency-Key", "create-upload-" + suffix),
                 "{\"filename\":\"external.png\",\"contentType\":\"image/png\",\"size\":" + PNG.length + "}", 201));
         putBlob(upload.path("uploadUrl").asText(), PNG);
         send("POST", api("/uploads/" + upload.path("assetId").asText() + "/complete"),

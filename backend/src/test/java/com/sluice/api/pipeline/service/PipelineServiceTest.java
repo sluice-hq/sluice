@@ -1,6 +1,7 @@
 package com.sluice.api.pipeline.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.sluice.api.auth.domain.ProjectContext;
 import com.sluice.api.pipeline.MediaContract;
 import com.sluice.api.pipeline.domain.Pipeline;
@@ -62,6 +63,39 @@ class PipelineServiceTest {
                 "product-images", null, null, fixture.context);
 
         assertEquals(fixture.version.getId(), resolved.getId());
+    }
+
+    @Test
+    void publishedLegacyVersionWithNullContractsReturnsASafeDisabledContract() throws Exception {
+        Fixture fixture = fixture("PUBLISHED");
+        PipelineVersion legacy = new PipelineVersion(UUID.randomUUID(), fixture.pipeline, 1, "PUBLISHED",
+                "image/png", null);
+        when(fixture.pipelines.findByProjectId(fixture.context.getProjectId())).thenReturn(List.of(fixture.pipeline));
+        when(fixture.aliases.findByPipelineIdAndAlias(fixture.pipeline.getId(), "stable"))
+                .thenReturn(Optional.of(new PipelineAlias(fixture.pipeline.getId(), "stable", legacy)));
+
+        JsonNode contract = fixture.service.getPublishedPipelines(fixture.context).get(0).inputContract();
+
+        assertEquals(0, contract.path("maxBytes").asLong());
+        assertEquals("image/png", contract.path("mimeTypes").get(0).asText());
+    }
+
+    @Test
+    void malformedResolvedContractFallsBackToValidLegacyDefinition() throws Exception {
+        Fixture fixture = fixture("PUBLISHED");
+        PipelineVersion version = new PipelineVersion(UUID.randomUUID(), fixture.pipeline, 1, "DRAFT", "image/png",
+                mapper.readTree("""
+                        {"input":{"kind":"image","mimeTypes":["image/png"],"maxBytes":123}}
+                        """));
+        version.publish(mapper.createObjectNode(), mapper.readTree("{\"mimeTypes\":null}"), mapper.createObjectNode());
+        when(fixture.pipelines.findByProjectId(fixture.context.getProjectId())).thenReturn(List.of(fixture.pipeline));
+        when(fixture.aliases.findByPipelineIdAndAlias(fixture.pipeline.getId(), "stable"))
+                .thenReturn(Optional.of(new PipelineAlias(fixture.pipeline.getId(), "stable", version)));
+
+        JsonNode contract = fixture.service.getPublishedPipelines(fixture.context).get(0).inputContract();
+
+        assertEquals(123, contract.path("maxBytes").asLong());
+        assertEquals("image/png", contract.path("mimeTypes").get(0).asText());
     }
 
     private Fixture fixture(String status) throws Exception {

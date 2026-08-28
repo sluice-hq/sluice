@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.dao.DataIntegrityViolationException;
 import com.sluice.api.pipeline.validation.ProcessorConfigurationException;
 import com.sluice.api.pipeline.service.PipelineValidationException;
@@ -71,6 +72,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException exc) {
         return problem(HttpStatus.BAD_REQUEST, "Request validation failed.", "validation_failed");
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ProblemDetail handleMissingRequestHeader(MissingRequestHeaderException exc) {
+        return problem(HttpStatus.BAD_REQUEST, "A required request header is missing.", "required_header_missing");
     }
 
     @ExceptionHandler(BadCredentialsException.class)

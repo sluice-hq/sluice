@@ -31,7 +31,9 @@ $inputBase64 = (Get-Content -LiteralPath (Join-Path $demoDirectory 'sample.png.b
 [IO.File]::WriteAllBytes($inputPath, [Convert]::FromBase64String($inputBase64))
 $inputSize = (Get-Item -LiteralPath $inputPath).Length
 $uploadBody = @{ filename = 'demo-input.png'; contentType = 'image/png'; size = $inputSize } | ConvertTo-Json
-$upload = Invoke-RestMethod -Method Post -Uri "$ApiBaseUrl/uploads" -Headers $apiHeaders -ContentType 'application/json' -Body $uploadBody
+$upload = Invoke-RestMethod -Method Post -Uri "$ApiBaseUrl/uploads" `
+    -Headers ($apiHeaders + @{ 'Idempotency-Key' = "create-upload-$suffix" }) `
+    -ContentType 'application/json' -Body $uploadBody
 Invoke-WebRequest -UseBasicParsing -Method Put -Uri $upload.uploadUrl -InFile $inputPath `
     -Headers @{ 'x-ms-blob-type' = 'BlockBlob'; 'Content-Type' = 'image/png' } | Out-Null
 Invoke-RestMethod -Method Post -Uri "$ApiBaseUrl/uploads/$($upload.assetId)/complete" `

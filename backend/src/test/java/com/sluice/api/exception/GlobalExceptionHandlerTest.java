@@ -3,6 +3,7 @@ package com.sluice.api.exception;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import com.sluice.api.pipeline.validation.ConfigurationValidationError;
 import com.sluice.api.pipeline.validation.ProcessorConfigurationException;
 
@@ -45,5 +46,14 @@ class GlobalExceptionHandlerTest {
         assertEquals("processor_configuration_invalid", response.getProperties().get("code"));
         assertEquals("resize@1.0.0", response.getProperties().get("processor"));
         assertEquals(1, ((List<?>) response.getProperties().get("errors")).size());
+    }
+
+    @Test
+    void mapsMissingRequiredHeadersToAClientError() {
+        ProblemDetail response = new GlobalExceptionHandler()
+                .handleMissingRequestHeader(org.mockito.Mockito.mock(MissingRequestHeaderException.class));
+
+        assertEquals(400, response.getStatus());
+        assertEquals("required_header_missing", response.getProperties().get("code"));
     }
 }

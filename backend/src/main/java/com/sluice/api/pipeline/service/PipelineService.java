@@ -186,9 +186,52 @@ public class PipelineService {
                 .map(pipeline -> aliases.findByPipelineIdAndAlias(pipeline.getId(), "stable")
                         .map(PipelineAlias::getPipelineVersion)
                         .map(version -> new PublishedPipeline(pipeline.getId(), pipeline.getSlug(), pipeline.getName(), pipeline.getDescription(),
-                                version.getId(), version.getVersionNumber(), version.getExpectedInputMimeType()))
+                                version.getId(), version.getVersionNumber(), version.getExpectedInputMimeType(),
+                                publishedInputContract(version)))
                         .orElse(null))
                 .filter(Objects::nonNull).toList();
+    }
+
+    private JsonNode publishedInputContract(PipelineVersion version) {
+        JsonNode resolved = normalizeInputContract(version.getResolvedInputContract());
+        if (resolved != null) return resolved;
+
+        JsonNode definition = version.getDefinition();
+        JsonNode legacy = normalizeInputContract(definition != null && definition.isObject()
+                ? definition.get("input") : null);
+        if (legacy != null) return legacy;
+
+        var disabled = objectMapper.createObjectNode();
+        disabled.put("kind", "unknown");
+        var mimeTypes = disabled.putArray("mimeTypes");
+        String expected = version.getExpectedInputMimeType();
+        if (expected != null && !expected.isBlank() && !"*/*".equals(expected)) mimeTypes.add(expected);
+        disabled.put("maxBytes", 0);
+        disabled.put("maxPixels", 0);
+        disabled.put("alphaSupported", false);
+        disabled.put("animationSupported", false);
+        return disabled;
+    }
+
+    private JsonNode normalizeInputContract(JsonNode candidate) {
+        if (candidate == null || !candidate.isObject()) return null;
+        JsonNode mimeTypes = candidate.get("mimeTypes");
+        JsonNode maxBytes = candidate.get("maxBytes");
+        if (mimeTypes == null || !mimeTypes.isArray() || mimeTypes.isEmpty()
+                || maxBytes == null || !maxBytes.isIntegralNumber() || maxBytes.asLong() <= 0) return null;
+        for (JsonNode mimeType : mimeTypes) {
+            if (!mimeType.isTextual() || mimeType.asText().isBlank()) return null;
+        }
+
+        var normalized = objectMapper.createObjectNode();
+        String kind = candidate.path("kind").asText("");
+        normalized.put("kind", kind.isBlank() ? "unknown" : kind);
+        normalized.set("mimeTypes", mimeTypes.deepCopy());
+        normalized.put("maxBytes", maxBytes.asLong());
+        normalized.put("maxPixels", Math.max(0, candidate.path("maxPixels").asLong(0)));
+        normalized.put("alphaSupported", candidate.path("alphaSupported").asBoolean(false));
+        normalized.put("animationSupported", candidate.path("animationSupported").asBoolean(false));
+        return normalized;
     }
 
     private Pipeline findPipeline(String slug, ProjectContext context) {
@@ -242,5 +285,5 @@ public class PipelineService {
                                       JsonNode resolvedOutputContract, Instant createdAt, Instant publishedAt) {}
     public record PipelineAliasView(String alias, int versionNumber) {}
     public record PublishedPipeline(UUID id, String slug, String name, String description, UUID versionId,
-                                    int versionNumber, String expectedInputMimeType) {}
+                                    int versionNumber, String expectedInputMimeType, JsonNode inputContract) {}
 }

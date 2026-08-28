@@ -41,10 +41,11 @@ public class UploadController {
     @PostMapping
     @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
     public ResponseEntity<UploadUrlResponse> create(@RequestBody UploadUrlRequest request,
+                                                    @RequestHeader("Idempotency-Key") String key,
                                                     @AuthenticationPrincipal ProjectContext context) {
         validate(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(assets.requestUploadUrl(request.getFilename(), request.getContentType(), request.getSize(), context));
+                .body(uploads.create(request.getFilename(), request.getContentType(), request.getSize(), key, context));
     }
 
     @PostMapping("/{assetId}/complete")

@@ -14,6 +14,7 @@ import java.util.UUID;
 @Service
 public class IdempotencyService {
     public static final String RUN_CREATE = "RUN_CREATE";
+    public static final String UPLOAD_CREATE = "UPLOAD_CREATE";
     public static final String UPLOAD_COMPLETE = "UPLOAD_COMPLETE";
 
     private final IdempotencyRecordRepository records;

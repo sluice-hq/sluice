@@ -190,6 +190,21 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   const publishedSlug = publishedPipelines[0].slug as string;
   expect(publishedSlug).not.toContain('<');
 
+  const malformedContractPage = await context.newPage();
+  await malformedContractPage.route('**/api/backend/pipelines/published', async (route) => {
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify([{ ...publishedPipelines[0], inputContract: null, uploadConstraints: null }]),
+    });
+  });
+  await malformedContractPage.goto('/assets/upload');
+  await malformedContractPage.getByLabel('Published pipeline').selectOption({ index: 1 });
+  await expect(malformedContractPage.locator('#file-upload')).toBeDisabled();
+  await expect(malformedContractPage.getByRole('alert').filter({
+    hasText: 'no usable resolved input contract',
+  })).toBeVisible();
+  await malformedContractPage.close();
+
   await page.goto('/quick-start');
   await expect(page.getByRole('main').getByText(publishedSlug, { exact: true })).toBeVisible();
   await expect(page.getByRole('note')).toHaveCount(0);
@@ -217,15 +232,18 @@ test('developer completes the local dashboard golden path', async ({ page, conte
 
   await page.goto('/assets/upload');
   const image = Buffer.from(readFileSync(resolve(demoDir, 'sample.png.base64'), 'utf8').trim(), 'base64');
+  await expect(page.locator('#file-upload')).toBeDisabled();
+  await page.getByLabel('Published pipeline').selectOption({ index: 1 });
+  await expect(page.getByRole('note')).toContainText('Accepted types: image/png');
+  await page.locator('#file-upload').setInputFiles({ name: 'browser-demo.mp4', mimeType: 'video/mp4', buffer: image });
+  const incompatibleFileAlert = page.getByRole('alert').filter({ hasText: 'Test could not continue' });
+  await expect(incompatibleFileAlert).toContainText('video/mp4');
+  await expect(incompatibleFileAlert).toContainText('image/png');
   await page.locator('#file-upload').setInputFiles({ name: 'browser-demo.png', mimeType: 'image/png', buffer: image });
-  await page.getByLabel('Processing pipeline').selectOption({ index: 1 });
-  await page.getByRole('button', { name: 'Start Upload' }).click();
-  await expect(page.getByRole('heading', { name: 'Upload Successful' })).toBeVisible({ timeout: 90_000 });
+  await page.getByRole('button', { name: 'Upload and create run' }).click();
+  await expect(page.getByRole('heading', { name: 'Run created' })).toBeVisible({ timeout: 90_000 });
 
-  await page.getByRole('link', { name: 'Runs' }).click();
-  const runLink = page.locator('tbody a').first();
-  await expect(runLink).toBeVisible({ timeout: 30_000 });
-  await runLink.click();
+  await page.getByRole('button', { name: 'View run' }).click();
   await page.waitForURL(/\/jobs\/[0-9a-f-]{36}$/);
   const runId = page.url().split('/').pop()!;
   await expect.poll(async () => {
@@ -238,6 +256,13 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   expect(run.outputs).toHaveLength(1);
   expect(run.outputs[0].contentType).toBe('image/webp');
   await expect(page.getByRole('heading', { name: 'Outputs and compression' })).toBeVisible();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('link', { name: 'Download output' }).click();
+  const outputDownload = await downloadPromise;
+  expect(outputDownload.suggestedFilename()).toBe(run.outputs[0].filename);
+  const downloadedPath = await outputDownload.path();
+  expect(downloadedPath).not.toBeNull();
+  expect(readFileSync(downloadedPath!).length).toBeGreaterThan(0);
 
   await expect.poll(async () => {
     const response = await page.request.get('/api/backend/dashboard');
@@ -260,11 +285,11 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await page.getByRole('button', { name: 'Confirm publish' }).click();
 
   await page.goto('/assets/upload');
+  const governancePipelineOption = page.getByLabel('Published pipeline').locator('option', { hasText: governancePipelineName });
+  await page.getByLabel('Published pipeline').selectOption(await governancePipelineOption.getAttribute('value') ?? '');
   await page.locator('#file-upload').setInputFiles({ name: 'browser-governed.png', mimeType: 'image/png', buffer: image });
-  const governancePipelineOption = page.getByLabel('Processing pipeline').locator('option', { hasText: governancePipelineName });
-  await page.getByLabel('Processing pipeline').selectOption(await governancePipelineOption.getAttribute('value') ?? '');
-  await page.getByRole('button', { name: 'Start Upload' }).click();
-  await expect(page.getByRole('heading', { name: 'Upload Successful' })).toBeVisible({ timeout: 90_000 });
+  await page.getByRole('button', { name: 'Upload and create run' }).click();
+  await expect(page.getByRole('heading', { name: 'Run created' })).toBeVisible({ timeout: 90_000 });
 
   await page.getByRole('link', { name: 'Runs' }).click();
   const governedRunLink = page.locator('tbody a').first();

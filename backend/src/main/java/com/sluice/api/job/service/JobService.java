@@ -19,6 +19,8 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import com.sluice.api.pipeline.MediaTypeMatcher;
+import com.sluice.api.pipeline.domain.PipelineVersion;
+import com.fasterxml.jackson.databind.JsonNode;
 
 @Service
 public class JobService {
@@ -86,9 +88,7 @@ public class JobService {
         if (asset.getUploadStatus() != Asset.UploadStatus.COMPLETED) {
             throw new IllegalStateException("Asset upload must be completed before processing");
         }
-        if (!MediaTypeMatcher.matches(asset.getContentType(), version.getExpectedInputMimeType())) {
-            throw new IllegalArgumentException("Asset content type is not compatible with the pipeline input");
-        }
+        validateInputContract(asset, version);
         
         job.setPipelineVersionId(version.getId());
         job.setWebhookEndpointId(webhookEndpointId);
@@ -96,6 +96,37 @@ public class JobService {
         Job savedJob = jobRepository.save(job);
         eventPublisher.publishEvent(new com.sluice.api.job.event.JobStatusChangedEvent(this, savedJob.getId(), savedJob.getStatus()));
         return savedJob;
+    }
+
+    private void validateInputContract(Asset asset, PipelineVersion version) {
+        JsonNode contract = version.getResolvedInputContract();
+        if (contract == null || contract.isNull()) {
+            if (!MediaTypeMatcher.matches(asset.getContentType(), version.getExpectedInputMimeType())) {
+                throw new IllegalArgumentException("Asset content type is not compatible with the pipeline input");
+            }
+            return;
+        }
+
+        JsonNode mimeTypes = contract.path("mimeTypes");
+        JsonNode maxBytes = contract.get("maxBytes");
+        if (!contract.isObject() || !mimeTypes.isArray() || mimeTypes.isEmpty()
+                || maxBytes == null || !maxBytes.isIntegralNumber() || maxBytes.asLong() <= 0) {
+            throw new IllegalArgumentException("Published pipeline has an invalid resolved input contract");
+        }
+
+        boolean compatible = false;
+        for (JsonNode mimeType : mimeTypes) {
+            if (!mimeType.isTextual() || mimeType.asText().isBlank()) {
+                throw new IllegalArgumentException("Published pipeline has an invalid resolved input contract");
+            }
+            compatible |= MediaTypeMatcher.matches(asset.getContentType(), mimeType.asText());
+        }
+        if (!compatible) {
+            throw new IllegalArgumentException("Asset content type is not compatible with the pipeline input");
+        }
+        if (asset.getSize() > maxBytes.asLong()) {
+            throw new IllegalArgumentException("Asset exceeds the pipeline input byte limit");
+        }
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
