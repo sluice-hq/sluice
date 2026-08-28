@@ -76,4 +76,53 @@ class JobServiceTest {
         verify(jobs, never()).save(any());
         verify(events, never()).publishEvent(any());
     }
+
+    @Test
+    void acceptsAnyMimePatternFromTheResolvedInputContract() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        ProjectContext context = new ProjectContext(projectId, null, true);
+        Asset asset = new Asset(assetId, "input.pdf", 10, "application/pdf", "blob-url",
+                Asset.UploadStatus.COMPLETED, Instant.now(), projectId);
+        PipelineVersion version = publishedVersion("image/png", """
+                {"kind":"document","mimeTypes":["image/png","application/pdf"],"maxBytes":100}
+                """);
+        JobRepository jobs = mock(JobRepository.class);
+        AssetRepository assets = mock(AssetRepository.class);
+        when(assets.findByIdAndProjectId(assetId, projectId)).thenReturn(Optional.of(asset));
+        when(jobs.save(any(Job.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Job created = new JobService(jobs, mock(ApplicationEventPublisher.class), mock(PipelineService.class), assets)
+                .createJobForVersion(assetId, version, context);
+
+        assertEquals(version.getId(), created.getPipelineVersionId());
+    }
+
+    @Test
+    void rejectsAssetAboveResolvedInputByteLimit() throws Exception {
+        UUID assetId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        ProjectContext context = new ProjectContext(projectId, null, true);
+        Asset asset = new Asset(assetId, "input.png", 101, "image/png", "blob-url",
+                Asset.UploadStatus.COMPLETED, Instant.now(), projectId);
+        PipelineVersion version = publishedVersion("image/png", """
+                {"kind":"image","mimeTypes":["image/png"],"maxBytes":100}
+                """);
+        JobRepository jobs = mock(JobRepository.class);
+        AssetRepository assets = mock(AssetRepository.class);
+        when(assets.findByIdAndProjectId(assetId, projectId)).thenReturn(Optional.of(asset));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> new JobService(jobs, mock(ApplicationEventPublisher.class), mock(PipelineService.class), assets)
+                        .createJobForVersion(assetId, version, context));
+        verify(jobs, never()).save(any());
+    }
+
+    private PipelineVersion publishedVersion(String expectedMimeType, String resolvedContract) throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        PipelineVersion version = new PipelineVersion(UUID.randomUUID(), null, 1, "DRAFT", expectedMimeType,
+                mapper.readTree("{\"steps\":[]}"));
+        version.publish(mapper.createObjectNode(), mapper.readTree(resolvedContract), mapper.createObjectNode());
+        return version;
+    }
 }

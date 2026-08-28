@@ -16,8 +16,10 @@ async function proxy(request: NextRequest, context: RouteContext) {
   const headers = new Headers(await serverAuthHeaders());
   const contentType = request.headers.get('content-type');
   const accept = request.headers.get('accept');
+  const idempotencyKey = request.headers.get('idempotency-key');
   if (contentType) headers.set('content-type', contentType);
   if (accept) headers.set('accept', accept);
+  if (idempotencyKey) headers.set('idempotency-key', idempotencyKey);
 
   const response = await fetch(target, {
     method: request.method,

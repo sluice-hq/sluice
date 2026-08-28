@@ -3,13 +3,22 @@
 import { useQuery } from '@tanstack/react-query';
 import { getJob } from '@/api/jobs';
 import { getRun } from '@/api/runs';
+import type { Asset } from '@/api/types';
 import { StatusBadge } from '@/components/domain/StatusBadge';
 import { EmptyState } from '@/components/domain/EmptyState';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Activity, Calendar, FileVideo, Clock } from 'lucide-react';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { ArrowLeft, Activity, Calendar, FileVideo, Clock, Download } from 'lucide-react';
 import Link from 'next/link';
 import { use } from 'react';
 import { useJobEvents } from '@/hooks/useJobEvents';
+
+function DownloadOutputButton({ output }: { output: Asset }) {
+  return <div className="mt-3">
+    <a className={buttonVariants({ size: 'sm' })} href={`/api/downloads/assets/${output.id}`}>
+      <Download className="mr-2 size-4" />Download output
+    </a>
+  </div>;
+}
 
 export default function JobDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -20,13 +29,17 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
     refetchInterval: (query) => {
       // Don't refetch if completed or failed, otherwise poll every 2 seconds until SSE is implemented
       const status = query.state.data?.status;
-      return (status === 'COMPLETED' || status === 'FAILED') ? false : 2000;
+      return (status === 'COMPLETED' || status === 'FAILED' || status === 'REVIEW_REQUIRED') ? false : 2000;
     },
   });
   const { data: run } = useQuery({
     queryKey: ['run', resolvedParams.id],
     queryFn: () => getRun(resolvedParams.id),
-    refetchInterval: job && !['QUEUED', 'RUNNING', 'RETRY_WAIT'].includes(job.status) ? false : 2000,
+    refetchInterval: (query) => {
+      const currentRun = query.state.data;
+      if (currentRun?.status === 'FAILED' || currentRun?.status === 'REVIEW_REQUIRED') return false;
+      return currentRun?.status === 'COMPLETED' && currentRun.outputs.length > 0 ? false : 2000;
+    },
   });
 
   useJobEvents(job?.id, job?.status);
@@ -110,9 +123,12 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
             <section className="rounded-xl border border-border bg-card p-6 shadow-[0_12px_30px_rgb(0_0_0_/_0.12)]">
               <h3 className="font-semibold">Outputs and compression</h3>
               {run.outputs.length ? <div className="mt-3 space-y-2 text-sm">
-                {run.outputs.map((output) => <Link key={output.id} href={`/assets/${output.id}`} className="block rounded border p-3 hover:border-primary">
+                {run.outputs.map((output) => <div key={output.id} className="rounded border p-3">
+                  <Link href={`/assets/${output.id}`} className="hover:text-primary hover:underline">
                   <span className="font-medium">{output.filename}</span><span className="ml-2 text-muted-foreground">{output.contentType} · {output.size.toLocaleString()} bytes</span>
-                </Link>)}
+                  </Link>
+                  <DownloadOutputButton output={output} />
+                </div>)}
                 <p className="text-muted-foreground">Saved {run.metrics.bytesSaved?.toLocaleString() ?? '—'} bytes · ratio {run.metrics.compressionRatio ?? '—'}</p>
               </div> : <p className="mt-3 text-sm text-muted-foreground">No normal output was produced.</p>}
             </section>

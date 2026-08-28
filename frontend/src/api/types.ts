@@ -66,7 +66,23 @@ export interface PublishedPipeline {
   versionId: string;
   versionNumber: number;
   expectedInputMimeType: string;
+  inputContract: {
+    kind: string;
+    mimeTypes: string[];
+    maxBytes: number;
+    maxPixels: number;
+    alphaSupported: boolean;
+    animationSupported: boolean;
+  };
+  uploadConstraints: {
+    maxBytes: number;
+    allowedContentTypes: string[];
+  };
+  contractUsable: boolean;
+  contractIssue: string | null;
 }
+
+export interface DownloadUrlResponse { downloadUrl: string }
 
 export interface RunDetails {
   id: string;

@@ -9,10 +9,10 @@ export function getRun(id: string): Promise<RunDetails> {
   return fetchApi<RunDetails>(`/runs/${id}`);
 }
 
-export function startRun(pipeline: string, inputAssetId: string): Promise<RunDetails> {
+export function startRun(pipeline: string, inputAssetId: string, idempotencyKey = crypto.randomUUID()): Promise<RunDetails> {
   return fetchApi<RunDetails>('/runs', {
     method: 'POST',
-    headers: { 'Idempotency-Key': crypto.randomUUID() },
+    headers: { 'Idempotency-Key': idempotencyKey },
     body: JSON.stringify({ pipeline, alias: 'stable', inputAssetId }),
   });
 }

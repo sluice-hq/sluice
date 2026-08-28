@@ -94,31 +94,39 @@ public class AssetService {
     }
 
     public com.sluice.api.asset.dto.UploadUrlResponse requestUploadUrl(String filename, String contentType, long size, ProjectContext context) {
+        return requestUploadUrl(UUID.randomUUID(), filename, contentType, size, context);
+    }
+
+    @Transactional
+    public com.sluice.api.asset.dto.UploadUrlResponse requestUploadUrl(UUID assetId, String filename,
+                                                                       String contentType, long size,
+                                                                       ProjectContext context) {
+        String blobName = uploadBlobName(assetId, filename);
+        String uploadUrl = storageService.generateUploadUrl(blobName, contentType);
+        int queryStart = uploadUrl.indexOf("?");
+        if (queryStart < 1) throw new IllegalStateException("Storage did not return a scoped upload URL");
+
+        Asset asset = new Asset(assetId, filename, size, contentType, uploadUrl.substring(0, queryStart),
+                Asset.UploadStatus.PENDING, Instant.now(), context.getProjectId());
+        assetRepository.save(asset);
+        return new com.sluice.api.asset.dto.UploadUrlResponse(asset.getId(), uploadUrl, blobName);
+    }
+
+    public com.sluice.api.asset.dto.UploadUrlResponse refreshUploadUrl(Asset asset) {
+        if (asset.getUploadStatus() != Asset.UploadStatus.PENDING) {
+            throw new IllegalStateException("Idempotent upload request already completed");
+        }
+        String blobName = uploadBlobName(asset.getId(), asset.getFilename());
+        String uploadUrl = storageService.generateUploadUrl(blobName, asset.getContentType());
+        return new com.sluice.api.asset.dto.UploadUrlResponse(asset.getId(), uploadUrl, blobName);
+    }
+
+    private String uploadBlobName(UUID assetId, String filename) {
         String extension = "";
         if (filename != null && filename.contains(".")) {
             extension = filename.substring(filename.lastIndexOf("."));
         }
-        String blobName = UUID.randomUUID().toString() + extension;
-        
-        String uploadUrl = storageService.generateUploadUrl(blobName, contentType);
-        
-        // Extract the permanent storage URL by stripping the SAS token (everything after the '?')
-        String storageUrl = uploadUrl.substring(0, uploadUrl.indexOf("?"));
-        
-        Asset asset = new Asset(
-                UUID.randomUUID(),
-                filename,
-                size,
-                contentType,
-                storageUrl,
-                Asset.UploadStatus.PENDING,
-                Instant.now(),
-                context.getProjectId()
-        );
-        
-        assetRepository.save(asset);
-        
-        return new com.sluice.api.asset.dto.UploadUrlResponse(asset.getId(), uploadUrl, blobName);
+        return assetId + extension;
     }
 
     @Transactional

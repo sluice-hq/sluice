@@ -12,7 +12,7 @@ This repository is an early, working foundation, not the finished V1. Identity, 
 - Project-isolated assets, pipelines, jobs, and dashboard queries.
 - Direct Azure Blob/Azurite upload URLs, upload completion checks, and short-lived download URLs.
 - Reusable `POST /uploads` and `POST /runs` APIs. Upload completion is separate from processing, so one asset can be run through multiple pipelines.
-- Idempotency-key replay protection for run creation and upload completion, with conflicting key reuse rejected.
+- Idempotency-key replay protection for upload creation/completion and run creation, with conflicting key reuse rejected.
 - Immutable pipeline slug/alias/version resolution, durable `StepRun` records, and a persisted queue outbox for each run.
 - RabbitMQ-backed asynchronous jobs with worker processing, retries, recovery scans, and SSE job events.
 - Versioned pipeline authoring with synchronized canonical JSON/Form editing, starter templates, schema-aware controls, processor-version validation, immutable publishing, stable aliases, and history.
@@ -182,7 +182,7 @@ All paths below include the `/api/v1` prefix.
 | `POST` | `/pipelines/{slug}/validate` | Validate a draft or candidate definition |
 | `POST` | `/pipelines/{slug}/publish` | Validate and publish a draft immutably |
 | `PUT` | `/pipelines/{slug}/aliases/{alias}` | Move an alias to a published version |
-| `POST` | `/uploads` | Create a pending asset and write-only upload URL |
+| `POST` | `/uploads` | Idempotently create a pending asset and write-only upload URL; requires `Idempotency-Key` |
 | `POST` | `/uploads/{assetId}/complete` | Verify and finalize an asset without starting work; supports `Idempotency-Key` |
 | `POST` | `/runs` | Start a run using a pipeline slug and optional alias or immutable version; supports `Idempotency-Key` |
 | `GET` | `/runs`, `/runs/{id}` | List or inspect durable runs, planned steps, and outputs |
@@ -200,7 +200,7 @@ All paths below include the `/api/v1` prefix.
 
 The preferred flow completes the upload first, then starts one or more runs:
 
-1. `POST /uploads` with `{filename, contentType, size}`.
+1. `POST /uploads` with an `Idempotency-Key` header and `{filename, contentType, size}`.
 2. PUT the bytes to the returned SAS URL.
 3. `POST /uploads/{assetId}/complete`.
 4. Optionally `POST /webhook-endpoints`, store the returned secret securely, and add `callback.webhookEndpointId` to the run request.
@@ -215,7 +215,9 @@ After creating a key and publishing a pipeline with slug `product-images`, reque
 $api = "http://localhost:8080/api/v1"
 $headers = @{ "X-API-Key" = $env:SLUICE_API_KEY }
 $body = @{ filename = "photo.png"; contentType = "image/png"; size = (Get-Item .\photo.png).Length } | ConvertTo-Json
-$upload = Invoke-RestMethod -Method Post -Uri "$api/uploads" -Headers $headers -ContentType "application/json" -Body $body
+$upload = Invoke-RestMethod -Method Post -Uri "$api/uploads" `
+  -Headers ($headers + @{ "Idempotency-Key" = "create-upload-photo-001" }) `
+  -ContentType "application/json" -Body $body
 ```
 
 Upload the bytes directly to the returned SAS URL, then complete the upload:
@@ -265,6 +267,20 @@ Local defaults are defined in `backend/src/main/resources/application.properties
 | `SLUICE_DASHBOARD_URL` | Playwright dashboard origin | `http://localhost:3000` |
 
 The root `.env.example` lists the remaining media, processor, governance, storage, and observability overrides accepted by the application. Production must supply a strong JWT secret and managed database, storage, queue, CORS, and API URL settings. `application-production.properties` intentionally has no source-code fallbacks for required database, storage, JWT, and CORS values.
+
+### Governance providers and testing
+
+Sluice uses the deterministic `LocalContentSafetyProvider` by default. It hashes the media bytes into a repeatable synthetic score so local tests can exercise `ALLOW`, `REVIEW`, and `BLOCK` without network access or credentials. It is a test double, not an AI classifier, and must never be presented as detecting real harmful content.
+
+The production adapter calls Azure AI Content Safety. Enable it only outside source control:
+
+```env
+SLUICE_GOVERNANCE_PROVIDER=azure
+AZURE_CONTENT_SAFETY_ENDPOINT=https://<resource-name>.cognitiveservices.azure.com
+AZURE_CONTENT_SAFETY_API_KEY=<store-outside-source-control>
+```
+
+Use the local provider for deterministic unit, integration, and browser tests. Use an opt-in Azure smoke test with small non-sensitive fixtures to verify credentials, response parsing, persisted provider facts, and failure behavior; do not assert exact model scores because managed models can change. Azure currently offers an F0 evaluation tier and documents a 4 MB Analyze Image input limit, so verify current [pricing](https://azure.microsoft.com/pricing/details/content-safety/) and [service limits](https://learn.microsoft.com/azure/ai-services/content-safety/overview) before the cloud demo. Microsoft also provides preview containers, but connected containers still report billing to Azure and fully disconnected use requires approval and a commitment plan; they are outside Sluice V1.
 
 ## Verification
 
