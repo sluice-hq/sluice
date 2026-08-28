@@ -4,6 +4,11 @@ import { resolve } from 'node:path';
 
 const demoDir = resolve(process.cwd(), '..', 'demo');
 
+function dateTimeLocal(date: Date): string {
+  const part = (number: number) => String(number).padStart(2, '0');
+  return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())}T${part(date.getHours())}:${part(date.getMinutes())}`;
+}
+
 test('developer completes the local dashboard golden path', async ({ page, context }) => {
   test.setTimeout(300_000);
   const suffix = Date.now().toString();
@@ -77,6 +82,18 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(page.getByText('Copy this key now. It cannot be shown again.')).toBeVisible();
   const revealed = await page.locator('input[readonly]').inputValue();
   expect(revealed).toMatch(/^sl_live_/);
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.getByRole('button', { name: 'Copy', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('API key copied to clipboard.');
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async () => { throw new Error('Clipboard denied for test'); } },
+    });
+  });
+  await page.getByRole('button', { name: 'Copy', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Clipboard unavailable. The key is selected; copy it manually.');
+  await expect(page.locator('#revealed-api-key')).toBeFocused();
   await page.reload();
   await expect(page.locator('input[readonly]')).toHaveCount(0);
   await expect(page.getByText('browser-demo')).toBeVisible();
@@ -120,10 +137,8 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByRole('heading', { name: 'Platform Overview' })).toBeVisible();
-  await Promise.all([
-    page.waitForNavigation(),
-    page.locator('#desktop-project').selectOption({ label: `Selected ${suffix}` }),
-  ]);
+  await page.locator('#desktop-project').selectOption({ label: `Selected ${suffix}` });
+  await expect(page.locator('#desktop-project')).toHaveValue(/.+/);
   await expect(page.locator('#desktop-project')).toHaveValue(session.selectedProjectId);
 
   await page.getByRole('link', { name: 'Processor Market' }).click();
@@ -322,13 +337,37 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(page.getByText('Provider', { exact: true })).toBeVisible();
   await expect(page.getByText('Categories', { exact: true })).toBeVisible();
   await expect(page.getByText('Reasons', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Runs', exact: true }).click();
+  await page.getByLabel('Status').selectOption('COMPLETED');
+  await page.getByLabel('Pipeline slug').fill(definition.slug);
+  await page.getByLabel('From').fill(dateTimeLocal(new Date(Date.now() - 86_400_000)));
+  await page.getByLabel('To', { exact: true }).fill(dateTimeLocal(new Date(Date.now() + 86_400_000)));
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page).toHaveURL(/\/jobs\?.*status=COMPLETED.*pipeline=/);
+  await expect(page.getByRole('link', { name: new RegExp(definition.slug) })).toBeVisible();
+  await page.getByRole('link', { name: new RegExp(definition.slug) }).click();
+  await page.getByRole('link', { name: 'Back to Runs' }).click();
+  await expect(page).toHaveURL(/\/jobs\?.*status=COMPLETED.*pipeline=/);
   await page.getByRole('link', { name: 'Governance' }).click();
-  await expect(page.getByText('ALLOW', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('ALLOW', { exact: true })).toBeVisible();
+  await page.getByLabel('Decision').selectOption('ALLOW');
+  await expect(page).toHaveURL(/\/governance\?decision=ALLOW$/);
+  await page.locator('tbody a').first().click();
+  await page.getByRole('link', { name: 'Back to Governance' }).click();
+  await expect(page).toHaveURL(/\/governance\?decision=ALLOW$/);
 
   await page.getByRole('link', { name: 'Settings' }).click();
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Revoke' }).click();
-  await expect(page.getByText('Revoked')).toBeVisible();
+  await page.getByRole('button', { name: 'Revoke', exact: true }).click();
+  const revokeDialog = page.getByRole('dialog', { name: 'Revoke API key?' });
+  await expect(revokeDialog).toBeVisible();
+  await revokeDialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(revokeDialog).toBeHidden();
+  const revokeButton = page.getByRole('button', { name: 'Revoke', exact: true });
+  await expect(revokeButton).toBeVisible();
+  await revokeButton.click();
+  await page.getByRole('dialog', { name: 'Revoke API key?' }).getByRole('button', { name: 'Revoke key' }).click();
+  await expect(page.getByRole('status')).toHaveText('API key revoked.');
+  await expect(page.getByText('Revoked', { exact: true })).toBeVisible();
   await page.goto('/app');
   const resumedChecklist = page.getByRole('region', { name: 'Start your first integration' });
   await expect(resumedChecklist).toBeVisible();

@@ -45,8 +45,13 @@ function Stat({ label, value }: { label: string; value: string }) {
 export default function JobDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const searchParams = useSearchParams();
-  const page = Number(searchParams.get('page') ?? '0');
-  const backHref = Number.isSafeInteger(page) && page > 0 ? `/jobs?page=${page}` : '/jobs';
+  const returnToGovernance = searchParams.get('returnTo') === 'governance';
+  const backParams = new URLSearchParams(searchParams.toString());
+  backParams.delete('returnTo');
+  const backQuery = backParams.toString();
+  const backBase = returnToGovernance ? '/governance' : '/jobs';
+  const backHref = backQuery ? `${backBase}?${backQuery}` : backBase;
+  const backLabel = returnToGovernance ? 'Back to Governance' : 'Back to Runs';
   const { data: run, isLoading, error } = useQuery({
     queryKey: ['run', resolvedParams.id],
     queryFn: () => getRun(resolvedParams.id),
@@ -62,13 +67,13 @@ export default function JobDetailsPage({ params }: { params: Promise<{ id: strin
 
   if (error) {
     return <div className="space-y-6">
-      <Link href={backHref}><Button variant="ghost" size="sm" className="-ml-4 text-muted-foreground"><ArrowLeft className="mr-2 size-4" />Back to Runs</Button></Link>
+      <Link href={backHref}><Button variant="ghost" size="sm" className="-ml-4 text-muted-foreground"><ArrowLeft className="mr-2 size-4" />{backLabel}</Button></Link>
       <EmptyState title="Error loading run" description={error.message} />
     </div>;
   }
 
   return <div className="space-y-6">
-    <Link href={backHref}><Button variant="ghost" size="sm" className="-ml-4 text-muted-foreground"><ArrowLeft className="mr-2 size-4" />Back to Runs</Button></Link>
+    <Link href={backHref}><Button variant="ghost" size="sm" className="-ml-4 text-muted-foreground"><ArrowLeft className="mr-2 size-4" />{backLabel}</Button></Link>
 
     {isLoading ? <div className="h-64 animate-pulse rounded-xl border border-border bg-card" /> : run ? <div className="space-y-6">
       <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-[0_18px_40px_rgb(0_0_0_/_0.16)] sm:flex-row sm:items-center sm:justify-between">

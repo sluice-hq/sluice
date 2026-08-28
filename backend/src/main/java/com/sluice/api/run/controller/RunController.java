@@ -22,6 +22,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.UUID;
 import java.util.List;
+import java.time.Instant;
 
 @RestController
 @RequestMapping("/api/v1/runs")
@@ -44,7 +45,29 @@ public class RunController {
     }
 
     @GetMapping
-    public Page<RunResponse> list(@AuthenticationPrincipal ProjectContext context, Pageable pageable) {
+    public Page<RunResponse> list(@AuthenticationPrincipal ProjectContext context, Pageable pageable,
+                                  @org.springframework.web.bind.annotation.RequestParam(required = false) String status,
+                                  @org.springframework.web.bind.annotation.RequestParam(required = false) String pipeline,
+                                  @org.springframework.web.bind.annotation.RequestParam(name = "from", required = false) String from,
+                                  @org.springframework.web.bind.annotation.RequestParam(name = "to", required = false) String to,
+                                  @org.springframework.web.bind.annotation.RequestParam(required = false) String decision) {
+        try {
+            var parsedStatus = status == null || status.isBlank() ? null : com.sluice.api.job.domain.JobStatus.valueOf(status.trim().toUpperCase());
+            var parsedDecision = decision == null || decision.isBlank() ? null : com.sluice.api.governance.GovernanceDecisionValue.valueOf(decision.trim().toUpperCase());
+            var parsedFrom = from == null || from.isBlank() ? null : Instant.parse(from);
+            var parsedTo = to == null || to.isBlank() ? null : Instant.parse(to);
+            if (parsedFrom != null && parsedTo != null && !parsedFrom.isBefore(parsedTo)) {
+                throw new IllegalArgumentException("from must be before to");
+            }
+            return runs.list(context, pageable, new RunService.RunFilters(parsedStatus,
+                    pipeline == null || pipeline.isBlank() ? null : pipeline.trim(), parsedFrom, parsedTo, parsedDecision));
+        } catch (IllegalArgumentException | java.time.DateTimeException ex) {
+            throw new IllegalArgumentException("Invalid run filter");
+        }
+    }
+
+    /** Source-compatible convenience for callers that do not provide filters. */
+    public Page<RunResponse> list(ProjectContext context, Pageable pageable) {
         return runs.list(context, pageable);
     }
 

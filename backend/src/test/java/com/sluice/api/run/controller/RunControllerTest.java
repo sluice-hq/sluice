@@ -16,8 +16,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 class RunControllerTest {
     @Test
@@ -68,5 +71,25 @@ class RunControllerTest {
 
         assertEquals(200, result.getStatusCode().value());
         verify(events).subscribeToJobEvents(runId);
+    }
+
+    @Test
+    void forwardsTypedRunFilters() {
+        ProjectContext context = new ProjectContext(UUID.randomUUID(), null, true);
+        RunService runs = mock(RunService.class);
+        var pageable = PageRequest.of(0, 20);
+        when(runs.list(eq(context), eq(pageable), any())).thenReturn(new PageImpl<>(List.of()));
+        new RunController(runs, mock(JobEventService.class)).list(context, pageable, "COMPLETED", " images ",
+                "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z", "ALLOW");
+        verify(runs).list(eq(context), eq(pageable), argThat(filters -> filters.status() == JobStatus.COMPLETED
+                && "images".equals(filters.pipeline()) && filters.from().toString().startsWith("2026-01-01")
+                && filters.to().toString().startsWith("2026-01-02") && filters.decision().name().equals("ALLOW")));
+    }
+
+    @Test
+    void rejectsInvalidRunFiltersAsBadRequestException() {
+        ProjectContext context = new ProjectContext(UUID.randomUUID(), null, true);
+        assertThrows(IllegalArgumentException.class, () -> new RunController(mock(RunService.class), mock(JobEventService.class))
+                .list(context, PageRequest.of(0, 20), "not-a-status", null, null, null, null));
     }
 }

@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
   BookOpen,
@@ -35,7 +35,10 @@ const navigation = [
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sessionAction, setSessionAction] = useState<'project' | 'logout' | null>(null);
+  const [sessionError, setSessionError] = useState('');
   const publicRoute = pathname === '/' || pathname === '/login' || pathname === '/signup';
   const { data: session, isLoading, isError } = useQuery<Session>({
     queryKey: ['session'],
@@ -61,18 +64,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const selectedProject = session.projects.find((project) => project.id === session.selectedProjectId);
 
   async function selectProject(projectId: string) {
-    await csrfFetch('/api/session/project', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId }),
-    });
-    window.location.reload();
+    if (sessionAction) return;
+    setSessionAction('project'); setSessionError('');
+    try { const response = await csrfFetch('/api/session/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }) });
+      if (!response.ok) throw new Error('Could not switch project. Your current session is still active.');
+      const sessionResponse = await fetch('/api/session');
+      if (!sessionResponse.ok) throw new Error('Project switched, but fresh project data could not be loaded. Refresh to continue.');
+      queryClient.setQueryData<Session>(['session'], await sessionResponse.json());
+      await queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== 'session' });
+    } catch (cause) { setSessionError(cause instanceof Error ? cause.message : 'Could not switch project.'); }
+    finally { setSessionAction(null); }
   }
 
   async function logout() {
-    await csrfFetch('/api/session/logout', { method: 'POST' });
-    router.replace('/login');
-    router.refresh();
+    if (sessionAction) return;
+    setSessionAction('logout'); setSessionError('');
+    try { const response = await csrfFetch('/api/session/logout', { method: 'POST' });
+      if (!response.ok) throw new Error('Could not sign out. Please try again.');
+      queryClient.removeQueries({ queryKey: ['session'] });
+      router.replace('/login'); router.refresh();
+    } catch (cause) { setSessionError(cause instanceof Error ? cause.message : 'Could not sign out.'); }
+    finally { setSessionAction(null); }
   }
 
   const navigationItems = navigation.map((item) => {
@@ -108,7 +120,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <nav aria-label="Main navigation" className="flex-1 space-y-1 overflow-y-auto px-3 py-5">
           {navigationItems}
         </nav>
-        <SessionPanel session={session} selectedProject={selectedProject} onProjectChange={selectProject} onLogout={logout} />
+        <SessionPanel session={session} selectedProject={selectedProject} onProjectChange={selectProject} onLogout={logout} pending={sessionAction} error={sessionError} />
       </aside>
 
       <div className="min-h-screen md:pl-60">
@@ -142,7 +154,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {mobileMenuOpen && (
           <div className="fixed inset-x-0 top-16 z-20 border-b border-border bg-sidebar px-4 pb-4 pt-3 shadow-2xl md:hidden">
             <nav aria-label="Mobile navigation" className="space-y-1">{navigationItems}</nav>
-            <SessionPanel session={session} selectedProject={selectedProject} onProjectChange={selectProject} onLogout={logout} compact />
+            <SessionPanel session={session} selectedProject={selectedProject} onProjectChange={selectProject} onLogout={logout} compact pending={sessionAction} error={sessionError} />
           </div>
         )}
 
@@ -166,12 +178,16 @@ function SessionPanel({
   selectedProject,
   onProjectChange,
   onLogout,
+  pending,
+  error,
   compact = false,
 }: {
   session: Session;
   selectedProject?: Session['projects'][number];
   onProjectChange: (projectId: string) => Promise<void>;
   onLogout: () => Promise<void>;
+  pending?: 'project' | 'logout' | null;
+  error?: string;
   compact?: boolean;
 }) {
   return (
@@ -180,7 +196,8 @@ function SessionPanel({
       <select
         id={compact ? 'mobile-project' : 'desktop-project'}
         value={session.selectedProjectId || ''}
-        onChange={(event) => onProjectChange(event.target.value)}
+        onChange={(event) => onProjectChange(event.target.value)} disabled={pending !== null && pending !== undefined}
+        aria-busy={pending === 'project'}
         className="w-full rounded-lg border border-sidebar-border bg-background px-3 py-2 text-sm text-foreground shadow-sm outline-none transition-colors focus:border-sidebar-ring focus:ring-2 focus:ring-sidebar-ring/30"
       >
         {session.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
@@ -195,14 +212,15 @@ function SessionPanel({
         </div>
         <button
           type="button"
-          onClick={onLogout}
+          onClick={onLogout} disabled={pending !== null && pending !== undefined}
           title="Sign out"
           className="grid size-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         >
           <LogOut className="size-4" aria-hidden="true" />
-          <span className="sr-only">Sign out</span>
+          <span className="sr-only">{pending === 'logout' ? 'Signing out…' : 'Sign out'}</span>
         </button>
       </div>
+      {error && <div role="status" aria-live="polite" className="mt-2 min-h-4 text-xs text-red-400">{error}</div>}
     </div>
   );
 }
