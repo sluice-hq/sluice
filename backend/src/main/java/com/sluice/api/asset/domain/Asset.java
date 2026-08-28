@@ -27,6 +27,9 @@ public class Asset {
     @jakarta.persistence.JoinColumn(name = "parent_asset_id")
     private Asset parentAsset;
 
+    @jakarta.persistence.Column(name = "parent_asset_id", insertable = false, updatable = false)
+    private UUID parentAssetId;
+
     public enum UploadStatus {
         PENDING,
         COMPLETED
@@ -75,5 +78,9 @@ public class Asset {
     public void setProducingJobId(UUID producingJobId) { this.producingJobId = producingJobId; }
 
     public Asset getParentAsset() { return parentAsset; }
-    public void setParentAsset(Asset parentAsset) { this.parentAsset = parentAsset; }
+    public UUID getParentAssetId() { return parentAssetId; }
+    public void setParentAsset(Asset parentAsset) {
+        this.parentAsset = parentAsset;
+        this.parentAssetId = parentAsset == null ? null : parentAsset.getId();
+    }
 }

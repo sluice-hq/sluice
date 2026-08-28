@@ -129,19 +129,19 @@ public class RunService {
         Job job = jobRepository.findByIdAndProjectId(id, context.getProjectId())
                 .orElseThrow(() -> new IllegalArgumentException("Run not found"));
         return assets.findByProducingJobIdAndProjectId(job.getId(), context.getProjectId()).stream()
-                .map(asset -> new AssetResponse(asset.getId(), asset.getFilename(), asset.getSize(),
-                        asset.getContentType(), asset.getStorageUrl(), asset.getUploadStatus().name(), asset.getCreatedAt()))
+                .map(AssetResponse::from)
                 .toList();
     }
 
     private RunResponse toResponse(Job job, ProjectContext context) {
-        PipelineVersion version = versions.findById(job.getPipelineVersionId())
-                .orElseThrow(() -> new IllegalStateException("Run pipeline version no longer exists"));
+        PipelineVersion version = job.getPipelineVersionId() == null ? null
+                : versions.findById(job.getPipelineVersionId()).orElse(null);
+        RunResponse.PipelineReference pipeline = version == null ? null
+                : new RunResponse.PipelineReference(version.getPipeline().getSlug(), version.getVersionNumber());
         List<RunResponse.StepResponse> plannedSteps = steps.findByJobIdOrderByStepIndexAsc(job.getId()).stream()
                 .map(RunResponse.StepResponse::from).toList();
         List<AssetResponse> outputs = assets.findByProducingJobIdAndProjectId(job.getId(), context.getProjectId()).stream()
-                .map(asset -> new AssetResponse(asset.getId(), asset.getFilename(), asset.getSize(),
-                        asset.getContentType(), asset.getStorageUrl(), asset.getUploadStatus().name(), asset.getCreatedAt()))
+                .map(AssetResponse::from)
                 .toList();
         Long queueWait = job.getProcessingStartedAt() == null ? null
                 : java.time.Duration.between(job.getQueuedAt(), job.getProcessingStartedAt()).toMillis();
@@ -159,7 +159,7 @@ public class RunService {
                         decision.getModelVersion(), decision.getCategoryScores(), decision.getReasonCodes()))
                 .orElse(null);
         return new RunResponse(job.getId(), job.getStatus().name(),
-                new RunResponse.PipelineReference(version.getPipeline().getSlug(), version.getVersionNumber()),
+                pipeline,
                 job.getAssetId(), plannedSteps, outputs, job.getCreatedAt(), job.getUpdatedAt(),
                 new RunResponse.Metrics(queueWait, processing, job.getInputBytes(), job.getOutputBytes(),
                         job.getBytesSaved(), job.getCompressionRatio()),

@@ -17,6 +17,7 @@ import com.sluice.api.pipeline.repository.PipelineVersionRepository;
 import com.sluice.api.pipeline.service.PipelineService;
 import com.sluice.api.step.repository.StepRunRepository;
 import com.sluice.api.run.dto.CreateRunRequest;
+import com.sluice.api.run.dto.RunResponse;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -112,6 +113,25 @@ class RunServiceTest {
         org.junit.jupiter.api.Assertions.assertFalse(iterator.hasNext());
         verify(outbox).createRunQueuedEvent(any(Job.class));
         verify(outbox).publishAfterCommit(any(OutboxEvent.class), any());
+    }
+
+    @Test
+    void legacyRunWithoutPipelineVersionReturnsNullablePipelineReference() {
+        Job legacy = job();
+        JobRepository repository = mock(JobRepository.class);
+        when(repository.findByIdAndProjectId(jobId, projectId)).thenReturn(Optional.of(legacy));
+        PipelineVersionRepository versions = mock(PipelineVersionRepository.class);
+        StepRunRepository steps = mock(StepRunRepository.class);
+        when(steps.findByJobIdOrderByStepIndexAsc(jobId)).thenReturn(java.util.List.of());
+        AssetRepository assets = mock(AssetRepository.class);
+        when(assets.findByProducingJobIdAndProjectId(jobId, projectId)).thenReturn(java.util.List.of());
+
+        RunResponse response = new RunService(mock(JobService.class), repository, assets, mock(PipelineService.class),
+                versions, steps, mock(IdempotencyService.class), mock(OutboxService.class))
+                .get(jobId, context).orElseThrow();
+
+        org.junit.jupiter.api.Assertions.assertNull(response.pipeline());
+        verifyNoInteractions(versions);
     }
 
     private RunService service(JobService jobs, JobRepository repository, IdempotencyService idempotency) {

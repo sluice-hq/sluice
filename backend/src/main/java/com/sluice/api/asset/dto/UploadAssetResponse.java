@@ -8,7 +8,6 @@ public class UploadAssetResponse {
     private String filename;
     private long size;
     private String contentType;
-    private String storageUrl;
     private Instant assetCreatedAt;
     
     private UUID jobId;
@@ -18,16 +17,25 @@ public class UploadAssetResponse {
     public UploadAssetResponse() {
     }
 
-    public UploadAssetResponse(UUID assetId, String filename, long size, String contentType, String storageUrl, Instant assetCreatedAt, UUID jobId, String jobStatus, Instant jobCreatedAt) {
+    public UploadAssetResponse(UUID assetId, String filename, long size, String contentType, Instant assetCreatedAt, UUID jobId, String jobStatus, Instant jobCreatedAt) {
         this.assetId = assetId;
         this.filename = filename;
         this.size = size;
         this.contentType = contentType;
-        this.storageUrl = storageUrl;
         this.assetCreatedAt = assetCreatedAt;
         this.jobId = jobId;
         this.jobStatus = jobStatus;
         this.jobCreatedAt = jobCreatedAt;
+    }
+
+    /**
+     * Source-compatible overload for older callers. The private storage URL is
+     * intentionally ignored and is never serialized into the public response.
+     */
+    @Deprecated
+    public UploadAssetResponse(UUID assetId, String filename, long size, String contentType, String ignoredStorageUrl,
+                               Instant assetCreatedAt, UUID jobId, String jobStatus, Instant jobCreatedAt) {
+        this(assetId, filename, size, contentType, assetCreatedAt, jobId, jobStatus, jobCreatedAt);
     }
 
     public UUID getAssetId() {
@@ -60,14 +68,6 @@ public class UploadAssetResponse {
 
     public void setContentType(String contentType) {
         this.contentType = contentType;
-    }
-
-    public String getStorageUrl() {
-        return storageUrl;
-    }
-
-    public void setStorageUrl(String storageUrl) {
-        this.storageUrl = storageUrl;
     }
 
     public Instant getAssetCreatedAt() {
