@@ -36,8 +36,14 @@ import java.time.Instant;
 @Service
 public class RunService {
     public record RunFilters(com.sluice.api.job.domain.JobStatus status, String pipeline, Instant from,
-                             Instant to, com.sluice.api.governance.GovernanceDecisionValue decision) {
-        public static RunFilters empty() { return new RunFilters(null, null, null, null, null); }
+                             Instant to, com.sluice.api.governance.GovernanceDecisionValue decision,
+                             boolean governanceOnly) {
+        public RunFilters(com.sluice.api.job.domain.JobStatus status, String pipeline, Instant from,
+                          Instant to, com.sluice.api.governance.GovernanceDecisionValue decision) {
+            this(status, pipeline, from, to, decision, false);
+        }
+
+        public static RunFilters empty() { return new RunFilters(null, null, null, null, null, false); }
     }
     private final JobService jobs;
     private final JobRepository jobRepository;
@@ -132,6 +138,7 @@ public class RunService {
                 filters.pipeline() != null, filters.pipeline() == null ? "" : filters.pipeline(),
                 filters.from() != null, filters.from() == null ? Instant.EPOCH : filters.from(),
                 filters.to() != null, filters.to() == null ? Instant.EPOCH : filters.to(),
+                filters.governanceOnly(),
                 filters.decision() != null, filters.decision() == null ? com.sluice.api.governance.GovernanceDecisionValue.ALLOW : filters.decision(),
                 pageable).map(job -> toResponse(job, context));
     }

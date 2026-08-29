@@ -478,11 +478,23 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(page).toHaveURL(/\/jobs\?.*status=COMPLETED.*pipeline=/);
   await page.getByRole('link', { name: 'Governance' }).click();
   await expect(page.getByLabel('ALLOW', { exact: true })).toBeVisible();
-  await page.getByLabel('Decision').selectOption('ALLOW');
-  await expect(page).toHaveURL(/\/governance\?decision=ALLOW$/);
+  await page.getByLabel('Decision', { exact: true }).selectOption('ALLOW');
+  await page.getByLabel('Pipeline slug').fill('missing-governance-pipeline');
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page.getByRole('heading', { name: 'No governance decisions match these filters' })).toBeVisible();
+  await page.getByRole('button', { name: 'Reset filters' }).click();
+  await expect(page).toHaveURL(/\/governance$/);
+  await page.getByLabel('Decision', { exact: true }).selectOption('ALLOW');
+  await page.getByLabel('Pipeline slug').fill(definition.slug);
+  await page.getByLabel('Created from').fill(dateTimeLocal(new Date(Date.now() - 86_400_000)).split('T')[0]);
+  await page.getByLabel('Created through').fill(dateTimeLocal(new Date(Date.now() + 86_400_000)).split('T')[0]);
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page).toHaveURL(/\/governance\?.*decision=ALLOW.*pipeline=/);
+  const governanceQuery = new URL(page.url()).search;
+  await expect(page.getByText('Showing 1-1 of 1 decisions')).toBeVisible();
   await page.locator('tbody a').first().click();
   await page.getByRole('link', { name: 'Back to Governance' }).click();
-  await expect(page).toHaveURL(/\/governance\?decision=ALLOW$/);
+  await expect(page).toHaveURL(`/governance${governanceQuery}`);
 
   await page.getByRole('link', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Revoke', exact: true }).click();

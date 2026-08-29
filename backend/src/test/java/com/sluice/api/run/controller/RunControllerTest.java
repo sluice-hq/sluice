@@ -80,16 +80,17 @@ class RunControllerTest {
         var pageable = PageRequest.of(0, 20);
         when(runs.list(eq(context), eq(pageable), any())).thenReturn(new PageImpl<>(List.of()));
         new RunController(runs, mock(JobEventService.class)).list(context, pageable, "COMPLETED", " images ",
-                "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z", "ALLOW");
+                "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z", "ALLOW", true);
         verify(runs).list(eq(context), eq(pageable), argThat(filters -> filters.status() == JobStatus.COMPLETED
                 && "images".equals(filters.pipeline()) && filters.from().toString().startsWith("2026-01-01")
-                && filters.to().toString().startsWith("2026-01-02") && filters.decision().name().equals("ALLOW")));
+                && filters.to().toString().startsWith("2026-01-02") && filters.decision().name().equals("ALLOW")
+                && filters.governanceOnly()));
     }
 
     @Test
     void rejectsInvalidRunFiltersAsBadRequestException() {
         ProjectContext context = new ProjectContext(UUID.randomUUID(), null, true);
         assertThrows(IllegalArgumentException.class, () -> new RunController(mock(RunService.class), mock(JobEventService.class))
-                .list(context, PageRequest.of(0, 20), "not-a-status", null, null, null, null));
+                .list(context, PageRequest.of(0, 20), "not-a-status", null, null, null, null, false));
     }
 }

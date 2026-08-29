@@ -37,7 +37,8 @@ public class GovernanceDecisionService {
 
     @Transactional(readOnly = true)
     public Optional<GovernanceDecision> latest(UUID jobId) {
-        return decisions.findByJobIdOrderByCreatedAtAsc(jobId).stream().reduce((first, second) -> second);
+        return decisions.findLatestByJobId(jobId, org.springframework.data.domain.PageRequest.of(0, 1))
+                .stream().findFirst();
     }
 
     private String nullable(Object value) { return value == null ? null : String.valueOf(value); }
