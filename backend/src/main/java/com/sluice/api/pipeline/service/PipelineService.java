@@ -11,6 +11,7 @@ import com.sluice.api.pipeline.repository.PipelineRepository;
 import com.sluice.api.pipeline.repository.PipelineVersionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Instant;
 import java.util.List;
@@ -29,6 +30,7 @@ public class PipelineService {
     private final PipelineAliasRepository aliases;
     private final PipelineValidator validator;
     private final ObjectMapper objectMapper;
+    private final com.sluice.api.pipeline.catalog.service.ProcessorEnablementService enablementService;
 
     public PipelineService(PipelineRepository pipelines, PipelineVersionRepository versions,
                            PipelineAliasRepository aliases, PipelineValidator validator, ObjectMapper objectMapper) {
@@ -37,6 +39,19 @@ public class PipelineService {
         this.aliases = aliases;
         this.validator = validator;
         this.objectMapper = objectMapper;
+        this.enablementService = null;
+    }
+
+    @Autowired
+    public PipelineService(PipelineRepository pipelines, PipelineVersionRepository versions,
+                           PipelineAliasRepository aliases, PipelineValidator validator, ObjectMapper objectMapper,
+                           com.sluice.api.pipeline.catalog.service.ProcessorEnablementService enablementService) {
+        this.pipelines = pipelines;
+        this.versions = versions;
+        this.aliases = aliases;
+        this.validator = validator;
+        this.objectMapper = objectMapper;
+        this.enablementService = enablementService;
     }
 
     @Transactional
@@ -47,7 +62,7 @@ public class PipelineService {
         Pipeline pipeline = pipelines.save(new Pipeline(UUID.randomUUID(), slug, name.trim(), description, context.getProjectId()));
         PipelineVersion draft = new PipelineVersion(UUID.randomUUID(), pipeline, 1, "DRAFT",
                 expectedMime(definition), definition.deepCopy());
-        PipelineValidationReport report = validator.validateDefinition(slug, definition);
+        PipelineValidationReport report = validateDefinition(slug, definition, context);
         draft.recordValidation(tree(report), tree(report.inputContract()), tree(report.outputContract()));
         versions.save(draft);
         return detail(pipeline);
@@ -80,7 +95,7 @@ public class PipelineService {
     public PipelineVersionView updateDraft(String slug, int expectedRevision, JsonNode definition, ProjectContext context) {
         Pipeline pipeline = findPipelineForUpdate(slug, context);
         if (!slug.equals(definition.path("slug").asText())) throw new IllegalArgumentException("Definition slug does not match pipeline");
-        PipelineValidationReport report = validator.validateDefinition(slug, definition);
+        PipelineValidationReport report = validateDefinition(slug, definition, context);
         Optional<PipelineVersion> existing = versions.findFirstByPipelineIdAndStatus(pipeline.getId(), "DRAFT");
         PipelineVersion draft;
         if (existing.isEmpty()) {
@@ -103,7 +118,7 @@ public class PipelineService {
         PipelineVersion draft = versions.findFirstByPipelineIdAndStatus(pipeline.getId(), "DRAFT")
                 .orElseThrow(() -> new IllegalStateException("Pipeline has no draft"));
         JsonNode definition = candidate == null ? draft.getDefinition() : candidate;
-        PipelineValidationReport report = validator.validateDefinition(slug, definition);
+        PipelineValidationReport report = validateDefinition(slug, definition, context);
         if (candidate == null) {
             draft.recordValidation(tree(report), tree(report.inputContract()), tree(report.outputContract()));
             versions.save(draft);
@@ -117,7 +132,7 @@ public class PipelineService {
         PipelineVersion draft = versions.findFirstByPipelineIdAndStatus(pipeline.getId(), "DRAFT")
                 .orElseThrow(() -> new IllegalStateException("Pipeline has no draft"));
         if (draft.getRevision() != expectedRevision) throw new IllegalStateException("Draft revision is stale");
-        PipelineValidationReport report = validator.validateDefinition(slug, draft.getDefinition());
+        PipelineValidationReport report = validateDefinition(slug, draft.getDefinition(), context);
         if (!report.valid()) throw new PipelineValidationException(report);
         draft.publish(tree(report), tree(report.inputContract()), tree(report.outputContract()));
         PipelineVersion published = versions.save(draft);
@@ -237,6 +252,13 @@ public class PipelineService {
     private Pipeline findPipeline(String slug, ProjectContext context) {
         return pipelines.findBySlugAndProjectId(slug, context.getProjectId())
                 .orElseThrow(() -> new IllegalArgumentException("Pipeline not found"));
+    }
+
+    private PipelineValidationReport validateDefinition(String slug, JsonNode definition, ProjectContext context) {
+        if (enablementService != null) {
+            return validator.validateDefinition(slug, definition, context.getProjectId());
+        }
+        return validator.validateDefinition(slug, definition);
     }
 
     private Pipeline findPipelineForUpdate(String slug, ProjectContext context) {
