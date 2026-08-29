@@ -141,6 +141,23 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(page.locator('#desktop-project')).toHaveValue(/.+/);
   await expect(page.locator('#desktop-project')).toHaveValue(session.selectedProjectId);
 
+  const authenticatedCookies = await context.cookies();
+  const csrfToken = authenticatedCookies.find((cookie) => cookie.name === 'sluice_csrf')?.value;
+  expect(csrfToken).toBeTruthy();
+  const requiredProcessorReleases = [
+    ['mime-validation', '1.0.0'],
+    ['governance.content-safety', '1.0.0'],
+    ['resize', '2.0.0'],
+    ['webp', '2.0.0'],
+  ];
+  for (const [slug, version] of requiredProcessorReleases) {
+    const enabled = await page.request.put(
+      `/api/backend/projects/${session.selectedProjectId}/processor-releases/${encodeURIComponent(slug)}/versions/${version}`,
+      { headers: { 'X-Sluice-CSRF': csrfToken! } },
+    );
+    expect(enabled.status()).toBe(200);
+  }
+
   await page.getByRole('link', { name: 'Processor Market' }).click();
   await expect(page.getByRole('heading', { name: /Composable media capabilities/i })).toBeVisible();
   await expect(page.getByRole('article')).toHaveCount(7);
