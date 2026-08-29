@@ -15,6 +15,7 @@ import com.sluice.api.auth.domain.ProjectContext;
 import com.sluice.api.storage.StorageService;
 import com.sluice.api.config.MediaSafetyPolicy;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import java.time.Instant;
 
 
 @RestController
@@ -41,17 +42,37 @@ public class AssetController {
     @GetMapping
     public ResponseEntity<Page<AssetResponse>> getAssets(
             @AuthenticationPrincipal ProjectContext context,
+            @io.swagger.v3.oas.annotations.Parameter(description = "Case-insensitive literal filename search")
+            @RequestParam(required = false) String filename,
+            @io.swagger.v3.oas.annotations.Parameter(description = "Exact upload status: PENDING or COMPLETED")
+            @RequestParam(required = false) String status,
+            @io.swagger.v3.oas.annotations.Parameter(description = "Exact MIME family without the slash, such as image or video")
+            @RequestParam(required = false) String mediaType,
+            @io.swagger.v3.oas.annotations.Parameter(description = "Inclusive ISO-8601 creation timestamp")
+            @RequestParam(required = false) String createdFrom,
+            @io.swagger.v3.oas.annotations.Parameter(description = "Exclusive ISO-8601 creation timestamp")
+            @RequestParam(required = false) String createdBefore,
             @io.swagger.v3.oas.annotations.Parameter(
                     description = "Exact caller-owned subject correlation ID; project-scoped and never authorization")
             @RequestParam(required = false) String externalSubjectId,
             @io.swagger.v3.oas.annotations.Parameter(
                     description = "Exact caller-owned media/group reference; project-scoped and never authorization")
             @RequestParam(required = false) String externalReference,
+            @org.springframework.data.web.PageableDefault(
+                    size = 20, sort = {"createdAt", "id"}, direction = org.springframework.data.domain.Sort.Direction.DESC)
             Pageable pageable) {
-        Page<AssetResponse> assets = assetService
-                .getAssets(context, externalSubjectId, externalReference, pageable)
-                .map(AssetResponse::from);
-        return ResponseEntity.ok(assets);
+        try {
+            var parsedStatus = status == null || status.isBlank() ? null
+                    : com.sluice.api.asset.domain.Asset.UploadStatus.valueOf(status.trim().toUpperCase(java.util.Locale.ROOT));
+            var parsedFrom = createdFrom == null || createdFrom.isBlank() ? null : Instant.parse(createdFrom);
+            var parsedBefore = createdBefore == null || createdBefore.isBlank() ? null : Instant.parse(createdBefore);
+            var filters = new AssetService.AssetFilters(filename, parsedStatus, mediaType, parsedFrom, parsedBefore,
+                    externalSubjectId, externalReference);
+            Page<AssetResponse> assets = assetService.getAssets(context, filters, pageable).map(AssetResponse::from);
+            return ResponseEntity.ok(assets);
+        } catch (IllegalArgumentException | java.time.DateTimeException ex) {
+            throw new IllegalArgumentException("Invalid asset filter");
+        }
     }
 
     @GetMapping("/{id}")

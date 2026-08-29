@@ -187,6 +187,53 @@ public class ProjectIsolationTests {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    public void assetFiltersComposeAcrossTheProjectDataset() throws Exception {
+        Asset match = new Asset(UUID.randomUUID(), "Holiday.Profile.JPG", 200L, "image/jpeg",
+                "http://test.com/holiday.jpg", Asset.UploadStatus.COMPLETED,
+                Instant.parse("2026-08-20T12:00:00Z"), projectA.getId(), "user_456", "avatar_2");
+        assetRepository.save(match);
+        assetRepository.save(new Asset(UUID.randomUUID(), "holiday-preview.mp4", 300L, "video/mp4",
+                "http://test.com/holiday.mp4", Asset.UploadStatus.PENDING,
+                Instant.parse("2026-08-20T13:00:00Z"), projectA.getId(), "user_456", "avatar_2"));
+        assetRepository.save(new Asset(UUID.randomUUID(), "Holiday.Profile.JPG", 400L, "image/jpeg",
+                "http://test.com/other-project.jpg", Asset.UploadStatus.COMPLETED,
+                Instant.parse("2026-08-20T12:00:00Z"), projectB.getId(), "user_456", "avatar_2"));
+        String token = jwtService.generateToken(user1.getId());
+
+        mockMvc.perform(get("/api/v1/assets")
+                        .param("filename", "  HOLIDAY.PROFILE  ")
+                        .param("status", "completed")
+                        .param("mediaType", "IMAGE")
+                        .param("createdFrom", "2026-08-20T00:00:00Z")
+                        .param("createdBefore", "2026-08-21T00:00:00Z")
+                        .param("externalSubjectId", "user_456")
+                        .param("externalReference", "avatar_2")
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Project-ID", projectA.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(match.getId().toString()));
+    }
+
+    @Test
+    public void assetFiltersRejectInvalidRangesAndMediaFamilies() throws Exception {
+        String token = jwtService.generateToken(user1.getId());
+
+        mockMvc.perform(get("/api/v1/assets")
+                        .param("createdFrom", "2026-08-21T00:00:00Z")
+                        .param("createdBefore", "2026-08-20T00:00:00Z")
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Project-ID", projectA.getId().toString()))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/v1/assets")
+                        .param("mediaType", "image/%")
+                        .header("Authorization", "Bearer " + token)
+                        .header("X-Project-ID", projectA.getId().toString()))
+                .andExpect(status().isBadRequest());
+    }
+
     private String hashKey(String key) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] encodedhash = digest.digest(key.getBytes(StandardCharsets.UTF_8));

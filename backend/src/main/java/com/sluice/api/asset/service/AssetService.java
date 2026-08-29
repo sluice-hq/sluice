@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.sluice.api.auth.domain.ProjectContext;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -21,6 +22,18 @@ import org.slf4j.LoggerFactory;
 @Service
 public class AssetService {
     private static final Logger log = LoggerFactory.getLogger(AssetService.class);
+    private static final int MAX_FILENAME_FILTER_LENGTH = 255;
+    private static final int MAX_MEDIA_TYPE_LENGTH = 64;
+    private static final java.util.regex.Pattern MEDIA_TYPE_PATTERN =
+            java.util.regex.Pattern.compile("[A-Za-z0-9][A-Za-z0-9.+-]*");
+
+    public record AssetFilters(String filename, Asset.UploadStatus status, String mediaType,
+                               Instant createdFrom, Instant createdBefore,
+                               String externalSubjectId, String externalReference) {
+        public static AssetFilters empty() {
+            return new AssetFilters(null, null, null, null, null, null, null);
+        }
+    }
 
     private final StorageService storageService;
     private final AssetRepository assetRepository;
@@ -36,17 +49,56 @@ public class AssetService {
     }
 
     public Page<Asset> getAssets(ProjectContext context, Pageable pageable) {
-        return getAssets(context, null, null, pageable);
+        return getAssets(context, AssetFilters.empty(), pageable);
     }
 
     public Page<Asset> getAssets(ProjectContext context, String externalSubjectId,
                                  String externalReference, Pageable pageable) {
-        AssetReferencePolicy.validate(externalSubjectId, externalReference);
-        if (externalSubjectId == null && externalReference == null) {
+        return getAssets(context,
+                new AssetFilters(null, null, null, null, null, externalSubjectId, externalReference), pageable);
+    }
+
+    public Page<Asset> getAssets(ProjectContext context, AssetFilters filters, Pageable pageable) {
+        AssetFilters normalized = normalize(filters == null ? AssetFilters.empty() : filters);
+        if (normalized.equals(AssetFilters.empty())) {
             return assetRepository.findAllByProjectId(context.getProjectId(), pageable);
         }
-        return assetRepository.findAllByProjectIdAndExternalReferences(
-                context.getProjectId(), externalSubjectId, externalReference, pageable);
+        return assetRepository.searchAssets(
+                context.getProjectId(),
+                normalized.filename() != null, normalized.filename(),
+                normalized.status() != null, normalized.status(),
+                normalized.mediaType() != null, normalized.mediaType(),
+                normalized.createdFrom() != null, normalized.createdFrom(),
+                normalized.createdBefore() != null, normalized.createdBefore(),
+                normalized.externalSubjectId() != null, normalized.externalSubjectId(),
+                normalized.externalReference() != null, normalized.externalReference(),
+                pageable);
+    }
+
+    private AssetFilters normalize(AssetFilters filters) {
+        String filename = normalizeOptional(filters.filename());
+        if (filename != null && filename.length() > MAX_FILENAME_FILTER_LENGTH) {
+            throw new IllegalArgumentException("filename filter must not exceed " + MAX_FILENAME_FILTER_LENGTH + " characters");
+        }
+        String mediaType = normalizeOptional(filters.mediaType());
+        if (mediaType != null && (mediaType.length() > MAX_MEDIA_TYPE_LENGTH
+                || !MEDIA_TYPE_PATTERN.matcher(mediaType).matches())) {
+            throw new IllegalArgumentException("mediaType filter is invalid");
+        }
+        if (filters.createdFrom() != null && filters.createdBefore() != null
+                && !filters.createdFrom().isBefore(filters.createdBefore())) {
+            throw new IllegalArgumentException("createdFrom must be before createdBefore");
+        }
+        AssetReferencePolicy.validate(filters.externalSubjectId(), filters.externalReference());
+        return new AssetFilters(filename == null ? null : filename.toLowerCase(Locale.ROOT), filters.status(),
+                mediaType == null ? null : mediaType.toLowerCase(Locale.ROOT), filters.createdFrom(),
+                filters.createdBefore(), filters.externalSubjectId(), filters.externalReference());
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     public Optional<Asset> getAsset(UUID assetId, ProjectContext context) {

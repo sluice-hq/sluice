@@ -57,6 +57,11 @@ class OpenApiContractTests {
                 .path("parameters");
         assertTrue(assetListParameters.toString().contains("externalSubjectId"));
         assertTrue(assetListParameters.toString().contains("externalReference"));
+        assertTrue(assetListParameters.toString().contains("filename"));
+        assertTrue(assetListParameters.toString().contains("status"));
+        assertTrue(assetListParameters.toString().contains("mediaType"));
+        assertTrue(assetListParameters.toString().contains("createdFrom"));
+        assertTrue(assetListParameters.toString().contains("createdBefore"));
 
         JsonNode createRun = document.path("paths").path("/api/v1/runs").path("post");
         assertTrue(createRun
