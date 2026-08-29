@@ -1,9 +1,11 @@
 'use client';
 /* eslint-disable react-hooks/set-state-in-effect -- Query results hydrate the local draft editor. */
 
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { listProcessors, type ProcessorContract } from '@/api/processors';
+import { listProjectProcessors, type ProcessorContract } from '@/api/processors';
 import {
   createPipeline, getPipeline, getPipelineHistory, listPipelines, publishPipeline, saveDraft,
   validatePipeline, type PipelineDefinition, type ValidationReport,
@@ -12,12 +14,13 @@ import {
 const emptyDefinition: PipelineDefinition = {
   schemaVersion: '1', slug: 'my-pipeline',
   input: { kind: 'image', mimeTypes: ['image/jpeg', 'image/png'], maxBytes: 50000000, maxPixels: 40000000 },
-  steps: [{ id: 'validate', processor: 'mime-validation', version: '1.0.0', config: { allowedTypes: ['image/jpeg', 'image/png'] } }],
+  steps: [],
   limits: { maxSteps: 10, timeoutSeconds: 90, maxOutputBytes: 50000000 },
 };
 
 export default function PipelinesPage() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
   const [selected, setSelected] = useState('');
   const [name, setName] = useState('My pipeline');
   const [description, setDescription] = useState('');
@@ -30,8 +33,15 @@ export default function PipelinesPage() {
   const [dirty, setDirty] = useState(false);
   const [confirmPublish, setConfirmPublish] = useState(false);
   const hydratedPipeline = useRef<string | null>(null);
+  const appliedMarketRelease = useRef('');
   const { data: pipelineList = [] } = useQuery({ queryKey: ['pipelines'], queryFn: listPipelines });
-  const { data: processors = [] } = useQuery({ queryKey: ['processors'], queryFn: listProcessors });
+  const { data: session } = useQuery<{ selectedProjectId?: string }>({ queryKey: ['session'], queryFn: async () => { const response = await fetch('/api/session'); if (!response.ok) throw new Error('Session unavailable'); return response.json(); } });
+  const projectId = session?.selectedProjectId ?? '';
+  const projectReleasesQuery = useQuery({ queryKey: ['project-processor-releases', projectId], queryFn: () => listProjectProcessors(projectId), enabled: !!projectId });
+  const projectReleases = useMemo(() => projectReleasesQuery.data ?? [], [projectReleasesQuery.data]);
+  const processors = useMemo(() => projectReleases.map((item) => item.processor), [projectReleases]);
+  const enabledProcessors = useMemo(() => projectReleases.filter((item) => item.enabled).map((item) => item.processor), [projectReleases]);
+  const projectReleasesReady = !!projectId && projectReleasesQuery.isSuccess;
   const { data: detail } = useQuery({ queryKey: ['pipeline', selected], queryFn: () => getPipeline(selected), enabled: !!selected });
   const { data: history = [] } = useQuery({ queryKey: ['pipeline-history', selected], queryFn: () => getPipelineHistory(selected), enabled: !!selected });
 
@@ -55,6 +65,21 @@ export default function PipelinesPage() {
   }, [dirty]);
 
   const processorMap = useMemo(() => new Map(processors.map((item) => [`${item.slug}@${item.version}`, item])), [processors]);
+  const enabledKeys = useMemo(() => new Set(enabledProcessors.map((item) => `${item.slug}@${item.version}`)), [enabledProcessors]);
+  const unavailableSteps = projectReleasesReady ? definition.steps.filter((step) => !enabledKeys.has(`${step.processor}@${step.version}`)) : [];
+
+  useEffect(() => {
+    const slug = searchParams.get('processor') ?? '';
+    const version = searchParams.get('version') ?? '';
+    const key = `${slug}@${version}`;
+    if (!slug || !version || appliedMarketRelease.current === key || !enabledKeys.has(key)) return;
+    const processor = processorMap.get(key);
+    if (!processor) return;
+    const id = `${slug.replaceAll('.', '-')}-${definition.steps.length + 1}`;
+    update({ ...definition, steps: [...definition.steps, { id, processor: slug, version, config: configDefaults(processor) }] });
+    setMessage(`${processor.displayName} v${version} added from the Processor Market.`);
+    appliedMarketRelease.current = key;
+  }, [definition, enabledKeys, processorMap, searchParams]);
 
   function update(next: PipelineDefinition) { setDefinition(next); setJson(JSON.stringify(next, null, 2)); setReport(null); setDirty(true); }
   function updateStep(index: number, patch: Record<string, unknown>) {
@@ -122,7 +147,10 @@ export default function PipelinesPage() {
           <label className="text-sm">Description<input value={description} onChange={(e) => { setDescription(e.target.value); setDirty(true); }} disabled={!!selected} className="mt-1 w-full rounded-md border border-border bg-background p-2" /></label></div>
         <div className="flex gap-2"><button onClick={() => switchMode('form')} className={`rounded-md px-3 py-1.5 text-sm ${mode === 'form' ? 'bg-primary' : 'bg-background'}`}>Form</button><button onClick={() => switchMode('json')} className={`rounded-md px-3 py-1.5 text-sm ${mode === 'json' ? 'bg-primary' : 'bg-background'}`}>JSON</button></div>
         {mode === 'json' ? <textarea aria-label="Canonical pipeline JSON" value={json} onChange={(e) => { setJson(e.target.value); setReport(null); setDirty(true); }} className="min-h-[520px] w-full rounded-md border border-border bg-background p-4 font-mono text-sm" />
-          : <FormEditor definition={definition} processors={processors} processorMap={processorMap} update={update} updateStep={updateStep} />}
+          : <FormEditor definition={definition} processors={enabledProcessors} processorMap={processorMap} releasesReady={projectReleasesReady} update={update} updateStep={updateStep} />}
+        {!!projectId && projectReleasesQuery.isLoading && <p role="status" className="rounded-md border border-border bg-background p-3 text-sm text-muted-foreground">Loading enabled processor releases…</p>}
+        {!!projectId && projectReleasesQuery.isError && <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">Enabled processor releases could not be loaded. Existing draft step availability cannot be checked until the catalog is available.</p>}
+        {unavailableSteps.length > 0 && <p role="alert" className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">{unavailableSteps.length} step release(s) are not enabled for this project. Existing published pipelines remain valid, but this draft cannot be published until those exact releases are enabled or replaced. <Link href="/processors" className="font-medium text-primary hover:underline">Open Processor Market</Link></p>}
         {report && <div className={`rounded-md border p-3 text-sm ${report.valid ? 'border-emerald-500/40' : 'border-destructive/40'}`}><p className="font-medium">{report.valid ? 'Valid pipeline' : `${report.errors.length} validation issue(s)`}</p>
           {report.errors.map((error) => <p key={`${error.path}-${error.code}`} className="mt-1 font-mono text-xs">{error.path}: {error.message}</p>)}</div>}
         {message && <p role="status" className="rounded-md border border-border bg-background p-3 text-sm">{message}</p>}
@@ -135,17 +163,23 @@ export default function PipelinesPage() {
   </div>;
 }
 
-function FormEditor({ definition, processors, processorMap, update, updateStep }: {
+function FormEditor({ definition, processors, processorMap, releasesReady, update, updateStep }: {
   definition: PipelineDefinition; processors: ProcessorContract[]; processorMap: Map<string, ProcessorContract>;
+  releasesReady: boolean;
   update: (next: PipelineDefinition) => void; updateStep: (index: number, patch: Record<string, unknown>) => void;
 }) {
-  const [processorQuery, setProcessorQuery] = useState('');
-  const published = processors.filter((item) => item.status === 'PUBLISHED');
   const releasesBySlug = new Map<string, ProcessorContract[]>();
-  published.forEach((item) => releasesBySlug.set(item.slug, [...(releasesBySlug.get(item.slug) ?? []), item]));
+  processors.forEach((item) => releasesBySlug.set(item.slug, [...(releasesBySlug.get(item.slug) ?? []), item]));
+  const canUseTemplate = (slugs: string[]) => slugs.every((slug) => releasesBySlug.has(slug));
+  const precedingOutput = definition.steps.length === 0
+    ? definition.input.mimeTypes
+    : propagatedOutputMimeTypes(definition.steps[definition.steps.length - 1], definition.input.mimeTypes, processorMap);
+  const nextProcessor = processors.find((candidate) => precedingOutput.some((mime) => candidate.input.mimeTypes.some((accepted) => mediaTypeMatches(mime, accepted))));
   return <div className="space-y-4">
     <label className="block text-sm">Pipeline slug<input value={definition.slug} disabled className="mt-1 w-full rounded-md border border-border bg-background p-2" /></label>
-    <div className="rounded-lg border border-border bg-background/40 p-4"><p className="text-sm font-medium">Starter templates</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => applyTemplate(['mime-validation', 'webp'], releasesBySlug, definition, update)} className="rounded border border-primary/40 px-3 py-1.5 text-sm text-primary">WebP delivery</button><button type="button" onClick={() => applyTemplate(['mime-validation', 'resize', 'webp'], releasesBySlug, definition, update)} className="rounded border border-primary/40 px-3 py-1.5 text-sm text-primary">Resize + WebP</button></div></div>
+    {processors.length > 0 ? <div className="rounded-lg border border-border bg-background/40 p-4"><p className="text-sm font-medium">Starter templates</p><p className="mt-1 text-xs text-muted-foreground">Templates only use processor releases enabled for this project.</p><div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={!canUseTemplate(['mime-validation', 'webp'])} onClick={() => applyTemplate(['mime-validation', 'webp'], releasesBySlug, definition, update)} className="cursor-pointer rounded border border-primary/40 px-3 py-1.5 text-sm text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40">WebP delivery</button><button type="button" disabled={!canUseTemplate(['mime-validation', 'resize', 'webp'])} onClick={() => applyTemplate(['mime-validation', 'resize', 'webp'], releasesBySlug, definition, update)} className="cursor-pointer rounded border border-primary/40 px-3 py-1.5 text-sm text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40">Resize + WebP</button></div></div>
+      : releasesReady ? <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-6 text-center"><h2 className="font-semibold">Enable a processor to start building</h2><p className="mt-2 text-sm text-muted-foreground">This project has no processor releases enabled yet. Choose only the capabilities this project needs.</p><Link href="/processors" className="mt-4 inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/80">Browse Processor Market</Link></div>
+        : null}
     <label className="block text-sm">Input MIME types<input value={definition.input.mimeTypes.join(', ')} onChange={(e) => update({ ...definition, input: { ...definition.input, mimeTypes: e.target.value.split(',').map((v) => v.trim()).filter(Boolean) } })} className="mt-1 w-full rounded-md border border-border bg-background p-2" /></label>
     {definition.steps.map((step, index) => {
       const selected = processorMap.get(`${step.processor}@${step.version}`);
@@ -153,22 +187,29 @@ function FormEditor({ definition, processors, processorMap, update, updateStep }
       const previous = index === 0 ? definition.input.mimeTypes : propagatedOutputMimeTypes(
         definition.steps[index - 1], definition.input.mimeTypes, processorMap);
       const compatible = !selected || previous.some((actual) => selected.input.mimeTypes.some((accepted) => mediaTypeMatches(actual, accepted)));
-      const choices = [...releasesBySlug.values()].filter((releases) => `${releases[0].displayName} ${releases[0].slug} ${releases[0].category}`.toLowerCase().includes(processorQuery.toLowerCase()));
-      const releaseChoices = processors.filter((item) => item.status === 'PUBLISHED' || item.status === 'DEPRECATED');
       return <div key={`${step.id}-${index}`} className="space-y-3 rounded-lg border border-border bg-background/40 p-4">
-        <label className="block text-sm">Find a processor<input value={processorQuery} onChange={(event) => setProcessorQuery(event.target.value)} placeholder="Search Transform, Optimize, Privacy…" className="mt-1 w-full rounded border border-border bg-background p-2" /></label>
-        <div className="flex flex-wrap gap-2">{choices.map((releases) => <button key={releases[0].slug} type="button" onClick={() => updateStep(index, { processor: releases[0].slug, version: releases[0].version, config: configDefaults(releases[0]) })} className={`rounded border px-2 py-1 text-xs ${step.processor === releases[0].slug ? 'border-primary bg-primary/10 text-primary' : 'border-border'}`}>{releases[0].category} · {releases[0].displayName}</button>)}</div>
-        <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Step id<input value={step.id} onChange={(e) => updateStep(index, { id: e.target.value })} className="mt-1 w-full rounded border border-border bg-background p-2" /></label>
-          <label className="text-sm">Exact processor release<select value={`${step.processor}@${step.version}`} onChange={(e) => { const [processor, version] = e.target.value.split('@'); updateStep(index, { processor, version, config: {} }); }} className="mt-1 w-full rounded border border-border bg-background p-2">
-            {releaseChoices.map((item) => <option key={`${item.slug}@${item.version}`} value={`${item.slug}@${item.version}`}>{item.displayName} · {item.version}{item.status !== 'PUBLISHED' ? ' (deprecated)' : ''}</option>)}</select></label></div>
+        <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Step id<input value={step.id} onChange={(e) => updateStep(index, { id: e.target.value })} className="mt-1 w-full rounded border border-border bg-background p-2" /></label><ProcessorPicker pickerId={`step-${index}`} processors={processors} selected={selected} acceptedInputs={previous} onSelect={(processor) => updateStep(index, { processor: processor.slug, version: processor.version, config: configDefaults(processor) })} /></div>
         {selected && <div className="rounded-lg border border-border bg-background/45 p-3 text-xs leading-5"><div className="flex flex-wrap items-center gap-2"><span className="font-semibold text-sm">{selected.displayName} · v{selected.version}</span><span className="rounded-full border border-border px-2 py-0.5 capitalize text-muted-foreground">{selected.status.toLowerCase()}</span></div><p className="mt-1 text-muted-foreground">{selected.description}</p><p className="mt-1 text-muted-foreground">Accepts {selected.input.mimeTypes.join(', ')} · produces {selected.output.mimeTypes.join(', ')}</p><a className="mt-1 inline-block text-primary underline-offset-2 hover:underline" href={`/processors#processor-${selected.slug}`}>View full processor details</a>{selected.status === 'DEPRECATED' && <p role="alert" className="mt-2 text-amber-300">This release is deprecated. Use it only when compatibility with an existing pipeline requires it.</p>}</div>}
         {!compatible && <p role="alert" className="rounded border border-destructive/40 bg-destructive/10 p-2 text-xs">This processor cannot accept the preceding output. Reorder the steps or choose a compatible release.</p>}
         {Object.entries(properties).map(([key, schema]) => <ConfigControl key={key} name={key} schema={schema} value={step.config[key]} onChange={(value) => updateStep(index, { config: { ...step.config, [key]: value } })} />)}
         <div className="flex gap-3"><button disabled={index === 0} onClick={() => reorder(definition, index, index - 1, update)} className="text-xs disabled:text-muted-foreground">Move up</button><button disabled={index === definition.steps.length - 1} onClick={() => reorder(definition, index, index + 1, update)} className="text-xs disabled:text-muted-foreground">Move down</button><button onClick={() => update({ ...definition, steps: definition.steps.filter((_, i) => i !== index) })} className="text-xs text-destructive">Remove step</button></div>
       </div>;
     })}
-    <button disabled={!processors.length || definition.steps.length >= 10} onClick={() => { const item = processors[0]; if (item) update({ ...definition, steps: [...definition.steps, { id: `step-${definition.steps.length + 1}`, processor: item.slug, version: item.version, config: {} }] }); }} className="rounded-md border border-border px-3 py-2 text-sm">Add ordered step</button>
+    <button disabled={!nextProcessor || definition.steps.length >= 10} onClick={() => { if (nextProcessor) update({ ...definition, steps: [...definition.steps, { id: `step-${definition.steps.length + 1}`, processor: nextProcessor.slug, version: nextProcessor.version, config: configDefaults(nextProcessor) }] }); }} className="cursor-pointer rounded-md border border-border px-3 py-2 text-sm transition hover:border-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40">Add ordered step</button>
   </div>;
+}
+
+function ProcessorPicker({ pickerId, processors, selected, acceptedInputs, onSelect }: { pickerId: string; processors: ProcessorContract[]; selected?: ProcessorContract; acceptedInputs: string[]; onSelect: (processor: ProcessorContract) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [highlighted, setHighlighted] = useState(0);
+  const results = processors.filter((processor) => `${processor.displayName} ${processor.slug} ${processor.version} ${processor.category} ${processor.description} ${processor.input.mimeTypes.join(' ')} ${processor.output.mimeTypes.join(' ')}`.toLowerCase().includes(query.toLowerCase()));
+  const compatible = (processor: ProcessorContract) => acceptedInputs.some((mime) => processor.input.mimeTypes.some((accepted) => mediaTypeMatches(mime, accepted)));
+  const groups = [...new Set(results.map((processor) => processor.category))].sort();
+  const orderedResults = groups.flatMap((group) => results.filter((processor) => processor.category === group));
+  const listId = `processor-options-${pickerId}`;
+  function choose(processor: ProcessorContract) { if (!compatible(processor)) return; onSelect(processor); setOpen(false); setQuery(''); }
+  return <div className="relative text-sm"><span>Exact processor release</span><button type="button" aria-label="Select exact processor release" aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listId : undefined} onClick={() => setOpen((value) => !value)} className="mt-1 flex w-full cursor-pointer items-center justify-between rounded border border-border bg-background p-2 text-left hover:border-primary"><span>{selected ? `${selected.displayName} · v${selected.version}` : 'Choose a processor'}</span><span aria-hidden="true">⌄</span></button>{open && <div className="absolute z-20 mt-1 w-full min-w-80 rounded-lg border border-border bg-card p-2 shadow-xl"><input autoFocus role="combobox" aria-label="Search enabled processor releases" aria-autocomplete="list" aria-expanded="true" aria-controls={listId} aria-activedescendant={orderedResults[highlighted] ? `${listId}-${highlighted}` : undefined} value={query} onChange={(event) => { setQuery(event.target.value); setHighlighted(0); }} onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false); if (event.key === 'ArrowDown') { event.preventDefault(); setHighlighted((value) => Math.min(value + 1, orderedResults.length - 1)); } if (event.key === 'ArrowUp') { event.preventDefault(); setHighlighted((value) => Math.max(value - 1, 0)); } if (event.key === 'Enter' && orderedResults[highlighted]) { event.preventDefault(); choose(orderedResults[highlighted]); } }} placeholder="Search name, category or file type" className="w-full rounded border border-border bg-background p-2" /><div id={listId} role="listbox" aria-label="Enabled processor releases" className="mt-2 max-h-72 overflow-y-auto">{groups.map((group) => <div key={group} role="group" aria-label={group}><p className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group}</p>{orderedResults.map((processor, index) => processor.category === group && <button id={`${listId}-${index}`} role="option" aria-selected={`${processor.slug}@${processor.version}` === `${selected?.slug}@${selected?.version}`} aria-disabled={!compatible(processor)} key={`${processor.slug}@${processor.version}`} type="button" disabled={!compatible(processor)} onClick={() => choose(processor)} className={`block w-full cursor-pointer rounded px-2 py-2 text-left text-sm hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-40 ${index === highlighted ? 'bg-primary/10' : ''}`}><span className="block font-medium">{processor.displayName} · v{processor.version}</span><span className="block text-xs text-muted-foreground">{processor.input.mimeTypes.join(', ')} → {processor.output.mimeTypes.join(', ')}</span></button>)}</div>)}{orderedResults.length === 0 && <p className="p-3 text-sm text-muted-foreground">No enabled releases match this search.</p>}</div><Link href="/processors" className="mt-2 block border-t border-border px-2 pt-2 text-xs font-medium text-primary hover:underline">Manage processors in the market</Link></div>}</div>;
 }
 
 function applyTemplate(slugs: string[], releases: Map<string, ProcessorContract[]>, definition: PipelineDefinition, update: (next: PipelineDefinition) => void) {
