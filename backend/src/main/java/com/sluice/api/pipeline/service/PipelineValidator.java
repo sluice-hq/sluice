@@ -9,6 +9,8 @@ import com.sluice.api.pipeline.ProcessorRegistry;
 import com.sluice.api.pipeline.domain.PipelineVersion;
 import com.sluice.api.pipeline.validation.ProcessorConfigurationException;
 import com.sluice.api.pipeline.validation.ProcessorConfigurationValidator;
+import com.sluice.api.pipeline.catalog.service.ProcessorEnablementService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -24,14 +26,27 @@ public class PipelineValidator {
 
     private final ProcessorRegistry processorRegistry;
     private final ProcessorConfigurationValidator configurationValidator;
+    private final ProcessorEnablementService enablementService;
 
     public PipelineValidator(ProcessorRegistry processorRegistry,
                              ProcessorConfigurationValidator configurationValidator) {
+        this(processorRegistry, configurationValidator, null);
+    }
+
+    @Autowired
+    public PipelineValidator(ProcessorRegistry processorRegistry,
+                             ProcessorConfigurationValidator configurationValidator,
+                             ProcessorEnablementService enablementService) {
         this.processorRegistry = processorRegistry;
         this.configurationValidator = configurationValidator;
+        this.enablementService = enablementService;
     }
 
     public PipelineValidationReport validateDefinition(String pipelineSlug, JsonNode definition) {
+        return validateDefinition(pipelineSlug, definition, null);
+    }
+
+    public PipelineValidationReport validateDefinition(String pipelineSlug, JsonNode definition, java.util.UUID projectId) {
         List<PipelineValidationError> errors = new ArrayList<>();
         if (definition == null || !definition.isObject()) {
             errors.add(error("/", "definition_invalid", "Pipeline definition must be a JSON object."));
@@ -108,6 +123,9 @@ public class PipelineValidator {
             if (declaredMaxSteps < 1 || declaredMaxSteps > MAX_STEPS || (steps != null && steps.isArray() && steps.size() > declaredMaxSteps)) {
                 errors.add(error("/limits/maxSteps", "max_steps_invalid", "maxSteps must be between the step count and 10."));
             }
+        }
+        if (projectId != null && enablementService != null) {
+            errors.addAll(enablementService.validateDefinition(projectId, definition));
         }
         return new PipelineValidationReport(errors.isEmpty(), errors, input, current);
     }

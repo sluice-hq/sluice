@@ -13,6 +13,17 @@ $signupBody = @{ email = $email; password = $password; projectName = "Demo $suff
 $signup = Invoke-RestMethod -Method Post -Uri "$ApiBaseUrl/auth/signup" -ContentType 'application/json' -Body $signupBody
 $humanHeaders = @{ Authorization = "Bearer $($signup.token)"; 'X-Project-ID' = $signup.selectedProjectId }
 
+$requiredProcessorReleases = @(
+    @{ slug = 'governance.content-safety'; version = '1.0.0' },
+    @{ slug = 'resize'; version = '2.0.0' },
+    @{ slug = 'webp'; version = '2.0.0' }
+)
+foreach ($release in $requiredProcessorReleases) {
+    Invoke-RestMethod -Method Put `
+        -Uri "$ApiBaseUrl/projects/$($signup.selectedProjectId)/processor-releases/$($release.slug)/versions/$($release.version)" `
+        -Headers $humanHeaders | Out-Null
+}
+
 $keyBody = @{ name = 'local-demo' } | ConvertTo-Json
 $createdKey = Invoke-RestMethod -Method Post -Uri "$ApiBaseUrl/projects/$($signup.selectedProjectId)/api-keys" `
     -Headers $humanHeaders -ContentType 'application/json' -Body $keyBody

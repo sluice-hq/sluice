@@ -6,6 +6,7 @@ import com.sluice.api.pipeline.ProcessorManifestResources;
 import com.sluice.api.pipeline.ProcessorMetadata;
 import com.sluice.api.pipeline.ProcessorRegistry;
 import com.sluice.api.pipeline.validation.ProcessorConfigurationValidator;
+import com.sluice.api.pipeline.catalog.service.ProcessorEnablementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import java.util.UUID;
 
 class PipelineValidatorTest {
     private final ObjectMapper mapper = new ObjectMapper();
@@ -78,6 +81,21 @@ class PipelineValidatorTest {
         assertFalse(report.valid());
         assertTrue(report.errors().stream().anyMatch(error -> error.path().startsWith("/steps/0/config")));
         assertTrue(report.errors().stream().anyMatch(error -> error.code().equals("processor_input_incompatible")));
+    }
+
+    @Test
+    void projectScopedValidationRejectsAReleaseThatIsNotEnabled() throws Exception {
+        register("resize", "resize-1.0.0.json");
+        ProcessorEnablementService enablements = mock(ProcessorEnablementService.class);
+        when(enablements.validateDefinition(any(UUID.class), any())).thenReturn(List.of(
+                new PipelineValidationError("/steps/0/version", "processor_release_not_enabled", "Enable it first.")));
+        PipelineValidator projectValidator = new PipelineValidator(registry, new ProcessorConfigurationValidator(), enablements);
+
+        var report = projectValidator.validateDefinition("product-images", mapper.readTree(definition(
+                "{\"id\":\"resize\",\"processor\":\"resize\",\"version\":\"1.0.0\",\"config\":{}}")), UUID.randomUUID());
+
+        assertFalse(report.valid());
+        assertTrue(report.errors().stream().anyMatch(error -> error.code().equals("processor_release_not_enabled")));
     }
 
     private void register(String slug, String resource) {

@@ -93,6 +93,13 @@ class LocalGoldenPathExternalIntegrationTests {
                 """.formatted(suffix), 201));
         String token = signup.path("token").asText();
         String projectId = signup.path("selectedProjectId").asText();
+        Map<String, String> manager = Map.of(
+                "Authorization", "Bearer " + token,
+                "X-Project-ID", projectId);
+
+        enableProcessorRelease(projectId, "governance.content-safety", "1.0.0", manager);
+        enableProcessorRelease(projectId, "resize", "2.0.0", manager);
+        enableProcessorRelease(projectId, "webp", "2.0.0", manager);
 
         JsonNode key = json(send("POST", api("/projects/" + projectId + "/api-keys"), Map.of(
                 "Authorization", "Bearer " + token,
@@ -180,6 +187,12 @@ class LocalGoldenPathExternalIntegrationTests {
 
     private String api(String path) { return "http://localhost:" + port + "/api/v1" + path; }
     private JsonNode json(String body) throws Exception { return objectMapper.readTree(body); }
+
+    private void enableProcessorRelease(String projectId, String slug, String version,
+                                        Map<String, String> managerHeaders) throws Exception {
+        send("PUT", api("/projects/" + projectId + "/processor-releases/" + slug + "/versions/" + version),
+                managerHeaders, null, 200);
+    }
 
     private String send(String method, String url, Map<String, String> headers, String body, int expected) throws Exception {
         HttpRequest.Builder request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(30));

@@ -1,6 +1,7 @@
 package com.sluice.api.pipeline;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.sluice.api.pipeline.catalog.repository.ProcessorVersionRepository;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -10,9 +11,16 @@ import java.util.List;
 public class PipelineResolver {
     
     private final ProcessorRegistry processorRegistry;
+    private final ProcessorVersionRepository processorVersions;
 
     public PipelineResolver(ProcessorRegistry processorRegistry) {
+        this(processorRegistry, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public PipelineResolver(ProcessorRegistry processorRegistry, ProcessorVersionRepository processorVersions) {
         this.processorRegistry = processorRegistry;
+        this.processorVersions = processorVersions;
     }
 
     public Pipeline resolve(JsonNode definition) {
@@ -27,6 +35,17 @@ public class PipelineResolver {
                 Processor processor = stepNode.hasNonNull("version")
                         ? processorRegistry.get(processorName, stepNode.get("version").asText())
                         : processorRegistry.get(processorName);
+                boolean globallyDisabled = "DISABLED".equals(processor.getManifest().status());
+                if (!globallyDisabled && processorVersions != null) {
+                    globallyDisabled = processorVersions.findByDefinitionSlugAndSemanticVersion(
+                                    processorName, stepNode.path("version").asText())
+                            .map(version -> "DISABLED".equals(version.getLifecycleStatus()))
+                            .orElse(false);
+                }
+                if (globallyDisabled) {
+                    throw new IllegalStateException("Processor release is globally disabled: "
+                            + processor.getManifest().key());
+                }
                 steps.add(new ConfiguredStep(stepId, processor, config));
             }
         }
