@@ -144,11 +144,27 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   const authenticatedCookies = await context.cookies();
   const csrfToken = authenticatedCookies.find((cookie) => cookie.name === 'sluice_csrf')?.value;
   expect(csrfToken).toBeTruthy();
+
+  const catalogFailurePage = await context.newPage();
+  await catalogFailurePage.route('**/api/backend/projects/*/processor-releases', async (route) => {
+    await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'Catalog unavailable' }) });
+  });
+  await catalogFailurePage.goto('/pipelines');
+  await expect(catalogFailurePage.getByRole('alert').filter({ hasText: 'Enabled processor releases could not be loaded.' })).toBeVisible();
+  await expect(catalogFailurePage.getByRole('heading', { name: 'Enable a processor to start building' })).toHaveCount(0);
+  await catalogFailurePage.goto('/processors');
+  await expect(catalogFailurePage.getByRole('alert').filter({ hasText: 'catalog could not be loaded' })).toBeVisible();
+  await expect(catalogFailurePage.getByText('No processor releases are published yet.')).toHaveCount(0);
+  await catalogFailurePage.close();
+
+  await page.getByRole('link', { name: 'Pipelines' }).click();
+  await expect(page.getByRole('heading', { name: 'Enable a processor to start building' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Browse Processor Market' })).toBeVisible();
+
   const requiredProcessorReleases = [
     ['mime-validation', '1.0.0'],
     ['governance.content-safety', '1.0.0'],
     ['resize', '2.0.0'],
-    ['webp', '2.0.0'],
   ];
   for (const [slug, version] of requiredProcessorReleases) {
     const enabled = await page.request.put(
@@ -158,14 +174,26 @@ test('developer completes the local dashboard golden path', async ({ page, conte
     expect(enabled.status()).toBe(200);
   }
 
-  await page.getByRole('link', { name: 'Processor Market' }).click();
+  await page.getByRole('link', { name: 'Processor Market', exact: true }).click();
   await expect(page.getByRole('heading', { name: /Composable media capabilities/i })).toBeVisible();
   await expect(page.getByRole('article')).toHaveCount(7);
-  const processorMarket = page.getByRole('main');
-  await expect(processorMarket.getByText('Transform', { exact: true })).toBeVisible();
-  await expect(processorMarket.getByText('Optimize', { exact: true })).toBeVisible();
-  await expect(processorMarket.getByText('Privacy', { exact: true })).toBeVisible();
-  await expect(processorMarket.getByText('Governance', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Transform', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Optimize', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Privacy', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Governance', exact: true })).toBeVisible();
+
+  await page.getByLabel('Search processors').fill('quality');
+  await expect(page).toHaveURL(/q=quality/);
+  await expect(page.getByRole('article')).toHaveCount(1);
+  await expect(page.getByRole('article')).toContainText('WebP Encoder');
+  await page.getByLabel('Produced output').selectOption('image/webp');
+  await expect(page).toHaveURL(/output=image%2Fwebp/);
+  await page.reload();
+  await expect(page.getByLabel('Search processors')).toHaveValue('quality');
+  await expect(page.getByLabel('Produced output')).toHaveValue('image/webp');
+  await expect(page.getByRole('article')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Reset filters' }).click();
+  await expect(page.getByRole('article')).toHaveCount(7);
 
   const resizeCard = page.getByRole('article').filter({ hasText: 'Image Resize' });
   await expect(resizeCard).toContainText('Recommended · v2.0.0');
@@ -177,7 +205,30 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await resizeCard.getByText('Version history (1)').click();
   await expect(resizeCard.getByText('v1.0.0', { exact: true })).toBeVisible();
 
-  await page.getByRole('link', { name: 'Pipelines' }).click();
+  const checksumCard = page.getByRole('article').filter({ hasText: 'SHA-256 Checksum' });
+  await checksumCard.getByRole('button', { name: 'Enable for project' }).click();
+  await expect(checksumCard.getByRole('link', { name: 'Use in pipeline' })).toBeVisible();
+  await checksumCard.getByRole('button', { name: 'Disable' }).click();
+  await expect(checksumCard.getByRole('alertdialog')).toContainText('Published pipelines remain unchanged.');
+  await checksumCard.getByRole('button', { name: 'Confirm disable' }).click();
+  await expect(checksumCard.getByRole('button', { name: 'Enable for project' })).toBeVisible();
+
+  const webpCard = page.getByRole('article').filter({ hasText: 'WebP Encoder' });
+  await webpCard.getByRole('button', { name: 'Enable for project' }).first().click();
+  await expect(webpCard.getByRole('link', { name: 'Use in pipeline' }).first()).toBeVisible();
+  await webpCard.getByRole('link', { name: 'Use in pipeline' }).first().click();
+  await expect(page).toHaveURL(/\/pipelines\?processor=webp&version=2\.0\.0/);
+  await expect(page.getByRole('status')).toContainText('WebP Encoder v2.0.0 added from the Processor Market.');
+  const processorPicker = page.getByRole('button', { name: 'Select exact processor release' });
+  await processorPicker.click();
+  const enabledReleaseOptions = page.getByRole('listbox', { name: 'Enabled processor releases' }).getByRole('option');
+  await expect(enabledReleaseOptions).toHaveCount(4);
+  await expect(enabledReleaseOptions.first()).toContainText('WebP Encoder · v2.0.0');
+  await expect(page.getByRole('listbox', { name: 'Enabled processor releases' })).not.toContainText('SHA-256 Checksum');
+  const processorSearch = page.getByRole('combobox', { name: 'Search enabled processor releases' });
+  await processorSearch.press('ArrowDown');
+  await processorSearch.press('Enter');
+  await expect(processorPicker).toContainText('Content Safety · v1.0.0');
   await page.getByLabel('Name').fill(pipelineName);
   await page.getByRole('button', { name: 'WebP delivery' }).click();
   await page.getByLabel('Input MIME types').fill('video/mp4');
