@@ -68,6 +68,13 @@ class OpenApiContractTests {
                 .path("requestBody").path("content").path("application/json").has("schema"));
         assertTrue(createRun.path("responses").has("202"));
         assertTrue(createRun.path("parameters").toString().contains("projectIdHeader"));
+        JsonNode listRunParameters = document.path("paths").path("/api/v1/runs").path("get")
+                .path("parameters");
+        assertTrue(listRunParameters.toString().contains("governanceOnly"));
+        assertTrue(listRunParameters.toString().contains("decision"));
+        assertTrue(listRunParameters.toString().contains("pipeline"));
+        assertTrue(listRunParameters.toString().contains("from"));
+        assertTrue(listRunParameters.toString().contains("to"));
         JsonNode callbackSchema = schemas.path("CreateRunRequest").path("properties").path("callback");
         String callbackReference = callbackSchema.path("$ref").asText();
         assertTrue(callbackReference.startsWith("#/components/schemas/"));

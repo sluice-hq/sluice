@@ -45,12 +45,19 @@ public class RunController {
     }
 
     @GetMapping
-    public Page<RunResponse> list(@AuthenticationPrincipal ProjectContext context, Pageable pageable,
+    public Page<RunResponse> list(@AuthenticationPrincipal ProjectContext context,
+                                  @org.springframework.data.web.PageableDefault(
+                                          size = 20, sort = {"createdAt", "id"},
+                                          direction = org.springframework.data.domain.Sort.Direction.DESC)
+                                  Pageable pageable,
                                   @org.springframework.web.bind.annotation.RequestParam(required = false) String status,
                                   @org.springframework.web.bind.annotation.RequestParam(required = false) String pipeline,
                                   @org.springframework.web.bind.annotation.RequestParam(name = "from", required = false) String from,
                                   @org.springframework.web.bind.annotation.RequestParam(name = "to", required = false) String to,
-                                  @org.springframework.web.bind.annotation.RequestParam(required = false) String decision) {
+                                  @org.springframework.web.bind.annotation.RequestParam(required = false) String decision,
+                                  @io.swagger.v3.oas.annotations.Parameter(
+                                          description = "Return only runs with a persisted governance decision")
+                                  @org.springframework.web.bind.annotation.RequestParam(defaultValue = "false") boolean governanceOnly) {
         try {
             var parsedStatus = status == null || status.isBlank() ? null : com.sluice.api.job.domain.JobStatus.valueOf(status.trim().toUpperCase());
             var parsedDecision = decision == null || decision.isBlank() ? null : com.sluice.api.governance.GovernanceDecisionValue.valueOf(decision.trim().toUpperCase());
@@ -60,7 +67,8 @@ public class RunController {
                 throw new IllegalArgumentException("from must be before to");
             }
             return runs.list(context, pageable, new RunService.RunFilters(parsedStatus,
-                    pipeline == null || pipeline.isBlank() ? null : pipeline.trim(), parsedFrom, parsedTo, parsedDecision));
+                    pipeline == null || pipeline.isBlank() ? null : pipeline.trim(), parsedFrom, parsedTo,
+                    parsedDecision, governanceOnly));
         } catch (IllegalArgumentException | java.time.DateTimeException ex) {
             throw new IllegalArgumentException("Invalid run filter");
         }

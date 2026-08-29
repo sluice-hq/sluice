@@ -24,8 +24,10 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
               and (:filterFrom = false or j.createdAt >= :fromTime)
               and (:filterTo = false or j.createdAt < :toTime)
               and (:filterPipeline = false or exists (select pv.id from PipelineVersion pv where pv.id = j.pipelineVersionId and pv.pipeline.slug = :pipeline))
+              and (:governanceOnly = false or exists (select governance.id from GovernanceDecision governance where governance.jobId = j.id))
               and (:filterDecision = false or exists (select gd.id from GovernanceDecision gd where gd.jobId = j.id and gd.decision = :decision
-                   and not exists (select newer.id from GovernanceDecision newer where newer.jobId = gd.jobId and newer.createdAt > gd.createdAt)))
+                   and not exists (select newer.id from GovernanceDecision newer where newer.jobId = gd.jobId
+                        and newer.stepRun.stepIndex > gd.stepRun.stepIndex)))
             """)
     org.springframework.data.domain.Page<Job> searchRuns(
             @org.springframework.data.repository.query.Param("projectId") UUID projectId,
@@ -37,6 +39,7 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
             @org.springframework.data.repository.query.Param("fromTime") java.time.Instant fromTime,
             @org.springframework.data.repository.query.Param("filterTo") boolean filterTo,
             @org.springframework.data.repository.query.Param("toTime") java.time.Instant toTime,
+            @org.springframework.data.repository.query.Param("governanceOnly") boolean governanceOnly,
             @org.springframework.data.repository.query.Param("filterDecision") boolean filterDecision,
             @org.springframework.data.repository.query.Param("decision") com.sluice.api.governance.GovernanceDecisionValue decision,
             org.springframework.data.domain.Pageable pageable);
