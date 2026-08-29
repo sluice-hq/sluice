@@ -66,7 +66,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   async function selectProject(projectId: string) {
     if (sessionAction) return;
     setSessionAction('project'); setSessionError('');
-    try { const response = await csrfFetch('/api/session/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }) });
+    try {
+      const response = await csrfFetch('/api/session/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }) });
       if (!response.ok) throw new Error('Could not switch project. Your current session is still active.');
       const sessionResponse = await fetch('/api/session');
       if (!sessionResponse.ok) throw new Error('Project switched, but fresh project data could not be loaded. Refresh to continue.');
@@ -79,7 +80,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   async function logout() {
     if (sessionAction) return;
     setSessionAction('logout'); setSessionError('');
-    try { const response = await csrfFetch('/api/session/logout', { method: 'POST' });
+    try {
+      const response = await csrfFetch('/api/session/logout', { method: 'POST' });
       if (!response.ok) throw new Error('Could not sign out. Please try again.');
       queryClient.removeQueries({ queryKey: ['session'] });
       router.replace('/login'); router.refresh();
@@ -166,9 +168,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
 function Brand() {
   return (
-    <Link href="/app" className="flex h-20 items-center gap-3 border-b border-sidebar-border px-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring">
+    <Link href="/app" className="relative flex h-20 items-center gap-1 border-b border-sidebar-border pl-11 pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring">
       <Image src="/logo-4.png" alt="" width={42} height={42} className="size-10 object-contain" priority />
-      <span className="text-lg font-semibold tracking-tight text-foreground">Sluice</span>
+      <span className="text-[30px] font-semibold tracking-tight text-foreground">Sluice</span>
     </Link>
   );
 }
