@@ -41,6 +41,9 @@ class OutputReconciliationPersistenceTests {
         projects.save(new Project(projectId, "Output boundary", Instant.now()));
         Asset input = assets.save(new Asset(UUID.randomUUID(), "input.png", 5, "image/png", "input",
                 Asset.UploadStatus.COMPLETED, Instant.now(), projectId));
+        input.setExternalSubjectId("user_123");
+        input.setExternalReference("avatar_1");
+        input = assets.save(input);
         Job job = jobs.save(new Job(UUID.randomUUID(), input.getId(), JobStatus.RUNNING,
                 Instant.now(), Instant.now(), projectId));
         when(storage.uploadFileAt(anyString(), anyString(), any(), anyLong())).thenReturn("stable-output");
@@ -58,6 +61,8 @@ class OutputReconciliationPersistenceTests {
             assertEquals(first.getId(), second.getId());
             assertEquals("stable-output", outputs.get(0).getStorageUrl());
             assertEquals(secondFile.length(), outputs.get(0).getSize());
+            assertEquals("user_123", outputs.get(0).getExternalSubjectId());
+            assertEquals("avatar_1", outputs.get(0).getExternalReference());
         } finally {
             java.nio.file.Files.deleteIfExists(firstFile.toPath());
             java.nio.file.Files.deleteIfExists(secondFile.toPath());

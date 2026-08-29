@@ -48,6 +48,16 @@ class OpenApiContractTests {
         assertTrue(document.path("security").toString().contains("bearerAuth"));
         assertTrue(document.path("security").toString().contains("apiKeyAuth"));
 
+        JsonNode uploadRequestProperties = schemas.path("UploadUrlRequest").path("properties");
+        assertTrue(uploadRequestProperties.has("externalSubjectId"));
+        assertTrue(uploadRequestProperties.has("externalReference"));
+        assertTrue(uploadRequestProperties.path("externalSubjectId").path("description")
+                .asText().contains("Not authorization"));
+        JsonNode assetListParameters = document.path("paths").path("/api/v1/assets").path("get")
+                .path("parameters");
+        assertTrue(assetListParameters.toString().contains("externalSubjectId"));
+        assertTrue(assetListParameters.toString().contains("externalReference"));
+
         JsonNode createRun = document.path("paths").path("/api/v1/runs").path("post");
         assertTrue(createRun
                 .path("requestBody").path("content").path("application/json").has("schema"));

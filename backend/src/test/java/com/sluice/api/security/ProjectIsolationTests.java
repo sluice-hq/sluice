@@ -26,6 +26,7 @@ import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @SluiceIntegrationTest
 public class ProjectIsolationTests {
@@ -84,7 +85,7 @@ public class ProjectIsolationTests {
         projectMemberRepository.save(new ProjectMember(user2.getId(), projectB.getId(), "OWNER", Instant.now()));
 
         // Create Asset in Project A
-        assetA = assetRepository.save(new Asset(
+        assetA = new Asset(
                 UUID.randomUUID(),
                 "test.png",
                 100L,
@@ -92,7 +93,10 @@ public class ProjectIsolationTests {
                 "http://test.com/test.png",
                 Asset.UploadStatus.COMPLETED,
                 Instant.now(),
-                projectA.getId()));
+                projectA.getId());
+        assetA.setExternalSubjectId("user_123");
+        assetA.setExternalReference("avatar_1");
+        assetA = assetRepository.save(assetA);
     }
 
     @Test
@@ -145,6 +149,42 @@ public class ProjectIsolationTests {
         mockMvc.perform(get("/api/v1/assets/" + assetA.getId())
                 .header("X-API-Key", rawKey))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    public void externalReferenceFiltersRemainProjectScoped() throws Exception {
+        String user1Token = jwtService.generateToken(user1.getId());
+        String user2Token = jwtService.generateToken(user2.getId());
+
+        mockMvc.perform(get("/api/v1/assets")
+                        .param("externalSubjectId", "user_123")
+                        .param("externalReference", "avatar_1")
+                        .header("Authorization", "Bearer " + user1Token)
+                        .header("X-Project-ID", projectA.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(assetA.getId().toString()))
+                .andExpect(jsonPath("$.content[0].externalSubjectId").value("user_123"))
+                .andExpect(jsonPath("$.content[0].externalReference").value("avatar_1"));
+
+        mockMvc.perform(get("/api/v1/assets")
+                        .param("externalSubjectId", "user_123")
+                        .param("externalReference", "avatar_1")
+                        .header("Authorization", "Bearer " + user2Token)
+                        .header("X-Project-ID", projectB.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    public void externalReferenceFiltersRejectUnsafeValues() throws Exception {
+        String user1Token = jwtService.generateToken(user1.getId());
+
+        mockMvc.perform(get("/api/v1/assets")
+                        .param("externalSubjectId", "user@example.com")
+                        .header("Authorization", "Bearer " + user1Token)
+                        .header("X-Project-ID", projectA.getId().toString()))
+                .andExpect(status().isBadRequest());
     }
 
     private String hashKey(String key) throws Exception {

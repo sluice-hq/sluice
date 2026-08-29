@@ -36,7 +36,17 @@ public class AssetService {
     }
 
     public Page<Asset> getAssets(ProjectContext context, Pageable pageable) {
-        return assetRepository.findAllByProjectId(context.getProjectId(), pageable);
+        return getAssets(context, null, null, pageable);
+    }
+
+    public Page<Asset> getAssets(ProjectContext context, String externalSubjectId,
+                                 String externalReference, Pageable pageable) {
+        AssetReferencePolicy.validate(externalSubjectId, externalReference);
+        if (externalSubjectId == null && externalReference == null) {
+            return assetRepository.findAllByProjectId(context.getProjectId(), pageable);
+        }
+        return assetRepository.findAllByProjectIdAndExternalReferences(
+                context.getProjectId(), externalSubjectId, externalReference, pageable);
     }
 
     public Optional<Asset> getAsset(UUID assetId, ProjectContext context) {
@@ -93,20 +103,38 @@ public class AssetService {
     }
 
     public com.sluice.api.asset.dto.UploadUrlResponse requestUploadUrl(String filename, String contentType, long size, ProjectContext context) {
-        return requestUploadUrl(UUID.randomUUID(), filename, contentType, size, context);
+        return requestUploadUrl(UUID.randomUUID(), filename, contentType, size, null, null, context);
+    }
+
+    public com.sluice.api.asset.dto.UploadUrlResponse requestUploadUrl(
+            String filename, String contentType, long size, String externalSubjectId,
+            String externalReference, ProjectContext context) {
+        return requestUploadUrl(UUID.randomUUID(), filename, contentType, size,
+                externalSubjectId, externalReference, context);
     }
 
     @Transactional
     public com.sluice.api.asset.dto.UploadUrlResponse requestUploadUrl(UUID assetId, String filename,
                                                                        String contentType, long size,
                                                                        ProjectContext context) {
+        return requestUploadUrl(assetId, filename, contentType, size, null, null, context);
+    }
+
+    @Transactional
+    public com.sluice.api.asset.dto.UploadUrlResponse requestUploadUrl(UUID assetId, String filename,
+                                                                       String contentType, long size,
+                                                                       String externalSubjectId,
+                                                                       String externalReference,
+                                                                       ProjectContext context) {
+        AssetReferencePolicy.validate(externalSubjectId, externalReference);
         String blobName = uploadBlobName(assetId, filename);
         String uploadUrl = storageService.generateUploadUrl(blobName, contentType);
         int queryStart = uploadUrl.indexOf("?");
         if (queryStart < 1) throw new IllegalStateException("Storage did not return a scoped upload URL");
 
         Asset asset = new Asset(assetId, filename, size, contentType, uploadUrl.substring(0, queryStart),
-                Asset.UploadStatus.PENDING, Instant.now(), context.getProjectId());
+                Asset.UploadStatus.PENDING, Instant.now(), context.getProjectId(),
+                externalSubjectId, externalReference);
         assetRepository.save(asset);
         return new com.sluice.api.asset.dto.UploadUrlResponse(asset.getId(), uploadUrl, blobName);
     }

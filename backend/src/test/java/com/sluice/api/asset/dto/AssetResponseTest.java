@@ -25,12 +25,16 @@ class AssetResponseTest {
         UUID producingJobId = UUID.randomUUID();
         derived.setParentAsset(parent);
         derived.setProducingJobId(producingJobId);
+        derived.setExternalSubjectId("user_123");
+        derived.setExternalReference("avatar_1");
 
         JsonNode json = objectMapper.readTree(objectMapper.writeValueAsString(AssetResponse.from(derived)));
 
         assertFalse(json.has("storageUrl"));
         assertEquals(parent.getId().toString(), json.path("parentAssetId").asText());
         assertEquals(producingJobId.toString(), json.path("producingJobId").asText());
+        assertEquals("user_123", json.path("externalSubjectId").asText());
+        assertEquals("avatar_1", json.path("externalReference").asText());
         assertTrue(json.path("filename").asText().contains("source.webp"));
     }
 
