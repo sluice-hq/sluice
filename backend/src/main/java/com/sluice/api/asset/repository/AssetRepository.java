@@ -21,12 +21,29 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
     @Query("""
             SELECT asset FROM Asset asset
             WHERE asset.projectId = :projectId
-              AND (:externalSubjectId IS NULL OR asset.externalSubjectId = :externalSubjectId)
-              AND (:externalReference IS NULL OR asset.externalReference = :externalReference)
+              AND (:filterFilename = false OR LOCATE(:filename, LOWER(asset.filename)) > 0)
+              AND (:filterStatus = false OR asset.uploadStatus = :status)
+              AND (:filterMediaType = false OR LOCATE(CONCAT(:mediaType, '/'), LOWER(asset.contentType)) = 1)
+              AND (:filterCreatedFrom = false OR asset.createdAt >= :createdFrom)
+              AND (:filterCreatedBefore = false OR asset.createdAt < :createdBefore)
+              AND (:filterExternalSubject = false OR asset.externalSubjectId = :externalSubjectId)
+              AND (:filterExternalReference = false OR asset.externalReference = :externalReference)
             """)
-    Page<Asset> findAllByProjectIdAndExternalReferences(
+    Page<Asset> searchAssets(
             @Param("projectId") UUID projectId,
+            @Param("filterFilename") boolean filterFilename,
+            @Param("filename") String filename,
+            @Param("filterStatus") boolean filterStatus,
+            @Param("status") Asset.UploadStatus status,
+            @Param("filterMediaType") boolean filterMediaType,
+            @Param("mediaType") String mediaType,
+            @Param("filterCreatedFrom") boolean filterCreatedFrom,
+            @Param("createdFrom") Instant createdFrom,
+            @Param("filterCreatedBefore") boolean filterCreatedBefore,
+            @Param("createdBefore") Instant createdBefore,
+            @Param("filterExternalSubject") boolean filterExternalSubject,
             @Param("externalSubjectId") String externalSubjectId,
+            @Param("filterExternalReference") boolean filterExternalReference,
             @Param("externalReference") String externalReference,
             Pageable pageable);
     long countByProjectId(UUID projectId);

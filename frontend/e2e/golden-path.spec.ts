@@ -361,6 +361,66 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(page.getByRole('link', { name: `Download ${run.outputs[0].filename}` })).toHaveAttribute('href', `/api/downloads/assets/${run.outputs[0].id}`);
   await page.goBack();
 
+  const referencedFilename = `customer-avatar-${suffix}.png`;
+  const externalSubjectId = `user_${suffix}`;
+  const externalReference = `avatar_${suffix}`;
+  const referencedUploadResponse = await page.request.post(`${session.apiBaseUrl}/uploads`, {
+    headers: { 'X-API-Key': revealed, 'Idempotency-Key': `asset-search-${suffix}` },
+    data: { filename: referencedFilename, contentType: 'image/png', size: image.length, externalSubjectId, externalReference },
+  });
+  expect(referencedUploadResponse.status()).toBe(201);
+  const referencedUpload = await referencedUploadResponse.json();
+  expect((await page.request.put(referencedUpload.uploadUrl, {
+    headers: { 'x-ms-blob-type': 'BlockBlob', 'Content-Type': 'image/png' }, data: image,
+  })).status()).toBe(201);
+  expect((await page.request.post(`${session.apiBaseUrl}/uploads/${referencedUpload.assetId}/complete`, {
+    headers: { 'X-API-Key': revealed, 'Idempotency-Key': `asset-complete-${suffix}` },
+  })).status()).toBe(200);
+
+  const today = dateTimeLocal(new Date()).slice(0, 10);
+  await page.goto('/assets');
+  await page.getByLabel('Filename').fill(`avatar-${suffix}`);
+  await page.getByLabel('Status').selectOption('COMPLETED');
+  await page.getByLabel('Media family').selectOption('image');
+  await page.getByLabel('External subject ID').fill(externalSubjectId);
+  await page.getByLabel('External reference').fill(externalReference);
+  await page.getByLabel('Created from').fill(today);
+  await page.getByLabel('Created through').fill(today);
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page).toHaveURL(new RegExp(`/assets\\?.*q=avatar-${suffix}.*status=COMPLETED.*type=image`));
+  await expect(page.getByRole('link', { name: referencedFilename })).toBeVisible();
+  await expect(page.getByLabel(`Remove Subject: ${externalSubjectId}`)).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('link', { name: referencedFilename })).toBeVisible();
+  await page.getByLabel(`Remove Filename: avatar-${suffix}`).click();
+  await expect(page).not.toHaveURL(/(?:\?|&)q=/);
+  await expect(page.getByRole('link', { name: referencedFilename })).toBeVisible();
+  await page.getByLabel('Filename').fill(`missing-${suffix}`);
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page.getByText('No assets match these filters')).toBeVisible();
+  await page.getByRole('button', { name: 'Reset filters' }).click();
+  await expect(page).toHaveURL(/\/assets$/);
+
+  const pagedAsset = {
+    id: referencedUpload.assetId, filename: referencedFilename, size: image.length,
+    contentType: 'image/png', uploadStatus: 'COMPLETED', createdAt: new Date().toISOString(),
+    parentAssetId: null, producingJobId: null, externalSubjectId, externalReference,
+  };
+  await page.route('**/api/backend/assets?*', async (route) => {
+    const requested = new URL(route.request().url());
+    const number = Number(requested.searchParams.get('page') ?? '0');
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      content: [pagedAsset], number, size: 20, numberOfElements: 1, totalElements: 21,
+      totalPages: 2, first: number === 0, last: number === 1, empty: false,
+    }) });
+  });
+  await page.goto('/assets?q=paged&status=COMPLETED');
+  const nextAssetsPage = page.getByRole('button', { name: 'Next', exact: true });
+  await expect(nextAssetsPage).toBeEnabled();
+  await nextAssetsPage.click();
+  await expect(page).toHaveURL(/\/assets\?q=paged&status=COMPLETED&page=1$/);
+  await page.unroute('**/api/backend/assets?*');
+
   await expect.poll(async () => {
     const response = await page.request.get('/api/backend/dashboard');
     return (await response.json()).completedJobs;
