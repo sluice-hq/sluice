@@ -23,15 +23,17 @@ class UploadControllerTest {
         AssetService assets = mock(AssetService.class);
         UploadService uploads = mock(UploadService.class);
         UUID assetId = UUID.randomUUID();
-        when(uploads.create("input.png", "image/png", 12, "request-1", context))
+        when(uploads.create("input.png", "image/png", 12, "user_123", "avatar_1", "request-1", context))
                 .thenReturn(new UploadUrlResponse(assetId, "upload-url?sig=value", assetId + ".png"));
 
         var response = new UploadController(assets, uploads)
-                .create(new UploadUrlRequest("input.png", "image/png", 12), "request-1", context);
+                .create(new UploadUrlRequest("input.png", "image/png", 12, "user_123", "avatar_1"),
+                        "request-1", context);
 
         assertEquals(201, response.getStatusCode().value());
         assertEquals(assetId, response.getBody().getAssetId());
-        verify(uploads).create("input.png", "image/png", 12, "request-1", context);
+        verify(uploads).create("input.png", "image/png", 12,
+                "user_123", "avatar_1", "request-1", context);
     }
 
     @Test

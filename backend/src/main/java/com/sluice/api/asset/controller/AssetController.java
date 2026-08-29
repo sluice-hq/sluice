@@ -41,8 +41,16 @@ public class AssetController {
     @GetMapping
     public ResponseEntity<Page<AssetResponse>> getAssets(
             @AuthenticationPrincipal ProjectContext context,
+            @io.swagger.v3.oas.annotations.Parameter(
+                    description = "Exact caller-owned subject correlation ID; project-scoped and never authorization")
+            @RequestParam(required = false) String externalSubjectId,
+            @io.swagger.v3.oas.annotations.Parameter(
+                    description = "Exact caller-owned media/group reference; project-scoped and never authorization")
+            @RequestParam(required = false) String externalReference,
             Pageable pageable) {
-        Page<AssetResponse> assets = assetService.getAssets(context, pageable).map(AssetResponse::from);
+        Page<AssetResponse> assets = assetService
+                .getAssets(context, externalSubjectId, externalReference, pageable)
+                .map(AssetResponse::from);
         return ResponseEntity.ok(assets);
     }
 
@@ -80,7 +88,8 @@ public class AssetController {
         safety.validate(request.getFilename(), request.getContentType(), request.getSize());
 
         com.sluice.api.asset.dto.UploadUrlResponse response = assetService.requestUploadUrl(
-                request.getFilename(), request.getContentType(), request.getSize(), context);
+                request.getFilename(), request.getContentType(), request.getSize(),
+                request.getExternalSubjectId(), request.getExternalReference(), context);
         return ResponseEntity.ok(response);
     }
 

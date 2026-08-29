@@ -5,6 +5,7 @@ import com.sluice.api.asset.dto.UploadUrlRequest;
 import com.sluice.api.asset.dto.UploadUrlResponse;
 import com.sluice.api.asset.service.AssetService;
 import com.sluice.api.asset.service.UploadService;
+import com.sluice.api.asset.service.AssetReferencePolicy;
 import com.sluice.api.auth.domain.ProjectContext;
 import com.sluice.api.config.MediaSafetyPolicy;
 import org.springframework.http.HttpStatus;
@@ -45,7 +46,8 @@ public class UploadController {
                                                     @AuthenticationPrincipal ProjectContext context) {
         validate(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(uploads.create(request.getFilename(), request.getContentType(), request.getSize(), key, context));
+                .body(uploads.create(request.getFilename(), request.getContentType(), request.getSize(),
+                        request.getExternalSubjectId(), request.getExternalReference(), key, context));
     }
 
     @PostMapping("/{assetId}/complete")
@@ -59,5 +61,6 @@ public class UploadController {
     private void validate(UploadUrlRequest request) {
         if (request == null) throw new IllegalArgumentException("Upload request is required");
         safety.validate(request.getFilename(), request.getContentType(), request.getSize());
+        AssetReferencePolicy.validate(request.getExternalSubjectId(), request.getExternalReference());
     }
 }

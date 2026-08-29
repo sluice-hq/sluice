@@ -21,6 +21,8 @@ export interface Asset {
   createdAt: string;
   parentAssetId: string | null;
   producingJobId: string | null;
+  externalSubjectId: string | null;
+  externalReference: string | null;
 }
 
 export interface Job {
@@ -51,6 +53,8 @@ export interface UploadUrlRequest {
   filename: string;
   contentType: string;
   size: number;
+  externalSubjectId?: string;
+  externalReference?: string;
 }
 
 export interface UploadUrlResponse {

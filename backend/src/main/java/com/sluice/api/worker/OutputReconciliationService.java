@@ -39,7 +39,7 @@ public class OutputReconciliationService {
                 ("sluice-run-output:" + job.getId()).getBytes(StandardCharsets.UTF_8));
         assets.upsertProducedOutput(outputAssetId, filename, output.getSize(), output.getContentType(),
                 storageUrl, Asset.UploadStatus.COMPLETED.name(), Instant.now(), job.getProjectId(),
-                job.getId(), input.getId());
+                job.getId(), input.getId(), input.getExternalSubjectId(), input.getExternalReference());
 
         return assets.findByProducingJobIdAndProjectId(job.getId(), job.getProjectId()).stream()
                 .findFirst()

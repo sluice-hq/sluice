@@ -200,6 +200,8 @@ public class JobWorker {
                                 job.getProjectId());
                         derived.setParentAsset(asset);
                         derived.setProducingJobId(job.getId());
+                        derived.setExternalSubjectId(asset.getExternalSubjectId());
+                        derived.setExternalReference(asset.getExternalReference());
                         assetRepository.save(derived);
                     }
                 }

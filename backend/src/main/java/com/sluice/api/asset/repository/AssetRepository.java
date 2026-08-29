@@ -18,6 +18,17 @@ import java.util.UUID;
 public interface AssetRepository extends JpaRepository<Asset, UUID> {
     Optional<Asset> findByIdAndProjectId(UUID id, UUID projectId);
     Page<Asset> findAllByProjectId(UUID projectId, Pageable pageable);
+    @Query("""
+            SELECT asset FROM Asset asset
+            WHERE asset.projectId = :projectId
+              AND (:externalSubjectId IS NULL OR asset.externalSubjectId = :externalSubjectId)
+              AND (:externalReference IS NULL OR asset.externalReference = :externalReference)
+            """)
+    Page<Asset> findAllByProjectIdAndExternalReferences(
+            @Param("projectId") UUID projectId,
+            @Param("externalSubjectId") String externalSubjectId,
+            @Param("externalReference") String externalReference,
+            Pageable pageable);
     long countByProjectId(UUID projectId);
     java.util.List<Asset> findByProducingJobIdAndProjectId(UUID producingJobId, UUID projectId);
 
@@ -25,10 +36,10 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
     @Query(value = """
             INSERT INTO assets (
                 id, filename, size, content_type, storage_url, upload_status, created_at,
-                project_id, producing_job_id, parent_asset_id
+                project_id, producing_job_id, parent_asset_id, external_subject_id, external_reference
             ) VALUES (
                 :id, :filename, :size, :contentType, :storageUrl, :uploadStatus, :createdAt,
-                :projectId, :producingJobId, :parentAssetId
+                :projectId, :producingJobId, :parentAssetId, :externalSubjectId, :externalReference
             )
             ON CONFLICT (producing_job_id) DO UPDATE SET
                 filename = EXCLUDED.filename,
@@ -36,7 +47,9 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
                 content_type = EXCLUDED.content_type,
                 storage_url = EXCLUDED.storage_url,
                 upload_status = EXCLUDED.upload_status,
-                parent_asset_id = EXCLUDED.parent_asset_id
+                parent_asset_id = EXCLUDED.parent_asset_id,
+                external_subject_id = EXCLUDED.external_subject_id,
+                external_reference = EXCLUDED.external_reference
             """, nativeQuery = true)
     int upsertProducedOutput(@Param("id") UUID id,
                              @Param("filename") String filename,
@@ -47,5 +60,7 @@ public interface AssetRepository extends JpaRepository<Asset, UUID> {
                              @Param("createdAt") Instant createdAt,
                              @Param("projectId") UUID projectId,
                              @Param("producingJobId") UUID producingJobId,
-                             @Param("parentAssetId") UUID parentAssetId);
+                             @Param("parentAssetId") UUID parentAssetId,
+                             @Param("externalSubjectId") String externalSubjectId,
+                             @Param("externalReference") String externalReference);
 }

@@ -22,6 +22,8 @@ public class Asset {
     private Instant createdAt;
     private UUID projectId;
     private UUID producingJobId;
+    private String externalSubjectId;
+    private String externalReference;
 
     @jakarta.persistence.ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
     @jakarta.persistence.JoinColumn(name = "parent_asset_id")
@@ -38,6 +40,12 @@ public class Asset {
     protected Asset() {}
 
     public Asset(UUID id, String filename, long size, String contentType, String storageUrl, UploadStatus uploadStatus, Instant createdAt, UUID projectId) {
+        this(id, filename, size, contentType, storageUrl, uploadStatus, createdAt, projectId, null, null);
+    }
+
+    public Asset(UUID id, String filename, long size, String contentType, String storageUrl,
+                 UploadStatus uploadStatus, Instant createdAt, UUID projectId,
+                 String externalSubjectId, String externalReference) {
         this.id = id;
         this.filename = filename;
         this.size = size;
@@ -46,6 +54,8 @@ public class Asset {
         this.uploadStatus = uploadStatus;
         this.createdAt = createdAt;
         this.projectId = projectId;
+        this.externalSubjectId = externalSubjectId;
+        this.externalReference = externalReference;
     }
 
     // Getters and Setters
@@ -76,6 +86,12 @@ public class Asset {
 
     public UUID getProducingJobId() { return producingJobId; }
     public void setProducingJobId(UUID producingJobId) { this.producingJobId = producingJobId; }
+
+    public String getExternalSubjectId() { return externalSubjectId; }
+    public void setExternalSubjectId(String externalSubjectId) { this.externalSubjectId = externalSubjectId; }
+
+    public String getExternalReference() { return externalReference; }
+    public void setExternalReference(String externalReference) { this.externalReference = externalReference; }
 
     public Asset getParentAsset() { return parentAsset; }
     public UUID getParentAssetId() { return parentAssetId; }

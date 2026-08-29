@@ -37,7 +37,7 @@ class OutputReconciliationServiceTest {
         assertSame(existing, result);
         verify(storage, never()).uploadFileAt(anyString(), anyString(), any(), anyLong());
         verify(assets, never()).upsertProducedOutput(any(), anyString(), anyLong(), anyString(), anyString(),
-                anyString(), any(), any(), any(), any());
+                anyString(), any(), any(), any(), any(), nullable(String.class), nullable(String.class));
         java.nio.file.Files.deleteIfExists(file.toPath());
     }
 
@@ -47,6 +47,8 @@ class OutputReconciliationServiceTest {
         Job job = new Job(UUID.randomUUID(), UUID.randomUUID(), JobStatus.RUNNING,
                 Instant.now(), Instant.now(), projectId);
         Asset input = asset(job.getAssetId(), projectId, "input");
+        input.setExternalSubjectId("user_123");
+        input.setExternalReference("avatar_1");
         Asset persisted = asset(UUID.randomUUID(), projectId, "blob-output");
         persisted.setProducingJobId(job.getId());
         persisted.setParentAsset(input);
@@ -57,7 +59,7 @@ class OutputReconciliationServiceTest {
         when(storage.uploadFileAt(anyString(), eq("image/webp"), any(), anyLong()))
                 .thenReturn("blob-output");
         when(assets.upsertProducedOutput(any(), anyString(), anyLong(), anyString(), anyString(), anyString(),
-                any(), any(), any(), any())).thenReturn(1);
+                any(), any(), any(), any(), nullable(String.class), nullable(String.class))).thenReturn(1);
         java.io.File file = java.nio.file.Files.createTempFile("reconcile-", ".webp").toFile();
         java.nio.file.Files.writeString(file.toPath(), "bytes");
 
@@ -72,7 +74,7 @@ class OutputReconciliationServiceTest {
                 eq(file.length()));
         verify(assets).upsertProducedOutput(any(), eq(job.getId() + "-output.webp"), eq(file.length()),
                 eq("image/webp"), eq("blob-output"), eq("COMPLETED"), any(), eq(projectId),
-                eq(job.getId()), eq(input.getId()));
+                eq(job.getId()), eq(input.getId()), eq("user_123"), eq("avatar_1"));
         java.nio.file.Files.deleteIfExists(file.toPath());
     }
 
@@ -90,7 +92,7 @@ class OutputReconciliationServiceTest {
                 .thenReturn(List.of(), List.of(winner));
         when(storage.uploadFileAt(anyString(), anyString(), any(), anyLong())).thenReturn("stable-output");
         when(assets.upsertProducedOutput(any(), anyString(), anyLong(), anyString(), anyString(), anyString(),
-                any(), any(), any(), any())).thenReturn(1);
+                any(), any(), any(), any(), nullable(String.class), nullable(String.class))).thenReturn(1);
         java.io.File file = java.nio.file.Files.createTempFile("reconcile-race-", ".webp").toFile();
         java.nio.file.Files.writeString(file.toPath(), "same output bytes");
 

@@ -114,12 +114,18 @@ class LocalGoldenPathExternalIntegrationTests {
         send("POST", api("/pipelines/external-webp/publish"), withJson(apiKey),
                 "{\"revision\":" + revision + "}", 200);
 
+        String externalSubjectId = "user_" + suffix;
+        String externalReference = "avatar_" + suffix;
         JsonNode upload = json(send("POST", api("/uploads"),
                 with(withJson(apiKey), "Idempotency-Key", "create-upload-" + suffix),
-                "{\"filename\":\"external.png\",\"contentType\":\"image/png\",\"size\":" + PNG.length + "}", 201));
+                "{\"filename\":\"external.png\",\"contentType\":\"image/png\",\"size\":" + PNG.length
+                        + ",\"externalSubjectId\":\"" + externalSubjectId
+                        + "\",\"externalReference\":\"" + externalReference + "\"}", 201));
         putBlob(upload.path("uploadUrl").asText(), PNG);
-        send("POST", api("/uploads/" + upload.path("assetId").asText() + "/complete"),
-                with(apiKey, "Idempotency-Key", "complete-" + suffix), null, 200);
+        JsonNode completedUpload = json(send("POST", api("/uploads/" + upload.path("assetId").asText() + "/complete"),
+                with(apiKey, "Idempotency-Key", "complete-" + suffix), null, 200));
+        assertEquals(externalSubjectId, completedUpload.path("externalSubjectId").asText());
+        assertEquals(externalReference, completedUpload.path("externalReference").asText());
 
         JsonNode run = json(send("POST", api("/runs"), with(withJson(apiKey), "Idempotency-Key", "run-" + suffix), """
                 {"pipeline":"external-webp","alias":"stable","inputAssetId":"%s"}
@@ -132,6 +138,14 @@ class LocalGoldenPathExternalIntegrationTests {
         assertEquals(1, completed.path("outputs").size());
         assertEquals("image/webp", completed.path("outputs").get(0).path("contentType").asText());
         assertTrue(completed.path("outputs").get(0).path("size").asLong() > 0);
+
+        JsonNode referencedAssets = json(send("GET", api("/assets?externalSubjectId=" + externalSubjectId
+                + "&externalReference=" + externalReference), apiKey, null, 200));
+        assertEquals(2, referencedAssets.path("totalElements").asInt());
+        for (JsonNode asset : referencedAssets.path("content")) {
+            assertEquals(externalSubjectId, asset.path("externalSubjectId").asText());
+            assertEquals(externalReference, asset.path("externalReference").asText());
+        }
 
         String outputId = completed.path("outputs").get(0).path("id").asText();
         JsonNode download = json(send("GET", api("/assets/" + outputId + "/download"), apiKey, null, 200));

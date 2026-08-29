@@ -25,9 +25,18 @@ public class UploadService {
 
     @Transactional
     public UploadUrlResponse create(String filename, String contentType, long size, String key, ProjectContext context) {
+        return create(filename, contentType, size, null, null, key, context);
+    }
+
+    @Transactional
+    public UploadUrlResponse create(String filename, String contentType, long size,
+                                    String externalSubjectId, String externalReference,
+                                    String key, ProjectContext context) {
         if (key == null || key.isBlank()) throw new IllegalArgumentException("Idempotency-Key is required");
-        String fingerprint = idempotency.hash(String.join("|", "upload-create", filename, contentType,
-                Long.toString(size)));
+        AssetReferencePolicy.validate(externalSubjectId, externalReference);
+        String fingerprint = idempotency.hash(String.join("|", "upload-create", fingerprintPart(filename),
+                fingerprintPart(contentType), Long.toString(size), fingerprintPart(externalSubjectId),
+                fingerprintPart(externalReference)));
         UUID requestedAssetId = UUID.randomUUID();
         IdempotencyRecord claim = idempotency.claim(context.getProjectId(), IdempotencyService.UPLOAD_CREATE,
                 key, fingerprint, requestedAssetId);
@@ -36,7 +45,8 @@ public class UploadService {
                     .orElseThrow(() -> new IllegalStateException("Idempotent upload resource no longer exists"));
             return assets.refreshUploadUrl(existing);
         }
-        return assets.requestUploadUrl(requestedAssetId, filename, contentType, size, context);
+        return assets.requestUploadUrl(requestedAssetId, filename, contentType, size,
+                externalSubjectId, externalReference, context);
     }
 
     @Transactional
@@ -50,5 +60,9 @@ public class UploadService {
             if (asset.getUploadStatus() == Asset.UploadStatus.COMPLETED) return asset;
         }
         return assets.completeUpload(assetId, context);
+    }
+
+    private String fingerprintPart(String value) {
+        return value == null ? "-1:" : value.length() + ":" + value;
     }
 }
