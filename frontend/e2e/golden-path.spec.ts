@@ -247,6 +247,19 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   expect(guidedDefinition.steps[1].config.quality).toBe(82);
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByRole('status')).toContainText('Draft saved.');
+  const pipelineSearch = page.getByLabel('Search pipelines');
+  const pipelineState = page.getByLabel('Pipeline state');
+  await pipelineSearch.fill(pipelineName.toUpperCase());
+  await pipelineState.selectOption('draft');
+  const selectedPipelineCard = page.getByRole('button', { name: new RegExp(pipelineName) });
+  await expect(selectedPipelineCard).toHaveAttribute('aria-current', 'true');
+  await pipelineSearch.fill(guidedDefinition.slug);
+  await expect(selectedPipelineCard).toBeVisible();
+  await pipelineState.selectOption('published');
+  await expect(page.getByText('No pipelines match this search and state.')).toBeVisible();
+  expect(JSON.parse(await page.getByLabel('Canonical pipeline JSON').inputValue())).toEqual(guidedDefinition);
+  await pipelineSearch.fill('');
+  await pipelineState.selectOption('all');
   await expect(page.getByRole('button', { name: 'Publish immutable version' })).toBeEnabled();
   const savedJson = await page.getByLabel('Canonical pipeline JSON').inputValue();
   await page.getByLabel('Canonical pipeline JSON').fill(`${savedJson}\n`);
@@ -265,6 +278,13 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(page.getByRole('alertdialog', { name: 'Confirm pipeline publication' })).toBeVisible();
   await page.getByRole('button', { name: 'Confirm publish' }).click();
   await expect(page.getByRole('status')).toContainText('Published an immutable version');
+  await pipelineState.selectOption('published');
+  await expect(selectedPipelineCard).toBeVisible();
+  await expect(selectedPipelineCard).toContainText('Published v1');
+  await pipelineState.selectOption('draft');
+  await expect(page.getByText('No pipelines match this search and state.')).toBeVisible();
+  await expect(page.getByLabel('Canonical pipeline JSON')).toHaveValue(`${savedJson}\n`);
+  await pipelineState.selectOption('all');
 
   const publishedResponse = await page.request.get('/api/backend/pipelines/published');
   expect(publishedResponse.status()).toBe(200);
@@ -281,12 +301,75 @@ test('developer completes the local dashboard golden path', async ({ page, conte
     });
   });
   await malformedContractPage.goto('/assets/upload');
-  await malformedContractPage.getByLabel('Published pipeline').selectOption({ index: 1 });
+  const malformedPipelinePicker = malformedContractPage.getByRole('combobox', { name: 'Published pipeline' });
+  await malformedPipelinePicker.fill(publishedSlug);
+  const malformedPipelineOption = malformedContractPage.getByRole('listbox', { name: 'Published pipelines' }).getByRole('option');
+  await expect(malformedPipelineOption).toContainText(publishedPipelines[0].name);
+  await expect(malformedPipelineOption).toContainText(`${publishedSlug} · Published v${publishedPipelines[0].versionNumber}`);
+  await malformedPipelinePicker.press('Enter');
   await expect(malformedContractPage.locator('#file-upload')).toBeDisabled();
   await expect(malformedContractPage.getByRole('alert').filter({
     hasText: 'no usable resolved input contract',
   })).toBeVisible();
   await malformedContractPage.close();
+
+  const compatibilityPage = await context.newPage();
+  const videoPipeline = {
+    ...publishedPipelines[0],
+    id: 'mock-video-pipeline',
+    slug: 'video-delivery',
+    name: 'Video delivery',
+    versionId: 'mock-video-version',
+    versionNumber: 7,
+    expectedInputMimeType: 'video/mp4',
+    inputContract: { ...publishedPipelines[0].inputContract, kind: 'video', mimeTypes: ['video/mp4'] },
+    uploadConstraints: { ...publishedPipelines[0].uploadConstraints, allowedContentTypes: ['video/mp4'] },
+  };
+  await compatibilityPage.route('**/api/backend/pipelines/published', async (route) => {
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify([videoPipeline, publishedPipelines[0]]) });
+  });
+  await compatibilityPage.goto('/assets/upload');
+  const compatibilityPicker = compatibilityPage.getByRole('combobox', { name: 'Published pipeline' });
+  await compatibilityPicker.focus();
+  const orderedPipelineOptions = compatibilityPage.getByRole('listbox', { name: 'Published pipelines' }).getByRole('option');
+  await expect(orderedPipelineOptions.first()).toContainText(publishedPipelines[0].name);
+  await expect(orderedPipelineOptions.last()).toContainText('Video delivery');
+  await expect(orderedPipelineOptions.first()).toHaveAttribute('tabindex', '-1');
+  await compatibilityPicker.fill(publishedSlug);
+  await compatibilityPicker.press('Enter');
+  await expect(compatibilityPicker).toHaveValue(`${publishedPipelines[0].name} · ${publishedSlug} · Published v${publishedPipelines[0].versionNumber}`);
+  const compatibilityImage = Buffer.from(readFileSync(resolve(demoDir, 'sample.png.base64'), 'utf8').trim(), 'base64');
+  await compatibilityPage.locator('#file-upload').setInputFiles({ name: 'selected-compatible.png', mimeType: 'image/png', buffer: compatibilityImage });
+  await expect(compatibilityPage.getByText('selected-compatible.png')).toBeVisible();
+  await compatibilityPicker.fill('Video delivery');
+  await compatibilityPicker.press('ArrowDown');
+  await compatibilityPicker.press('Enter');
+  await expect(compatibilityPicker).toHaveValue('Video delivery · video-delivery · Published v7');
+  await expect(compatibilityPage.getByText('selected-compatible.png')).toHaveCount(0);
+  await expect(compatibilityPage.getByRole('note')).toContainText('Accepted types: video/mp4');
+  await compatibilityPicker.fill(publishedSlug);
+  await compatibilityPicker.press('Enter');
+  await compatibilityPage.locator('#file-upload').setInputFiles({ name: 'project-bound.png', mimeType: 'image/png', buffer: compatibilityImage });
+  await expect(compatibilityPage.getByText('project-bound.png')).toBeVisible();
+  const projectSwitcher = compatibilityPage.locator('#desktop-project');
+  const originalProjectId = await projectSwitcher.inputValue();
+  const otherProjectId = await projectSwitcher.locator('option').evaluateAll((options, selectedProjectId) =>
+    options.map((option) => (option as HTMLOptionElement).value).find((value) => value && value !== selectedProjectId) ?? '',
+  originalProjectId);
+  expect(otherProjectId).not.toBe('');
+  await projectSwitcher.selectOption(otherProjectId);
+  await expect.poll(async () => {
+    const response = await compatibilityPage.request.get('/api/session');
+    return (await response.json()).selectedProjectId;
+  }).toBe(otherProjectId);
+  await expect(compatibilityPicker).toHaveValue('');
+  await expect(compatibilityPage.getByText('project-bound.png')).toHaveCount(0);
+  await projectSwitcher.selectOption(originalProjectId);
+  await expect.poll(async () => {
+    const response = await compatibilityPage.request.get('/api/session');
+    return (await response.json()).selectedProjectId;
+  }).toBe(originalProjectId);
+  await compatibilityPage.close();
 
   await page.goto('/quick-start');
   await expect(page.getByRole('main').getByText(publishedSlug, { exact: true })).toBeVisible();
@@ -316,7 +399,9 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await page.goto('/assets/upload');
   const image = Buffer.from(readFileSync(resolve(demoDir, 'sample.png.base64'), 'utf8').trim(), 'base64');
   await expect(page.locator('#file-upload')).toBeDisabled();
-  await page.getByLabel('Published pipeline').selectOption({ index: 1 });
+  const publishedPipelinePicker = page.getByRole('combobox', { name: 'Published pipeline' });
+  await publishedPipelinePicker.fill(publishedSlug);
+  await publishedPipelinePicker.press('Enter');
   await expect(page.getByRole('note')).toContainText('Accepted types: image/png');
   await page.locator('#file-upload').setInputFiles({ name: 'browser-demo.mp4', mimeType: 'video/mp4', buffer: image });
   const incompatibleFileAlert = page.getByRole('alert').filter({ hasText: 'Test could not continue' });
@@ -442,8 +527,9 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await page.getByRole('button', { name: 'Confirm publish' }).click();
 
   await page.goto('/assets/upload');
-  const governancePipelineOption = page.getByLabel('Published pipeline').locator('option', { hasText: governancePipelineName });
-  await page.getByLabel('Published pipeline').selectOption(await governancePipelineOption.getAttribute('value') ?? '');
+  const governancePipelinePicker = page.getByRole('combobox', { name: 'Published pipeline' });
+  await governancePipelinePicker.fill(governancePipelineName);
+  await governancePipelinePicker.press('Enter');
   await page.locator('#file-upload').setInputFiles({ name: 'browser-governed.png', mimeType: 'image/png', buffer: image });
   await page.getByRole('button', { name: 'Upload and create run' }).click();
   await expect(page.getByRole('heading', { name: 'Run created' })).toBeVisible({ timeout: 90_000 });

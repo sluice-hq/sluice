@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -8,6 +8,7 @@ import { ArrowLeft, Check, CheckCircle2, FileVideo, Loader2, Upload, X, XCircle 
 import { completeUpload, requestUploadUrl } from '@/api/assets';
 import { ApiError } from '@/api/client';
 import { getPublishedPipelines } from '@/api/pipelines';
+import type { PublishedPipeline } from '@/api/types';
 import { startRun } from '@/api/runs';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,109 @@ function formatBytes(bytes: number) {
   return `${Math.ceil(bytes / 1_000)} KB`;
 }
 
+function comparePublishedPipelines(left: PublishedPipeline, right: PublishedPipeline) {
+  const leftName = left.name.toLowerCase();
+  const rightName = right.name.toLowerCase();
+  if (leftName !== rightName) return leftName < rightName ? -1 : 1;
+  const leftSlug = left.slug.toLowerCase();
+  const rightSlug = right.slug.toLowerCase();
+  if (leftSlug !== rightSlug) return leftSlug < rightSlug ? -1 : 1;
+  if (left.versionNumber !== right.versionNumber) return right.versionNumber - left.versionNumber;
+  return left.versionId < right.versionId ? -1 : left.versionId > right.versionId ? 1 : 0;
+}
+
+function pipelineOptionLabel(pipeline: PublishedPipeline) {
+  return `${pipeline.name} · ${pipeline.slug} · Published v${pipeline.versionNumber}`;
+}
+
+type PipelineSelection = {
+  projectId: string;
+  pipeline: PublishedPipeline;
+};
+
+function PublishedPipelineCombobox({ pipelines, selected, disabled, loading, onSelect }: {
+  pipelines: PublishedPipeline[];
+  selected: PublishedPipeline | null;
+  disabled: boolean;
+  loading: boolean;
+  onSelect: (pipeline: PublishedPipeline) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [highlighted, setHighlighted] = useState(0);
+  const listId = useId();
+  const results = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return pipelines
+      .filter((pipeline) => !normalizedQuery
+        || pipeline.name.toLowerCase().includes(normalizedQuery)
+        || pipeline.slug.toLowerCase().includes(normalizedQuery))
+      .toSorted(comparePublishedPipelines);
+  }, [pipelines, query]);
+  const activeIndex = Math.min(highlighted, Math.max(results.length - 1, 0));
+
+  useEffect(() => {
+    if (open && results[activeIndex]) document.getElementById(`${listId}-${activeIndex}`)?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex, listId, open, results]);
+
+  function choose(pipeline: PublishedPipeline) {
+    if (pipeline.versionId !== selected?.versionId) onSelect(pipeline);
+    setOpen(false);
+    setQuery('');
+  }
+
+  return <div className="relative" onBlur={(event) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setOpen(false);
+      setQuery('');
+    }
+  }}>
+    <label htmlFor="published-pipeline" className="text-sm font-medium">Published pipeline</label>
+    <div className="relative mt-1">
+      <input
+        id="published-pipeline"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={open && results[activeIndex] ? `${listId}-${activeIndex}` : undefined}
+        autoComplete="off"
+        disabled={disabled}
+        placeholder={loading ? 'Loading pipelines…' : 'Search published pipelines'}
+        value={open ? query : selected ? pipelineOptionLabel(selected) : ''}
+        onFocus={() => { setOpen(true); setQuery(''); setHighlighted(0); }}
+        onChange={(event) => { setOpen(true); setQuery(event.target.value); setHighlighted(0); }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') { event.preventDefault(); setOpen(false); setQuery(''); }
+          if (event.key === 'ArrowDown') { event.preventDefault(); setOpen(true); setHighlighted((value) => Math.min(value + 1, Math.max(results.length - 1, 0))); }
+          if (event.key === 'ArrowUp') { event.preventDefault(); setOpen(true); setHighlighted((value) => Math.max(value - 1, 0)); }
+          if (event.key === 'Home' && open) { event.preventDefault(); setHighlighted(0); }
+          if (event.key === 'End' && open) { event.preventDefault(); setHighlighted(Math.max(results.length - 1, 0)); }
+          if (event.key === 'Enter' && open && results[activeIndex]) { event.preventDefault(); choose(results[activeIndex]); }
+        }}
+        className="h-10 w-full rounded-md border border-border bg-background px-3 pr-9 text-sm disabled:opacity-50"
+      />
+      <span aria-hidden="true" className="pointer-events-none absolute right-3 top-2 text-muted-foreground">⌄</span>
+    </div>
+    {open && !disabled && <div id={listId} role="listbox" aria-label="Published pipelines" className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-border bg-card p-2 shadow-xl">
+      {results.map((pipeline, index) => <button
+        id={`${listId}-${index}`}
+        key={pipeline.versionId}
+        type="button"
+        role="option"
+        aria-selected={pipeline.versionId === selected?.versionId}
+        tabIndex={-1}
+        onMouseDown={(event) => event.preventDefault()}
+        onMouseEnter={() => setHighlighted(index)}
+        onClick={() => choose(pipeline)}
+        className={`block w-full rounded px-3 py-2 text-left text-sm hover:bg-primary/10 ${index === activeIndex ? 'bg-primary/10' : ''}`}
+      ><span className="block font-medium">{pipeline.name}</span><span className="block text-xs text-muted-foreground">{pipeline.slug} · Published v{pipeline.versionNumber}</span></button>)}
+      {results.length === 0 && <p className="p-3 text-sm text-muted-foreground">No published pipelines match this search.</p>}
+    </div>}
+  </div>;
+}
+
 function explainFailure(error: unknown, phase: ActivePhase) {
   if (error instanceof ApiError) {
     if (error.status === 413) return 'The server rejected this file because it exceeds the active upload or pipeline size limit. Choose a smaller file.';
@@ -59,16 +163,27 @@ export default function UploadPage() {
   const [phase, setPhase] = useState<UploadPhase>('IDLE');
   const [failedPhase, setFailedPhase] = useState<ActivePhase | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pipelineSlug, setPipelineSlug] = useState('');
+  const [pipelineSelection, setPipelineSelection] = useState<PipelineSelection | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const submitting = useRef(false);
   const attempt = useRef<Attempt>({ assetId: null, uploadUrl: null, requestKey: '', completionKey: '', runKey: '' });
-  const { data: pipelines = [], isLoading: pipelinesLoading, error: pipelinesError } = useQuery({
-    queryKey: ['pipelines', 'published'],
-    queryFn: getPublishedPipelines,
+  const { data: session, isLoading: sessionLoading } = useQuery<{ selectedProjectId?: string }>({
+    queryKey: ['session'],
+    queryFn: async () => {
+      const response = await fetch('/api/session', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Session unavailable');
+      return response.json();
+    },
   });
+  const projectId = session?.selectedProjectId ?? '';
+  const { data: pipelines = [], isLoading: pipelinesQueryLoading, error: pipelinesError } = useQuery({
+    queryKey: ['pipelines', 'published', projectId],
+    queryFn: getPublishedPipelines,
+    enabled: Boolean(projectId),
+  });
+  const pipelinesLoading = sessionLoading || (Boolean(projectId) && pipelinesQueryLoading);
+  const pipeline = pipelineSelection?.projectId === projectId ? pipelineSelection.pipeline : null;
 
-  const pipeline = pipelines.find((item) => item.slug === pipelineSlug) ?? null;
   const acceptedTypes = useMemo(() => {
     if (!pipeline?.contractUsable) return [];
     return pipeline.uploadConstraints.allowedContentTypes.filter((type) =>
@@ -88,6 +203,17 @@ export default function UploadPage() {
     setError(null);
     setPhase('IDLE');
   }, []);
+
+  useEffect(() => {
+    if (pipelineSelection && (!projectId
+      || pipelineSelection.projectId !== projectId
+      || (!pipelinesLoading && !pipelines.some((candidate) => candidate.versionId === pipelineSelection.pipeline.versionId)))) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- A project/query boundary invalidates the complete upload attempt atomically.
+      setPipelineSelection(null);
+      setFile(null);
+      clearAttempt();
+    }
+  }, [clearAttempt, pipelineSelection, pipelines, pipelinesLoading, projectId]);
 
   const validateFile = useCallback((candidate: File) => {
     if (!pipeline) return 'Select a published pipeline before choosing a file.';
@@ -195,11 +321,7 @@ export default function UploadPage() {
         ) : <>
           <section className="space-y-2" aria-labelledby="pipeline-heading">
             <h3 id="pipeline-heading" className="font-semibold">1. Select the pipeline</h3>
-            <label htmlFor="pipeline" className="text-sm font-medium">Published pipeline</label>
-            <select id="pipeline" value={pipelineSlug} onChange={(event) => { setPipelineSlug(event.target.value); setFile(null); clearAttempt(); }} disabled={isBusy || pipelinesLoading} className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm disabled:opacity-50" required>
-              <option value="">{pipelinesLoading ? 'Loading pipelines…' : 'Select a published pipeline'}</option>
-              {pipelines.map((item) => <option key={item.id} value={item.slug}>{item.name} (v{item.versionNumber})</option>)}
-            </select>
+            <PublishedPipelineCombobox pipelines={pipelines} selected={pipeline} disabled={isBusy || pipelinesLoading} loading={pipelinesLoading} onSelect={(nextPipeline) => { setPipelineSelection({ projectId, pipeline: nextPipeline }); setFile(null); clearAttempt(); }} />
             {pipelinesError && <p className="text-sm text-status-error" role="alert">Could not load published pipelines. Check the API connection, then refresh.</p>}
             {!pipelinesLoading && !pipelinesError && pipelines.length === 0 && <p className="text-sm text-muted-foreground">This project has no published pipelines yet.</p>}
             {pipeline && <div className="rounded-lg border border-border bg-background/60 p-3 text-sm" role="note">
