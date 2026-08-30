@@ -109,11 +109,33 @@
   }
 }
 
+@keyframes sluice-template-flow {
+  0% {
+    border-color: rgb(35 149 255 / 0.2);
+    box-shadow: 0 0 0 0 rgb(35 149 255 / 0);
+  }
+  45% {
+    border-color: rgb(35 149 255 / 0.7);
+    box-shadow: 0 0 0 3px rgb(35 149 255 / 0.12), 10px 0 28px rgb(21 208 255 / 0.08);
+  }
+  100% {
+    border-color: transparent;
+    box-shadow: 0 0 0 0 rgb(35 149 255 / 0);
+  }
+}
+
+.sluice-template-settle {
+  animation: sluice-template-flow 700ms ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+  .sluice-template-settle {
+    animation: none !important;
   }
 }
