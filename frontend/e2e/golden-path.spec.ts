@@ -358,6 +358,10 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   originalProjectId);
   expect(otherProjectId).not.toBe('');
   await projectSwitcher.selectOption(otherProjectId);
+  await expect.poll(async () => {
+    const response = await compatibilityPage.request.get('/api/session');
+    return (await response.json()).selectedProjectId;
+  }).toBe(otherProjectId);
   await expect(compatibilityPicker).toHaveValue('');
   await expect(compatibilityPage.getByText('project-bound.png')).toHaveCount(0);
   await projectSwitcher.selectOption(originalProjectId);
