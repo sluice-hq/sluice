@@ -257,7 +257,7 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(selectedPipelineCard).toBeVisible();
   await pipelineState.selectOption('published');
   await expect(page.getByText('No pipelines match this search and state.')).toBeVisible();
-  await expect(page.getByLabel('Canonical pipeline JSON')).toHaveValue(JSON.stringify(guidedDefinition, null, 2));
+  expect(JSON.parse(await page.getByLabel('Canonical pipeline JSON').inputValue())).toEqual(guidedDefinition);
   await pipelineSearch.fill('');
   await pipelineState.selectOption('all');
   await expect(page.getByRole('button', { name: 'Publish immutable version' })).toBeEnabled();
@@ -303,7 +303,7 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await malformedContractPage.goto('/assets/upload');
   const malformedPipelinePicker = malformedContractPage.getByRole('combobox', { name: 'Published pipeline' });
   await malformedPipelinePicker.fill(publishedSlug);
-  const malformedPipelineOption = malformedContractPage.getByRole('option');
+  const malformedPipelineOption = malformedContractPage.getByRole('listbox', { name: 'Published pipelines' }).getByRole('option');
   await expect(malformedPipelineOption).toContainText(publishedPipelines[0].name);
   await expect(malformedPipelineOption).toContainText(`${publishedSlug} · Published v${publishedPipelines[0].versionNumber}`);
   await malformedPipelinePicker.press('Enter');
