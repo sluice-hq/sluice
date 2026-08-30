@@ -15,6 +15,8 @@ public class User {
     private String email;
     private String passwordHash;
     private Instant createdAt;
+    private Instant verifiedAt;
+    private long sessionVersion;
 
     protected User() {}
 
@@ -23,10 +25,22 @@ public class User {
         this.email = email;
         this.passwordHash = passwordHash;
         this.createdAt = createdAt;
+        this.sessionVersion = 0;
     }
 
     public UUID getId() { return id; }
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
     public Instant getCreatedAt() { return createdAt; }
+    public Instant getVerifiedAt() { return verifiedAt; }
+    public long getSessionVersion() { return sessionVersion; }
+
+    public void verify(Instant now) {
+        if (verifiedAt == null) verifiedAt = now;
+    }
+
+    public void changePassword(String newPasswordHash) {
+        this.passwordHash = newPasswordHash;
+        this.sessionVersion++;
+    }
 }

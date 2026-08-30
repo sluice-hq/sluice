@@ -49,7 +49,12 @@ public class OpenApiConfig {
     @Bean
     OpenApiCustomizer sluiceOperationSecurity() {
         return openApi -> openApi.getPaths().forEach((path, pathItem) -> {
-            boolean publicOperation = path.equals("/api/v1/auth/login") || path.equals("/api/v1/auth/signup");
+            boolean publicOperation = path.equals("/api/v1/auth/login")
+                    || path.equals("/api/v1/auth/signup")
+                    || path.equals("/api/v1/auth/verification/request")
+                    || path.equals("/api/v1/auth/verification/confirm")
+                    || path.equals("/api/v1/auth/recovery")
+                    || path.equals("/api/v1/auth/reset");
             pathItem.readOperations().forEach(operation -> {
                 if (publicOperation) {
                     operation.setSecurity(java.util.List.of());

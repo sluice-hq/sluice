@@ -63,6 +63,7 @@ export function AuthShell({
 
 export function PasswordInput({
   id,
+  name = 'password',
   autoComplete,
   maxLength,
   minLength,
@@ -71,6 +72,7 @@ export function PasswordInput({
   onChange,
 }: {
   id: string;
+  name?: string;
   autoComplete: string;
   maxLength: number;
   minLength?: number;
@@ -84,7 +86,7 @@ export function PasswordInput({
     <div className="relative">
       <Input
         id={id}
-        name="password"
+        name={name}
         type={visible ? 'text' : 'password'}
         autoComplete={autoComplete}
         minLength={minLength}

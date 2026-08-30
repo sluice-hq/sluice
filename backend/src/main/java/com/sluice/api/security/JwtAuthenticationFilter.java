@@ -2,6 +2,7 @@ package com.sluice.api.security;
 
 import com.sluice.api.auth.domain.ProjectContext;
 import com.sluice.api.project.repository.ProjectMemberRepository;
+import com.sluice.api.auth.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,10 +19,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final ProjectMemberRepository projectMemberRepository;
+    private final UserRepository userRepository;
 
-    public JwtAuthenticationFilter(JwtService jwtService, ProjectMemberRepository projectMemberRepository) {
+    public JwtAuthenticationFilter(JwtService jwtService, ProjectMemberRepository projectMemberRepository,
+                                   UserRepository userRepository) {
         this.jwtService = jwtService;
         this.projectMemberRepository = projectMemberRepository;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -34,7 +38,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = authHeader.substring(7);
             
             if (jwtService.isTokenValid(token)) {
-                UUID userId = jwtService.extractUserId(token);
+                try {
+                    UUID userId = jwtService.extractUserId(token);
+                    long sessionVersion = jwtService.extractSessionVersion(token);
+                    var user = userRepository.findById(userId).orElse(null);
+                    if (user == null || user.getSessionVersion() != sessionVersion) {
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
                 
                 String projectIdHeader = request.getHeader("X-Project-ID");
                 UUID projectId = null;
@@ -59,6 +70,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             context, null, Collections.emptyList()
                     );
                     SecurityContextHolder.getContext().setAuthentication(auth);
+                }
+                } catch (IllegalArgumentException ignored) {
+                    // A malformed identity claim is treated as an invalid token.
                 }
             }
         }

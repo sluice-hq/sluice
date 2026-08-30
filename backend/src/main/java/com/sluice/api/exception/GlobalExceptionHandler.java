@@ -17,6 +17,9 @@ import com.sluice.api.pipeline.validation.ProcessorConfigurationException;
 import com.sluice.api.pipeline.service.PipelineValidationException;
 import com.sluice.api.idempotency.service.IdempotencyConflictException;
 import com.sluice.api.config.MediaSafetyException;
+import com.sluice.api.auth.service.AuthRateLimitException;
+import com.sluice.api.auth.service.InvalidAuthTokenException;
+import org.springframework.http.ResponseEntity;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -82,6 +85,19 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadCredentialsException.class)
     public ProblemDetail handleBadCredentials(BadCredentialsException exc) {
         return problem(HttpStatus.UNAUTHORIZED, "Invalid email or password.", "invalid_credentials");
+    }
+
+    @ExceptionHandler(InvalidAuthTokenException.class)
+    public ProblemDetail handleInvalidAuthToken(InvalidAuthTokenException exc) {
+        return problem(HttpStatus.BAD_REQUEST, "The token is invalid or expired.", "invalid_or_expired_token");
+    }
+
+    @ExceptionHandler(AuthRateLimitException.class)
+    public ResponseEntity<ProblemDetail> handleAuthRateLimit(AuthRateLimitException exc) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", Long.toString(exc.getRetryAfterSeconds()))
+                .body(problem(HttpStatus.TOO_MANY_REQUESTS,
+                        "Too many authentication attempts. Try again later.", "auth_rate_limited"));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
