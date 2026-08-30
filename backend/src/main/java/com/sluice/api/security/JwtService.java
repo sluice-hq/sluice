@@ -25,8 +25,13 @@ public class JwtService {
     }
 
     public String generateToken(UUID userId) {
+        return generateToken(userId, 0);
+    }
+
+    public String generateToken(UUID userId, long sessionVersion) {
         return Jwts.builder()
                 .subject(userId.toString())
+                .claim("sv", sessionVersion)
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + expirationTime))
                 .signWith(key)
@@ -35,6 +40,11 @@ public class JwtService {
 
     public UUID extractUserId(String token) {
         return UUID.fromString(extractClaim(token, Claims::getSubject));
+    }
+
+    public long extractSessionVersion(String token) {
+        Object value = extractAllClaims(token).get("sv");
+        return value instanceof Number number ? number.longValue() : 0;
     }
 
     public boolean isTokenValid(String token) {

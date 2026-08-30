@@ -20,6 +20,67 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   const definition = JSON.parse(readFileSync(resolve(demoDir, 'pipeline.json'), 'utf8'));
   definition.slug = `browser-governed-${suffix}`;
 
+  const crossSiteRecovery = await page.request.post('/api/session/recovery', {
+    headers: { Origin: 'https://attacker.example', 'Sec-Fetch-Site': 'cross-site' },
+    data: { email: `target-${suffix}@example.com` },
+  });
+  expect(crossSiteRecovery.status()).toBe(403);
+  expect((await crossSiteRecovery.json()).code).toBe('csrf_rejected');
+
+  const crossSiteLogin = await page.request.post('/api/session/login', {
+    headers: { Origin: 'https://attacker.example', 'Sec-Fetch-Site': 'cross-site' },
+    data: { email: `target-${suffix}@example.com`, password },
+  });
+  expect(crossSiteLogin.status()).toBe(403);
+
+  await page.goto('/login');
+  await page.getByRole('link', { name: 'Forgot your password?' }).click();
+  await expect(page.getByRole('heading', { name: 'Reset your password' })).toBeVisible();
+  await page.getByRole('button', { name: 'Send reset link' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Enter a valid email address.' })).toBeVisible();
+  await page.getByLabel('Email address').fill(`missing-${suffix}@example.com`);
+  await page.getByRole('button', { name: 'Send reset link' }).click();
+  await expect(page.getByRole('status')).toContainText('If an account exists');
+
+  await page.goto(`/reset-password?token=invalid-${suffix}`);
+  await page.getByLabel('New password', { exact: true }).fill('replacement-password-2026');
+  await page.getByLabel('Confirm new password', { exact: true }).fill('different-password-2026');
+  await page.getByRole('button', { name: 'Reset password' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'The passwords do not match.' })).toBeVisible();
+  await page.getByLabel('Confirm new password', { exact: true }).fill('replacement-password-2026');
+  await page.getByRole('button', { name: 'Reset password' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'invalid or has expired' })).toBeVisible();
+
+  await page.route('**/api/session/reset', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'Password reset completed.' }),
+    });
+  });
+  await page.goto(`/reset-password?token=browser-success-${suffix}`);
+  await page.getByLabel('New password', { exact: true }).fill('replacement-password-2026');
+  await page.getByLabel('Confirm new password', { exact: true }).fill('replacement-password-2026');
+  await page.getByRole('button', { name: 'Reset password' }).click();
+  await expect(page.getByRole('status')).toContainText('Your password was reset');
+  await page.unroute('**/api/session/reset');
+
+  await page.goto(`/verify-email/confirm?token=invalid-${suffix}`);
+  await page.getByRole('button', { name: 'Verify email' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'invalid or has expired' })).toBeVisible();
+
+  await page.route('**/api/session/verification/confirm', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ message: 'Email verification completed.' }),
+    });
+  });
+  await page.goto(`/verify-email/confirm?token=browser-success-${suffix}`);
+  await page.getByRole('button', { name: 'Verify email' }).click();
+  await expect(page.getByRole('status')).toContainText('Your email is verified');
+  await page.unroute('**/api/session/verification/confirm');
+
   await page.goto('/');
   const anonymousOpenApi = await page.request.get('/api/backend/openapi.json');
   expect(anonymousOpenApi.status()).toBe(401);
@@ -39,6 +100,10 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'password');
   await page.getByLabel('First project name').fill(projectName);
   await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page).toHaveURL(new RegExp(`/verify-email\\?email=${encodeURIComponent(email)}`));
+  await expect(page.getByRole('heading', { name: 'Verify your email' })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('We sent a verification link');
+  await page.getByRole('link', { name: 'Open dashboard' }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByRole('heading', { name: 'Platform Overview' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Start your first integration' })).toBeVisible();
@@ -648,4 +713,12 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await expect(resumedChecklist.getByRole('listitem').filter({ hasText: 'Create an API key' }).getByLabel('Not complete')).toBeVisible();
   await expect(resumedChecklist.getByRole('listitem').filter({ hasText: 'Publish a pipeline' }).getByLabel('Complete')).toBeVisible();
   await expect(resumedChecklist.getByRole('listitem').filter({ hasText: 'Complete your first run' }).getByLabel('Complete')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Sign out' }).first().click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel('Email address').fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(page.getByRole('heading', { name: 'Platform Overview' })).toBeVisible();
 });

@@ -220,10 +220,12 @@ docker-compose.yml       Local PostgreSQL, RabbitMQ, Azurite, Prometheus, Grafan
 
 - Tenant data is project-scoped in the authentication context and application queries.
 - The dashboard stores its JWT in an HttpOnly, SameSite cookie; the BFF forwards it server-side.
-- State-changing dashboard proxy requests require a matching `X-Sluice-CSRF` header and SameSite CSRF cookie.
+- Email verification and password recovery use expiring, single-use tokens stored only as SHA-256 hashes. Password resets invalidate earlier dashboard JWTs through a credential-session version check.
+- Authentication requests have generic recovery/verification responses, bounded per-client and per-subject controls, and redacted audit records. Account lookup and email submission run behind a bounded asynchronous queue so public responses do not wait on provider latency. Local development captures email safely in memory; production is configured for Azure Communication Services Email.
+- State-changing authenticated dashboard proxy requests require a matching `X-Sluice-CSRF` header and SameSite CSRF cookie. Public authentication proxies separately reject browser requests that do not originate from Sluice.
 - API keys use 256 bits of randomness, are shown once, stored only as SHA-256 hashes, project-scoped, and revocable.
 - Blob containers are private. Upload and download access uses short-lived SAS URLs.
-- Pipeline contracts and media limits constrain supported content; arbitrary custom processor code, remote-URL processing, unrestricted graphs, quotas, and custom marketplace submissions are not implemented V1 capabilities.
+- Pipeline contracts and media limits constrain supported content; arbitrary custom processor code, remote-URL processing, unrestricted graphs, quotas, request-cost enforcement, and custom marketplace submissions are not implemented V1 capabilities.
 
 ## Deployment status
 

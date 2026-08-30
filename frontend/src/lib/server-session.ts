@@ -46,6 +46,32 @@ export function hasValidCsrfToken(request: NextRequest): boolean {
   return cookieBytes.length === headerBytes.length && timingSafeEqual(cookieBytes, headerBytes);
 }
 
+export function hasTrustedBrowserOrigin(request: NextRequest): boolean {
+  const fetchSite = request.headers.get('sec-fetch-site')?.toLowerCase();
+  if (fetchSite && fetchSite !== 'same-origin' && fetchSite !== 'none') return false;
+
+  const origin = request.headers.get('origin');
+  if (!origin) return true;
+  try {
+    return new URL(origin).origin === request.nextUrl.origin;
+  } catch {
+    return false;
+  }
+}
+
+export function backendResponseHeaders(response: Response): Headers {
+  const headers = new Headers();
+  const retryAfter = response.headers.get('Retry-After');
+  if (retryAfter) headers.set('Retry-After', retryAfter);
+  return headers;
+}
+
+export function forwardedClientHeaders(request: NextRequest): Record<string, string> {
+  const forwarded = request.headers.get('x-forwarded-for')?.split(',').pop()?.trim()
+    || request.headers.get('x-real-ip')?.trim();
+  return forwarded ? { 'X-Forwarded-For': forwarded } : {};
+}
+
 export async function serverAuthHeaders(): Promise<Record<string, string>> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;

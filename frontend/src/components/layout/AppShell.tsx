@@ -32,6 +32,10 @@ const navigation = [
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
+const publicRoutes = new Set([
+  '/', '/login', '/signup', '/verify-email', '/verify-email/confirm', '/forgot-password', '/reset-password',
+]);
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -39,7 +43,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sessionAction, setSessionAction] = useState<'project' | 'logout' | null>(null);
   const [sessionError, setSessionError] = useState('');
-  const publicRoute = pathname === '/' || pathname === '/login' || pathname === '/signup';
+  const publicRoute = publicRoutes.has(pathname);
   const { data: session, isLoading, isError } = useQuery<Session>({
     queryKey: ['session'],
     queryFn: async () => {

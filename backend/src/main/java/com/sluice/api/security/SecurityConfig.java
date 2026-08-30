@@ -2,6 +2,7 @@ package com.sluice.api.security;
 
 import com.sluice.api.auth.repository.ApiKeyRepository;
 import com.sluice.api.project.repository.ProjectMemberRepository;
+import com.sluice.api.auth.repository.UserRepository;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,16 +31,19 @@ public class SecurityConfig {
     private final JwtService jwtService;
     private final ProjectMemberRepository projectMemberRepository;
     private final ApiKeyRepository apiKeyRepository;
+    private final UserRepository userRepository;
     private final List<String> allowedOrigins;
     private final boolean publicPrometheus;
 
     public SecurityConfig(JwtService jwtService, ProjectMemberRepository projectMemberRepository,
                           ApiKeyRepository apiKeyRepository,
+                          UserRepository userRepository,
                           @Value("${sluice.cors.allowed-origins:http://localhost:3000}") String allowedOrigins,
                           @Value("${sluice.actuator.public-prometheus:false}") boolean publicPrometheus) {
         this.jwtService = jwtService;
         this.projectMemberRepository = projectMemberRepository;
         this.apiKeyRepository = apiKeyRepository;
+        this.userRepository = userRepository;
         this.allowedOrigins = List.of(allowedOrigins.split(",")).stream().map(String::trim)
                 .filter(origin -> !origin.isEmpty()).toList();
         this.publicPrometheus = publicPrometheus;
@@ -47,7 +51,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        JwtAuthenticationFilter jwtAuthFilter = new JwtAuthenticationFilter(jwtService, projectMemberRepository);
+        JwtAuthenticationFilter jwtAuthFilter = new JwtAuthenticationFilter(
+                jwtService, projectMemberRepository, userRepository);
         ApiKeyAuthenticationFilter apiKeyAuthFilter = new ApiKeyAuthenticationFilter(apiKeyRepository);
         
         http
@@ -64,7 +69,10 @@ public class SecurityConfig {
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(apiKeyAuthFilter, JwtAuthenticationFilter.class)
             .authorizeHttpRequests(authorize -> {
-                authorize.requestMatchers("/api/v1/auth/login", "/api/v1/auth/signup", "/actuator/health", "/actuator/info").permitAll();
+                authorize.requestMatchers("/api/v1/auth/login", "/api/v1/auth/signup",
+                        "/api/v1/auth/verification/request", "/api/v1/auth/verification/confirm",
+                        "/api/v1/auth/recovery", "/api/v1/auth/reset",
+                        "/actuator/health", "/actuator/info").permitAll();
                 if (publicPrometheus) authorize.requestMatchers("/actuator/prometheus").permitAll();
                 authorize.anyRequest().authenticated();
             });

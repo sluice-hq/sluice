@@ -1,15 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { API_URL, CSRF_COOKIE, PROJECT_COOKIE, SESSION_COOKIE, csrfCookieOptions, newCsrfToken, readBackendError, sessionCookieOptions } from '@/lib/server-session';
+import { API_URL, CSRF_COOKIE, PROJECT_COOKIE, SESSION_COOKIE, backendResponseHeaders, csrfCookieOptions, forwardedClientHeaders, hasTrustedBrowserOrigin, newCsrfToken, readBackendError, sessionCookieOptions } from '@/lib/server-session';
 
 export async function POST(request: NextRequest) {
+  if (!hasTrustedBrowserOrigin(request)) {
+    return NextResponse.json(
+      { status: 403, code: 'csrf_rejected', detail: 'The request must originate from Sluice.' },
+      { status: 403 },
+    );
+  }
   try {
     const response = await fetch(`${API_URL}/auth/signup`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...forwardedClientHeaders(request) },
       body: await request.text(),
       cache: 'no-store',
     });
-    if (!response.ok) return NextResponse.json(await readBackendError(response), { status: response.status });
+    if (!response.ok) {
+      return NextResponse.json(await readBackendError(response), {
+        status: response.status,
+        headers: backendResponseHeaders(response),
+      });
+    }
 
     const text = await response.text();
     let body: { token?: unknown; selectedProjectId?: unknown };

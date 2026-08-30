@@ -6,6 +6,8 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import com.sluice.api.pipeline.validation.ConfigurationValidationError;
 import com.sluice.api.pipeline.validation.ProcessorConfigurationException;
+import com.sluice.api.auth.service.AuthRateLimitException;
+import com.sluice.api.auth.service.InvalidAuthTokenException;
 
 import java.util.List;
 
@@ -55,5 +57,23 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(400, response.getStatus());
         assertEquals("required_header_missing", response.getProperties().get("code"));
+    }
+
+    @Test
+    void mapsInvalidAuthTokensWithoutExposingTokenDetails() {
+        ProblemDetail response = new GlobalExceptionHandler()
+                .handleInvalidAuthToken(new InvalidAuthTokenException());
+
+        assertEquals(400, response.getStatus());
+        assertEquals("invalid_or_expired_token", response.getProperties().get("code"));
+    }
+
+    @Test
+    void rateLimitResponseIncludesRetryAfter() {
+        var response = new GlobalExceptionHandler().handleAuthRateLimit(new AuthRateLimitException(42));
+
+        assertEquals(429, response.getStatusCode().value());
+        assertEquals("42", response.getHeaders().getFirst("Retry-After"));
+        assertEquals("auth_rate_limited", response.getBody().getProperties().get("code"));
     }
 }

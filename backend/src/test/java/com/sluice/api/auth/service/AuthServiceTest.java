@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class AuthServiceTest {
@@ -33,14 +34,16 @@ class AuthServiceTest {
         ProjectMemberRepository members = mock(ProjectMemberRepository.class);
         PasswordEncoder passwords = mock(PasswordEncoder.class);
         JwtService jwt = mock(JwtService.class);
+        AuthTokenService tokens = mock(AuthTokenService.class);
+        AuthAuditService audit = mock(AuthAuditService.class);
         when(users.findByEmailIgnoreCase("dev@example.com")).thenReturn(Optional.empty());
         when(passwords.encode("a-secure-password")).thenReturn("bcrypt-hash");
         when(users.save(any(User.class))).thenAnswer(call -> call.getArgument(0));
         when(projects.save(any(Project.class))).thenAnswer(call -> call.getArgument(0));
         when(members.save(any(ProjectMember.class))).thenAnswer(call -> call.getArgument(0));
-        when(jwt.generateToken(any(UUID.class))).thenReturn("jwt");
+        when(jwt.generateToken(any(UUID.class), org.mockito.ArgumentMatchers.anyLong())).thenReturn("jwt");
 
-        AuthService.AuthResult result = new AuthService(users, projects, members, passwords, jwt)
+        AuthService.AuthResult result = new AuthService(users, projects, members, passwords, jwt, tokens, audit)
                 .signup(" Dev@Example.com ", "a-secure-password", "Storefront");
 
         assertEquals("jwt", result.token());
@@ -57,12 +60,33 @@ class AuthServiceTest {
         ProjectMemberRepository members = mock(ProjectMemberRepository.class);
         PasswordEncoder passwords = mock(PasswordEncoder.class);
         JwtService jwt = mock(JwtService.class);
+        AuthTokenService tokens = mock(AuthTokenService.class);
+        AuthAuditService audit = mock(AuthAuditService.class);
         User user = new User(UUID.randomUUID(), "dev@example.com", "hash", Instant.now());
         when(users.findByEmailIgnoreCase("dev@example.com")).thenReturn(Optional.of(user));
         when(passwords.matches("wrong-password", "hash")).thenReturn(false);
 
         assertThrows(BadCredentialsException.class, () ->
-                new AuthService(users, projects, members, passwords, jwt)
+                new AuthService(users, projects, members, passwords, jwt, tokens, audit)
                         .login("dev@example.com", "wrong-password"));
+    }
+
+    @Test
+    void recoveryDispatchesAccountLookupOffTheRequestPath() {
+        UserRepository users = mock(UserRepository.class);
+        ProjectRepository projects = mock(ProjectRepository.class);
+        ProjectMemberRepository members = mock(ProjectMemberRepository.class);
+        PasswordEncoder passwords = mock(PasswordEncoder.class);
+        JwtService jwt = mock(JwtService.class);
+        AuthTokenService tokens = mock(AuthTokenService.class);
+        AuthAuditService audit = mock(AuthAuditService.class);
+        AuthEmailRequestDispatcher dispatcher = mock(AuthEmailRequestDispatcher.class);
+
+        new AuthService(users, projects, members, passwords, jwt, tokens, audit, dispatcher)
+                .requestRecovery(" Dev@Example.com ", "client");
+
+        verify(dispatcher).requestRecovery("dev@example.com");
+        verify(audit).record("recovery_request", "accepted", "dev@example.com", "client");
+        verifyNoInteractions(users);
     }
 }

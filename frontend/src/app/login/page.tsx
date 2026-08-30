@@ -150,6 +150,7 @@ export default function LoginPage() {
         <Button type="submit" className="h-11 w-full text-sm font-semibold" disabled={busy} aria-busy={busy}>
           {busy ? 'Signing in…' : 'Sign in'}
         </Button>
+        <p className="text-center text-sm"><Link className="text-primary underline-offset-4 hover:underline" href="/forgot-password">Forgot your password?</Link></p>
         <p className="text-center text-sm text-muted-foreground">New to Sluice? <Link className="text-primary underline-offset-4 hover:underline" href="/signup">Create an account</Link></p>
       </form>
     </AuthShell>
