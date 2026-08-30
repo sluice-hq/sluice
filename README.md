@@ -17,7 +17,7 @@ The repository provides a verified local product flow. Azure deployment automati
 - Direct Azure Blob Storage or Azurite uploads with completion verification and short-lived download URLs.
 - Versioned processor releases; revision-checked pipeline drafts; immutable published versions and aliases; contract validation before publication and execution.
 - Durable asynchronous runs with PostgreSQL-backed outbox delivery, RabbitMQ workers, retry/recovery handling, step facts, output provenance, Server-Sent Events, and signed terminal webhooks.
-- Processor market, guided and JSON pipeline authoring, first-run checklist, API Quick Start, pipeline test console, and asset/run/governance inspection.
+- Processor market, searchable guided and JSON pipeline authoring with descriptive starter flows and enabled-release safeguards, first-run checklist, API Quick Start, pipeline test console, and asset/run/governance inspection.
 - Local Prometheus and Grafana monitoring, plus backend, integration, API-smoke, and Playwright browser verification.
 
 ## Architecture
