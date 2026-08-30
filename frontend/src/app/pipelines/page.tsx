@@ -8,7 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listProjectProcessors, type ProcessorContract } from '@/api/processors';
 import {
   createPipeline, getPipeline, getPipelineHistory, listPipelines, publishPipeline, saveDraft,
-  validatePipeline, type PipelineDefinition, type ValidationReport,
+  validatePipeline, type PipelineDefinition, type PipelineSummary, type ValidationReport,
 } from '@/api/pipelines';
 
 const emptyDefinition: PipelineDefinition = {
@@ -18,10 +18,24 @@ const emptyDefinition: PipelineDefinition = {
   limits: { maxSteps: 10, timeoutSeconds: 90, maxOutputBytes: 50000000 },
 };
 
+type PipelineStateFilter = 'all' | 'draft' | 'published';
+
+function comparePipelineSummaries(left: PipelineSummary, right: PipelineSummary) {
+  const leftName = left.name.toLowerCase();
+  const rightName = right.name.toLowerCase();
+  if (leftName !== rightName) return leftName < rightName ? -1 : 1;
+  const leftSlug = left.slug.toLowerCase();
+  const rightSlug = right.slug.toLowerCase();
+  if (leftSlug !== rightSlug) return leftSlug < rightSlug ? -1 : 1;
+  return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+}
+
 export default function PipelinesPage() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const [selected, setSelected] = useState('');
+  const [pipelineSearch, setPipelineSearch] = useState('');
+  const [pipelineState, setPipelineState] = useState<PipelineStateFilter>('all');
   const [name, setName] = useState('My pipeline');
   const [description, setDescription] = useState('');
   const [mode, setMode] = useState<'form' | 'json'>('form');
@@ -35,6 +49,15 @@ export default function PipelinesPage() {
   const hydratedPipeline = useRef<string | null>(null);
   const appliedMarketRelease = useRef('');
   const { data: pipelineList = [] } = useQuery({ queryKey: ['pipelines'], queryFn: listPipelines });
+  const visiblePipelines = useMemo(() => {
+    const query = pipelineSearch.trim().toLowerCase();
+    return pipelineList
+      .filter((item) => !query || item.name.toLowerCase().includes(query) || item.slug.toLowerCase().includes(query))
+      .filter((item) => pipelineState === 'all'
+        || (pipelineState === 'draft' && item.draftVersion !== null)
+        || (pipelineState === 'published' && item.stableVersion !== null))
+      .toSorted(comparePipelineSummaries);
+  }, [pipelineList, pipelineSearch, pipelineState]);
   const { data: session } = useQuery<{ selectedProjectId?: string }>({ queryKey: ['session'], queryFn: async () => { const response = await fetch('/api/session'); if (!response.ok) throw new Error('Session unavailable'); return response.json(); } });
   const projectId = session?.selectedProjectId ?? '';
   const projectReleasesQuery = useQuery({ queryKey: ['project-processor-releases', projectId], queryFn: () => listProjectProcessors(projectId), enabled: !!projectId });
@@ -138,9 +161,16 @@ export default function PipelinesPage() {
     <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
       <aside className="space-y-3 rounded-xl border border-border bg-card p-4">
         <button onClick={() => selectPipeline('')} className="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium">New pipeline</button>
-        {pipelineList.map((item) => <button key={item.id} onClick={() => selectPipeline(item.slug)} className={`w-full rounded-md border p-3 text-left text-sm ${selected === item.slug ? 'border-primary bg-primary/10' : 'border-border'}`}>
-          <span className="block font-medium">{item.name}</span><span className="text-xs text-muted-foreground">{item.slug} · stable {item.stableVersion ?? '—'}</span>
+        <label className="block text-sm font-medium">Search pipelines<input type="search" value={pipelineSearch} onChange={(event) => setPipelineSearch(event.target.value)} placeholder="Name or slug" className="mt-1 w-full rounded-md border border-border bg-background p-2 font-normal" /></label>
+        <label className="block text-sm font-medium">Pipeline state<select value={pipelineState} onChange={(event) => setPipelineState(event.target.value as PipelineStateFilter)} className="mt-1 h-10 w-full rounded-md border border-border bg-background px-2 font-normal">
+          <option value="all">All states</option><option value="draft">Draft</option><option value="published">Published</option>
+        </select></label>
+        <p className="text-xs text-muted-foreground" aria-live="polite">Showing {visiblePipelines.length} of {pipelineList.length} pipelines</p>
+        {visiblePipelines.map((item) => <button key={item.id} onClick={() => selectPipeline(item.slug)} aria-current={selected === item.slug ? 'true' : undefined} className={`w-full rounded-md border p-3 text-left text-sm ${selected === item.slug ? 'border-primary bg-primary/10' : 'border-border'}`}>
+          <span className="block font-medium">{item.name}</span><span className="text-xs text-muted-foreground">{item.slug}</span><span className="mt-1 block text-xs text-muted-foreground">{item.draftVersion !== null ? `Draft v${item.draftVersion}` : 'No draft'} · {item.stableVersion !== null ? `Published v${item.stableVersion}` : 'Not published'}</span>
         </button>)}
+        {pipelineList.length > 0 && visiblePipelines.length === 0 && <p className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">No pipelines match this search and state.</p>}
+        {pipelineList.length === 0 && <p className="rounded-md border border-dashed border-border p-3 text-sm text-muted-foreground">No pipelines yet.</p>}
       </aside>
       <section className="space-y-5 rounded-xl border border-border bg-card p-5">
         <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Name<input value={name} onChange={(e) => { setName(e.target.value); setDirty(true); }} disabled={!!selected} className="mt-1 w-full rounded-md border border-border bg-background p-2" /></label>
