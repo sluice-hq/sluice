@@ -68,3 +68,12 @@ tasks.register('externalIntegrationTest', Test) {
 tasks.named('bootRun') {
 	systemProperty 'user.timezone', 'UTC'
 }
+
+tasks.named('bootJar') {
+	from(rootProject.file('../THIRD_PARTY_NOTICES.md')) {
+		into 'META-INF'
+	}
+	from(rootProject.file('../LICENSE')) {
+		into 'META-INF'
+	}
+}
