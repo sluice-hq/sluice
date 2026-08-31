@@ -1,9 +1,8 @@
 'use client';
 
-import Image from 'next/image';
-import Link from 'next/link';
 import { Eye, EyeOff, ShieldCheck, Sparkles } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { SluiceBrand } from '@/components/brand/SluiceBrand';
 import { Input } from '@/components/ui/input';
 
 export function AuthShell({
@@ -21,10 +20,7 @@ export function AuthShell({
     <main className="relative grid min-h-screen overflow-hidden bg-background lg:grid-cols-[minmax(0,1fr)_minmax(28rem,0.9fr)]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_80%_0%,rgb(35_149_255_/_0.16),transparent_28rem)]" />
       <section className="relative hidden border-r border-border/70 px-10 py-10 lg:flex lg:flex-col xl:px-[10vw]">
-        <Link href="/" className="flex w-fit items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <Image src="/logo-4.png" alt="" width={44} height={44} className="size-11 object-contain" priority />
-          <span className="text-xl font-semibold tracking-tight">Sluice</span>
-        </Link>
+        <SluiceBrand href="/" size="medium" priority />
         <div className="my-auto max-w-xl pb-14 pt-24">
           <span className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold tracking-wide text-primary">
             <Sparkles className="size-3.5" aria-hidden="true" />
@@ -47,10 +43,7 @@ export function AuthShell({
 
       <section className="relative flex items-center justify-center px-5 py-8 sm:px-8 lg:px-12">
         <div className="w-full max-w-md">
-          <Link href="/" className="mb-12 flex items-center gap-2 lg:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <Image src="/logo-4.png" alt="" width={36} height={36} className="size-9 object-contain" priority />
-            <span className="text-lg font-semibold tracking-tight">Sluice</span>
-          </Link>
+          <SluiceBrand href="/" size="small" priority className="mb-12 lg:hidden" />
           <p className="text-sm font-semibold text-primary">{eyebrow}</p>
           <h1 id="auth-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">{subtitle}</p>

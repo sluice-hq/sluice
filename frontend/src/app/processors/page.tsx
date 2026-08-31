@@ -8,7 +8,8 @@ import {
   disableProcessorRelease, enableProcessorRelease, listProjectProcessors,
   type ProcessorContract, type ProjectProcessorRelease,
 } from '@/api/processors';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { ActionStatus, type ActionStatusKind } from '@/components/ui/action-status';
 
 const categoryLabels: Record<string, { title: string; detail: string }> = {
   transform: { title: 'Transform', detail: 'Change an asset while preserving its role in the pipeline.' },
@@ -69,7 +70,7 @@ function ReleaseActions({ release, projectId, pendingKey, confirming, onEnable, 
   return <div className="space-y-2">
     <div className="flex flex-wrap gap-2">
       {release.enabled
-        ? <><Link href={href} className="inline-flex h-8 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/80">Use in pipeline</Link><Button type="button" variant="outline" disabled={pending} onClick={onAskDisable}>Disable</Button></>
+        ? <><Link href={href} className={buttonVariants()}>Use in pipeline</Link><Button type="button" variant="outline" disabled={pending} onClick={onAskDisable}>Disable</Button></>
         : <Button type="button" disabled={pending || !projectId} onClick={onEnable}>{pending ? 'Enabling…' : 'Enable for project'}</Button>}
       <Button type="button" variant="ghost" onClick={onCopy}>Copy step JSON</Button>
     </div>
@@ -109,6 +110,7 @@ export default function ProcessorsPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState('');
+  const [feedbackKind, setFeedbackKind] = useState<ActionStatusKind>('success');
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null);
   const session = useQuery<Session>({ queryKey: ['session'], queryFn: async () => { const response = await fetch('/api/session'); if (!response.ok) throw new Error('Session unavailable'); return response.json(); } });
   const projectId = session.data?.selectedProjectId ?? '';
@@ -119,8 +121,12 @@ export default function ProcessorsPage() {
       if (enable) await enableProcessorRelease(projectId, release.processor.slug, release.processor.version);
       else await disableProcessorRelease(projectId, release.processor.slug, release.processor.version);
     },
-    onSuccess: async (_, variables) => { setConfirmingKey(null); setFeedback(`${variables.release.processor.displayName} v${variables.release.processor.version} ${variables.enable ? 'enabled for this project.' : 'disabled for new authoring. Published pipelines remain unchanged.'}`); await queryClient.invalidateQueries({ queryKey: ['project-processor-releases', projectId] }); },
-    onError: (error) => setFeedback(error instanceof Error ? error.message : 'The processor setting could not be changed.'),
+    onMutate: (variables) => {
+      setFeedbackKind('pending');
+      setFeedback(`${variables.enable ? 'Enabling' : 'Disabling'} ${variables.release.processor.displayName} v${variables.release.processor.version}...`);
+    },
+    onSuccess: async (_, variables) => { setConfirmingKey(null); setFeedbackKind('success'); setFeedback(`${variables.release.processor.displayName} v${variables.release.processor.version} ${variables.enable ? 'enabled for this project.' : 'disabled for new authoring. Published pipelines remain unchanged.'}`); await queryClient.invalidateQueries({ queryKey: ['project-processor-releases', projectId] }); },
+    onError: (error) => { setFeedbackKind('error'); setFeedback(error instanceof Error ? error.message : 'The processor setting could not be changed.'); },
   });
   const q = searchParams.get('q') ?? '';
   const category = searchParams.get('category') ?? '';
@@ -152,17 +158,17 @@ export default function ProcessorsPage() {
   const outputTypes = [...new Set(releases.flatMap((release) => release.processor.output.mimeTypes))].sort();
   const activeFilters = [['q', q], ['category', category], ['input', input], ['output', output]].filter(([, value]) => value);
   const pendingKey = mutation.isPending ? releaseKey(mutation.variables.release) : undefined;
-  async function copy(release: ProjectProcessorRelease) { try { await navigator.clipboard.writeText(stepJson(release.processor)); setFeedback(`Copied ${release.processor.displayName} v${release.processor.version} step JSON.`); } catch { setFeedback('Clipboard unavailable. Select the example and copy it manually.'); } }
+  async function copy(release: ProjectProcessorRelease) { try { await navigator.clipboard.writeText(stepJson(release.processor)); setFeedbackKind('success'); setFeedback(`Copied ${release.processor.displayName} v${release.processor.version} step JSON.`); } catch { setFeedbackKind('error'); setFeedback('Clipboard unavailable. Select the example and copy it manually.'); } }
 
   return <div className="mx-auto max-w-7xl space-y-8">
     <header className="max-w-3xl"><p className="text-sm font-medium text-primary">Processor Market</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Composable media capabilities, with the facts upfront.</h1><p className="mt-3 leading-7 text-muted-foreground">Discover an exact release, enable it for this project, then add it to a pipeline. Every result comes from the versioned processor manifest.</p></header>
     <section aria-label="Processor discovery" className="space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-5">
       <div className="grid gap-3 lg:grid-cols-[minmax(14rem,1fr)_repeat(4,minmax(9rem,auto))]"><label className="text-sm">Search processors<input type="search" value={q} onChange={(event) => setParam('q', event.target.value)} placeholder="Name, purpose, MIME type, parameter…" className="mt-1 w-full rounded-lg border border-border bg-background p-2.5" /></label><label className="text-sm">Category<select value={category} onChange={(event) => setParam('category', event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2.5"><option value="">All categories</option>{categories.map((value) => <option key={value} value={value}>{categoryLabels[value]?.title ?? value}</option>)}</select></label><label className="text-sm">Accepted input<select value={input} onChange={(event) => setParam('input', event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2.5"><option value="">Any input</option>{inputTypes.map((value) => <option key={value} value={value}>{mediaLabel(value)} ({value})</option>)}</select></label><label className="text-sm">Produced output<select value={output} onChange={(event) => setParam('output', event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2.5"><option value="">Any output</option>{outputTypes.map((value) => <option key={value} value={value}>{mediaLabel(value)} ({value})</option>)}</select></label><label className="text-sm">Sort by<select value={sort} onChange={(event) => setParam('sort', event.target.value === 'name' ? '' : event.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2.5"><option value="name">Name</option><option value="category">Category</option><option value="input">Input file type</option><option value="newest">Newest release</option></select></label></div>
-      <div className="flex flex-wrap items-center gap-2"><p role="status" className="mr-auto text-sm text-muted-foreground">{filtered.length} of {products.length} processors</p>{activeFilters.map(([name, value]) => <button key={name} type="button" onClick={() => setParam(name, '')} className="rounded-full border border-border bg-background px-3 py-1 text-xs hover:border-primary">{name}: {name === 'input' || name === 'output' ? mediaLabel(value) : value} ×</button>)}{(activeFilters.length > 0 || sort !== 'name') && <Button type="button" variant="ghost" onClick={reset}>Reset filters</Button>}</div>
+      <div className="flex flex-wrap items-center gap-2"><p role="status" className="mr-auto text-sm text-muted-foreground">{filtered.length} of {products.length} processors</p>{activeFilters.map(([name, value]) => <button key={name} type="button" onClick={() => setParam(name, '')} className="rounded-full border border-border bg-background px-3 py-1 text-xs transition-colors hover:border-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{name}: {name === 'input' || name === 'output' ? mediaLabel(value) : value} ×</button>)}{(activeFilters.length > 0 || sort !== 'name') && <Button type="button" variant="ghost" onClick={reset}>Reset filters</Button>}</div>
     </section>
-    {feedback && <p role="status" className="rounded-xl border border-border bg-background p-3 text-sm">{feedback}</p>}
-    {(session.isLoading || catalogQuery.isLoading) && <p className="text-muted-foreground">Loading processor catalog…</p>}
-    {(session.isError || catalogQuery.isError) && <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">The project processor catalog could not be loaded. Try again once the API is available.</p>}
+    {feedback && <ActionStatus kind={feedbackKind} message={feedback} className="rounded-xl border border-border bg-background p-3" />}
+    {(session.isLoading || catalogQuery.isLoading) && <ActionStatus kind="pending" message="Loading processor catalog..." />}
+    {(session.isError || catalogQuery.isError) && <ActionStatus kind="error" message="The project processor catalog could not be loaded. Try again once the API is available." className="rounded-xl border border-destructive/40 bg-destructive/10 p-4" />}
     {!projectId && !session.isLoading && !session.isError && <p role="alert" className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">Select a project before managing processor releases.</p>}
     {projectId && catalogQuery.isSuccess && products.length === 0 && <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">No processor releases are published yet.</p>}
     {products.length > 0 && filtered.length === 0 && <div className="rounded-2xl border border-border bg-card p-8 text-center"><h2 className="text-xl font-semibold">No processors match these filters</h2><p className="mt-2 text-sm text-muted-foreground">Clear one or more filters to return to the full project catalog.</p><Button type="button" className="mt-4" onClick={reset}>Reset filters</Button></div>}

@@ -17,6 +17,8 @@ The repository provides a verified local product flow. Azure deployment automati
 - Direct Azure Blob Storage or Azurite uploads with completion verification and short-lived download URLs.
 - Versioned processor releases; revision-checked pipeline drafts; immutable published versions and aliases; contract validation before publication and execution.
 - Durable asynchronous runs with PostgreSQL-backed outbox delivery, RabbitMQ workers, retry/recovery handling, step facts, output provenance, Server-Sent Events, and signed terminal webhooks.
+- Deterministic local media-governance decisions with persisted allow/review/block evidence, plus an Azure AI Content Safety adapter awaiting live Azure provisioning and verification.
+- Email verification and password recovery with hashed, expiring, single-use link tokens; local email capture and an Azure Communication Services Email adapter are implemented.
 - Processor market, searchable guided and JSON pipeline authoring with descriptive starter flows and enabled-release safeguards, first-run checklist, API Quick Start, pipeline test console, and asset/run/governance inspection.
 - Local Prometheus and Grafana monitoring, plus backend, integration, API-smoke, and Playwright browser verification.
 
@@ -46,6 +48,8 @@ The API commits each run and its queue event together in PostgreSQL. The outbox 
 | Durable data | PostgreSQL 16 | Azure Database for PostgreSQL Flexible Server |
 | Media | Azurite | Private Azure Blob Storage |
 | Queue | RabbitMQ | Azure Service Bus |
+| Media governance | Deterministic local provider | Azure AI Content Safety |
+| Authentication email | Bounded in-memory capture | Azure Communication Services Email |
 | Observability | Actuator, Prometheus, Grafana | Azure Monitor and Application Insights |
 
 RabbitMQ is the current local broker. Azure Service Bus is a planned adapter, not a deployed component.
@@ -196,7 +200,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The browser test requires the local application to be running. It covers authentication and session behavior, CSRF rejection, projects and keys, pipeline publication, upload/run/output, and governance. GitHub Actions runs backend and frontend checks in parallel, then runs the integration, browser, and API-smoke paths in a dependent product gate.
+The browser test requires the local application to be running. It covers authentication and session behavior, CSRF rejection, project switching and feedback, API keys, processor discovery and enablement, guided/JSON pipeline authoring, upload/run/output, asset and governance discovery, and responsive navigation. GitHub Actions runs backend and frontend checks in parallel, then runs the integration, browser, and API-smoke paths in a dependent product gate.
 
 Before committing, check whitespace errors from the repository root:
 
@@ -231,7 +235,9 @@ docker-compose.yml       Local PostgreSQL, RabbitMQ, Azurite, Prometheus, Grafan
 
 Sluice currently runs locally with Docker Compose and a Spring Boot/Next.js development setup. There is no `infra/` directory, Terraform, Azure resource provisioning, container-image publication, or automated deployment in this repository.
 
-The intended Azure architecture uses Container Apps, API Management, Azure Database for PostgreSQL, Blob Storage, Service Bus, Key Vault, and Azure Monitor/Application Insights. It remains a target design, not a release claim.
+The intended Azure architecture uses Container Apps, API Management, Azure Database for PostgreSQL, Blob Storage, Service Bus, Key Vault, Azure AI Content Safety, Azure Communication Services Email, and Azure Monitor/Application Insights. It remains a target design, not a release claim.
+
+The Content Safety and Email adapters exist in code, but the Azure resources, verified email sender/domain, Key Vault wiring, durable production email delivery, live service smoke tests, monitoring, and cost safeguards are not implemented. These are explicit L-08C and L-08D deployment tickets in the SDD; local adapter tests are not evidence of a working hosted integration.
 
 ## License
 
