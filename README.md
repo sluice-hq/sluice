@@ -242,3 +242,10 @@ The Content Safety and Email adapters exist in code, but the Azure resources, ve
 ## License
 
 Sluice is licensed under the [Apache License 2.0](LICENSE).
+
+Direct backend and frontend dependencies, their resolved versions, licenses,
+upstream sources, and required attribution text are recorded in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The notice is also embedded
+in the backend executable JAR. The frontend production build includes the
+notice and a generated bundle of the original license files shipped by every
+direct runtime package.
