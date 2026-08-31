@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -20,6 +19,9 @@ import {
 } from 'lucide-react';
 import { csrfFetch } from '@/lib/csrf';
 import { cn } from '@/lib/utils';
+import { SluiceBrand } from '@/components/brand/SluiceBrand';
+import { ActionStatus } from '@/components/ui/action-status';
+import { AppShellSkeleton } from '@/components/layout/AppShellSkeleton';
 
 const navigation = [
   { name: 'Overview', href: '/app', icon: LayoutDashboard },
@@ -43,6 +45,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sessionAction, setSessionAction] = useState<'project' | 'logout' | null>(null);
   const [sessionError, setSessionError] = useState('');
+  const [sessionMessage, setSessionMessage] = useState('');
   const publicRoute = publicRoutes.has(pathname);
   const { data: session, isLoading, isError } = useQuery<Session>({
     queryKey: ['session'],
@@ -60,36 +63,54 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     if (!publicRoute && isError) router.replace('/login');
   }, [isError, publicRoute, router]);
 
+  useEffect(() => {
+    if (!sessionMessage || sessionAction) return;
+    const timeout = window.setTimeout(() => setSessionMessage(''), 4_000);
+    return () => window.clearTimeout(timeout);
+  }, [sessionAction, sessionMessage]);
+
   if (publicRoute) return children;
   if (isLoading || !session) {
-    return <div className="grid min-h-screen place-items-center bg-background text-sm text-muted-foreground">Loading Sluice…</div>;
+    return <AppShellSkeleton />;
   }
 
-  const selectedProject = session.projects.find((project) => project.id === session.selectedProjectId);
+  const activeSession = session;
+  const selectedProject = activeSession.projects.find((project) => project.id === activeSession.selectedProjectId);
 
   async function selectProject(projectId: string) {
-    if (sessionAction) return;
-    setSessionAction('project'); setSessionError('');
+    if (sessionAction || projectId === activeSession.selectedProjectId) return;
+    const nextProject = activeSession.projects.find((project) => project.id === projectId);
+    setSessionAction('project');
+    setSessionError('');
+    setSessionMessage(`Switching to ${nextProject?.name ?? 'project'}...`);
     try {
       const response = await csrfFetch('/api/session/project', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }) });
       if (!response.ok) throw new Error('Could not switch project. Your current session is still active.');
       const sessionResponse = await fetch('/api/session');
       if (!sessionResponse.ok) throw new Error('Project switched, but fresh project data could not be loaded. Refresh to continue.');
-      queryClient.setQueryData<Session>(['session'], await sessionResponse.json());
+      const refreshedSession = await sessionResponse.json() as Session;
+      queryClient.setQueryData<Session>(['session'], refreshedSession);
       await queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] !== 'session' });
-    } catch (cause) { setSessionError(cause instanceof Error ? cause.message : 'Could not switch project.'); }
+      setSessionMessage(`Switched to ${nextProject?.name ?? 'project'}.`);
+    } catch (cause) {
+      setSessionMessage('');
+      setSessionError(cause instanceof Error ? cause.message : 'Could not switch project.');
+    }
     finally { setSessionAction(null); }
   }
 
   async function logout() {
     if (sessionAction) return;
-    setSessionAction('logout'); setSessionError('');
+    setSessionAction('logout'); setSessionError(''); setSessionMessage('Signing out...');
     try {
       const response = await csrfFetch('/api/session/logout', { method: 'POST' });
       if (!response.ok) throw new Error('Could not sign out. Please try again.');
       queryClient.removeQueries({ queryKey: ['session'] });
       router.replace('/login'); router.refresh();
-    } catch (cause) { setSessionError(cause instanceof Error ? cause.message : 'Could not sign out.'); }
+    } catch (cause) {
+      setSessionMessage('');
+      setSessionError(cause instanceof Error ? cause.message : 'Could not sign out.');
+    }
     finally { setSessionAction(null); }
   }
 
@@ -122,19 +143,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         Skip to main content
       </a>
       <aside className="fixed inset-y-0 z-30 hidden w-60 flex-col border-r border-sidebar-border bg-sidebar md:flex">
-        <Brand />
+        <SluiceBrand
+          href="/app"
+          size="large"
+          priority
+          className="h-20 w-full rounded-none border-b border-sidebar-border pl-11 pr-5 focus-visible:ring-inset focus-visible:ring-sidebar-ring focus-visible:ring-offset-0"
+        />
         <nav aria-label="Main navigation" className="flex-1 space-y-1 overflow-y-auto px-3 py-5">
           {navigationItems}
         </nav>
-        <SessionPanel session={session} selectedProject={selectedProject} onProjectChange={selectProject} onLogout={logout} pending={sessionAction} error={sessionError} />
+        <SessionPanel session={session} selectedProject={selectedProject} onProjectChange={selectProject} onLogout={logout} pending={sessionAction} error={sessionError} message={sessionMessage} />
       </aside>
 
       <div className="min-h-screen md:pl-60">
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border/80 bg-background/90 px-4 backdrop-blur-xl md:px-8">
-          <Link href="/app" className="flex items-center gap-2 md:hidden" aria-label="Sluice overview">
-            <Image src="/logo-4.png" alt="" width={32} height={32} className="size-8 object-contain" priority />
-            <span className="font-semibold tracking-tight">Sluice</span>
-          </Link>
+          <SluiceBrand href="/app" size="small" priority className="md:hidden" />
           <div className="hidden flex-1 md:block" />
           <div className="flex items-center gap-2">
             <Link
@@ -160,22 +183,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {mobileMenuOpen && (
           <div className="fixed inset-x-0 top-16 z-20 border-b border-border bg-sidebar px-4 pb-4 pt-3 shadow-2xl md:hidden">
             <nav aria-label="Mobile navigation" className="space-y-1">{navigationItems}</nav>
-            <SessionPanel session={session} selectedProject={selectedProject} onProjectChange={selectProject} onLogout={logout} compact pending={sessionAction} error={sessionError} />
+            <SessionPanel session={session} selectedProject={selectedProject} onProjectChange={selectProject} onLogout={logout} compact pending={sessionAction} error={sessionError} message={sessionMessage} />
           </div>
         )}
 
         <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1500px] px-4 py-6 focus:outline-none sm:px-6 md:px-8 md:py-8">{children}</main>
       </div>
     </div>
-  );
-}
-
-function Brand() {
-  return (
-    <Link href="/app" className="relative flex h-20 items-center gap-1 border-b border-sidebar-border pl-11 pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sidebar-ring">
-      <Image src="/logo-4.png" alt="" width={42} height={42} className="size-10 object-contain" priority />
-      <span className="text-[30px] font-semibold tracking-tight text-foreground">Sluice</span>
-    </Link>
   );
 }
 
@@ -186,6 +200,7 @@ function SessionPanel({
   onLogout,
   pending,
   error,
+  message,
   compact = false,
 }: {
   session: Session;
@@ -194,6 +209,7 @@ function SessionPanel({
   onLogout: () => Promise<void>;
   pending?: 'project' | 'logout' | null;
   error?: string;
+  message?: string;
   compact?: boolean;
 }) {
   return (
@@ -226,7 +242,13 @@ function SessionPanel({
           <span className="sr-only">{pending === 'logout' ? 'Signing out…' : 'Sign out'}</span>
         </button>
       </div>
-      {error && <div role="status" aria-live="polite" className="mt-2 min-h-4 text-xs text-red-400">{error}</div>}
+      {(error || message) && (
+        <ActionStatus
+          kind={error ? 'error' : pending ? 'pending' : 'success'}
+          message={error || message || ''}
+          className="mt-2 text-xs"
+        />
+      )}
     </div>
   );
 }

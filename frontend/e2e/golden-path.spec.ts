@@ -85,8 +85,11 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   const anonymousOpenApi = await page.request.get('/api/backend/openapi.json');
   expect(anonymousOpenApi.status()).toBe(401);
   await expect(page.getByRole('heading', { name: /Turn media uploads into/i })).toBeVisible();
+  await expect(page.locator('[data-slot="sluice-brand"]')).toHaveCount(1);
+  await expect(page.getByRole('link', { name: 'Create a workspace' })).toHaveCSS('cursor', 'pointer');
   await page.getByRole('link', { name: 'Create a workspace' }).click();
   await expect(page).toHaveURL(/\/signup$/);
+  await expect(page.locator('[data-slot="sluice-brand"]')).toHaveCount(2);
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByText('Enter your email address.')).toBeVisible();
   await expect(page.getByText('Create a password.')).toBeVisible();
@@ -106,6 +109,7 @@ test('developer completes the local dashboard golden path', async ({ page, conte
   await page.getByRole('link', { name: 'Open dashboard' }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByRole('heading', { name: 'Platform Overview' })).toBeVisible();
+  await expect(page.locator('[data-slot="sluice-brand"]')).toHaveCount(2);
   await expect(page.getByRole('heading', { name: 'Start your first integration' })).toBeVisible();
   const initialChecklist = page.getByRole('region', { name: 'Start your first integration' });
   await expect(initialChecklist.getByRole('listitem').filter({ hasText: 'Create an API key' }).getByLabel('Not complete')).toBeVisible();
@@ -470,7 +474,10 @@ test('developer completes the local dashboard golden path', async ({ page, conte
     options.map((option) => (option as HTMLOptionElement).value).find((value) => value && value !== selectedProjectId) ?? '',
   originalProjectId);
   expect(otherProjectId).not.toBe('');
+  const otherProjectName = await projectSwitcher.locator(`option[value="${otherProjectId}"]`).textContent();
+  await expect(projectSwitcher).toHaveCSS('cursor', 'pointer');
   await projectSwitcher.selectOption(otherProjectId);
+  await expect(compatibilityPage.getByRole('status').filter({ hasText: `Switched to ${otherProjectName}.` })).toBeVisible();
   await expect.poll(async () => {
     const response = await compatibilityPage.request.get('/api/session');
     return (await response.json()).selectedProjectId;

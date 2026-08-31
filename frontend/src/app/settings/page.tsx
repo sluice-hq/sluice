@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { createApiKey, createProject, listApiKeys, revokeApiKey, type ApiKeySummary } from '@/api/identity';
 import { csrfFetch } from '@/lib/csrf';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ActionStatus } from '@/components/ui/action-status';
 
 interface Session {
   user: { email: string };
@@ -65,9 +66,18 @@ export default function SettingsPage() {
     catch { const input = document.querySelector<HTMLInputElement>('#revealed-api-key'); input?.focus(); input?.select(); setMessage('Clipboard unavailable. The key is selected; copy it manually.'); }
   }
 
+  const pendingMessage = pending === 'project'
+    ? 'Creating and selecting project...'
+    : pending === 'key'
+      ? 'Creating API key...'
+      : pending?.startsWith('revoke-')
+        ? 'Revoking API key...'
+        : '';
+  const statusMessage = error || pendingMessage || message;
+
   return <div className="max-w-4xl space-y-8">
-    <div role={error ? 'alert' : 'status'} aria-live="polite" className={error ? 'min-h-5 text-sm text-destructive' : 'min-h-5 text-sm text-muted-foreground'}>{error || message}</div>
     <header><h1 className="text-2xl font-bold">Developer settings</h1><p className="mt-1 text-muted-foreground">Manage projects and application credentials.</p></header>
+    {statusMessage && <ActionStatus kind={error ? 'error' : pending ? 'pending' : 'success'} message={statusMessage} />}
 
     <section className="rounded-xl border border-border bg-card p-6 space-y-4">
       <h2 className="text-lg font-semibold">Projects</h2>
@@ -75,13 +85,13 @@ export default function SettingsPage() {
         <div key={project.id} className="flex justify-between rounded-lg border border-border px-4 py-3">
           <span>{project.name}</span><span className="text-xs text-muted-foreground">{project.role}{project.id === projectId ? ' · selected' : ''}</span>
         </div>)}</div>
-      <form onSubmit={addProject} className="flex gap-2"><Input name="name" placeholder="New project name" maxLength={100} required disabled={pending !== null} /><Button type="submit" disabled={pending !== null}>{pending === 'project' ? 'Creating…' : 'Create project'}</Button></form>
+      <form onSubmit={addProject} className="flex flex-col gap-2 sm:flex-row"><Input name="name" placeholder="New project name" maxLength={100} required disabled={pending !== null} /><Button type="submit" disabled={pending !== null}>{pending === 'project' ? 'Creating…' : 'Create project'}</Button></form>
     </section>
 
     <section className="rounded-xl border border-border bg-card p-6 space-y-4">
       <div><h2 className="text-lg font-semibold">API keys</h2><p className="text-sm text-muted-foreground">Use these from your applications. Only hashes are stored by Sluice.</p></div>
       {revealedKey && <div className="rounded-lg border border-primary/40 bg-primary/10 p-4 space-y-2"><div className="flex gap-2"><Input id="revealed-api-key" readOnly value={revealedKey} /><Button type="button" onClick={copyKey}>Copy</Button></div></div>}
-      <form onSubmit={addKey} className="flex gap-2"><Input name="name" placeholder="Key name, e.g. storefront-dev" maxLength={100} required disabled={pending !== null} /><Button type="submit" disabled={pending !== null}>{pending === 'key' ? 'Creating…' : 'Create API key'}</Button></form>
+      <form onSubmit={addKey} className="flex flex-col gap-2 sm:flex-row"><Input name="name" placeholder="Key name, e.g. storefront-dev" maxLength={100} required disabled={pending !== null} /><Button type="submit" disabled={pending !== null}>{pending === 'key' ? 'Creating…' : 'Create API key'}</Button></form>
       <div className="divide-y divide-border">{keys.map((key) => <div key={key.id} className="flex items-center justify-between py-3">
         <div><p className="font-medium">{key.name}</p><p className="text-xs text-muted-foreground">Created {new Date(key.createdAt).toLocaleDateString()} · {key.lastUsedAt ? `last used ${new Date(key.lastUsedAt).toLocaleString()}` : 'never used'}</p></div>
         {key.revokedAt ? <span className="text-xs text-muted-foreground">Revoked</span> : <Button variant="destructive" disabled={pending !== null} onClick={() => setRevokeTarget(key.id)}>Revoke</Button>}
