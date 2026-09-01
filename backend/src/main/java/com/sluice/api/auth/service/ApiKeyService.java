@@ -6,6 +6,7 @@ import com.sluice.api.auth.repository.ApiKeyRepository;
 import com.sluice.api.project.domain.ProjectMember;
 import com.sluice.api.project.repository.ProjectMemberRepository;
 import com.sluice.api.security.ApiKeyHasher;
+import com.sluice.api.runtime.ConditionalOnApiRuntime;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
+@ConditionalOnApiRuntime
 public class ApiKeyService {
 
     private static final SecureRandom RANDOM = new SecureRandom();

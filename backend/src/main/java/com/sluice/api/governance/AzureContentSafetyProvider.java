@@ -2,6 +2,7 @@ package com.sluice.api.governance;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sluice.api.runtime.ConditionalOnWorkerRuntime;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+@ConditionalOnWorkerRuntime
 @ConditionalOnProperty(name = "sluice.governance.provider", havingValue = "azure")
 public class AzureContentSafetyProvider implements ContentSafetyProvider {
     private final URI analyzeUri;

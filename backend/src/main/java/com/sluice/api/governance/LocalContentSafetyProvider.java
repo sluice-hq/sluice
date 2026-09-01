@@ -1,5 +1,6 @@
 package com.sluice.api.governance;
 
+import com.sluice.api.runtime.ConditionalOnWorkerRuntime;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+@ConditionalOnWorkerRuntime
 @ConditionalOnProperty(name = "sluice.governance.provider", havingValue = "local", matchIfMissing = true)
 public class LocalContentSafetyProvider implements ContentSafetyProvider {
     @Override

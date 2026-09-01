@@ -5,6 +5,7 @@ import com.sluice.api.auth.domain.AuthTokenPurpose;
 import com.sluice.api.auth.domain.User;
 import com.sluice.api.auth.email.AuthEmailProvider;
 import com.sluice.api.auth.email.AuthEmailExecutionConfig;
+import com.sluice.api.runtime.ConditionalOnApiRuntime;
 import com.sluice.api.auth.repository.AuthTokenRepository;
 import com.sluice.api.auth.repository.UserRepository;
 import org.slf4j.Logger;
@@ -27,6 +28,7 @@ import java.util.HexFormat;
 import java.util.UUID;
 
 @Service
+@ConditionalOnApiRuntime
 public class AuthTokenService {
     private static final Logger log = LoggerFactory.getLogger(AuthTokenService.class);
     private final AuthTokenRepository tokenRepository;

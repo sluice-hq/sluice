@@ -1,5 +1,6 @@
 package com.sluice.api.auth.service;
 
+import com.sluice.api.runtime.ConditionalOnApiRuntime;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -13,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Component
+@ConditionalOnApiRuntime
 public class AuthAbuseGuard {
     private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();
     private final AtomicLong checks = new AtomicLong();

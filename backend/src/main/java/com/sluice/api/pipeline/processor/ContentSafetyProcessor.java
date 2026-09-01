@@ -15,13 +15,14 @@ import java.io.InputStream;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Component
 public class ContentSafetyProcessor implements Processor {
     public static final String DECISION_FACT = "governanceDecision";
-    private final ContentSafetyProvider provider;
+    private final Optional<ContentSafetyProvider> provider;
 
-    public ContentSafetyProcessor(ContentSafetyProvider provider) { this.provider = provider; }
+    public ContentSafetyProcessor(Optional<ContentSafetyProvider> provider) { this.provider = provider; }
 
     @Override
     public ProcessorMetadata getMetadata() {
@@ -45,7 +46,9 @@ public class ContentSafetyProcessor implements Processor {
         String mime = context.getCurrentResource() instanceof FileMediaResource file
                 ? file.getContentType() : context.getAsset() == null ? "application/octet-stream"
                 : context.getAsset().getContentType();
-        ContentSafetyProvider.ContentSafetyResult result = provider.analyze(content, mime);
+        ContentSafetyProvider.ContentSafetyResult result = provider.orElseThrow(() ->
+                new IllegalStateException("Content Safety execution provider is unavailable in this runtime"))
+                .analyze(content, mime);
         int reviewThreshold = config != null && config.has("reviewThreshold")
                 ? config.path("reviewThreshold").asInt() : 4;
         int blockThreshold = config != null && config.has("blockThreshold")

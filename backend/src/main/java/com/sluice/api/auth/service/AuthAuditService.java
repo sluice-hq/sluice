@@ -2,6 +2,7 @@ package com.sluice.api.auth.service;
 
 import com.sluice.api.auth.domain.AuthAuditEvent;
 import com.sluice.api.auth.repository.AuthAuditEventRepository;
+import com.sluice.api.runtime.ConditionalOnApiRuntime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +18,7 @@ import java.util.HexFormat;
 import java.util.UUID;
 
 @Service
+@ConditionalOnApiRuntime
 public class AuthAuditService {
     private static final Logger log = LoggerFactory.getLogger(AuthAuditService.class);
     private final AuthAuditEventRepository repository;

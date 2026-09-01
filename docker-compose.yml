@@ -1,3 +1,20 @@
+x-backend-environment: &backend-environment
+  SPRING_PROFILES_ACTIVE: local
+  SLUICE_DB_URL: jdbc:postgresql://postgres:5432/sluice?options=-c%20TimeZone=UTC
+  SLUICE_DB_USERNAME: sluice
+  SLUICE_DB_PASSWORD: sluice_password
+  SLUICE_FLYWAY_URL: jdbc:postgresql://postgres:5432/sluice?options=-c%20TimeZone=UTC
+  SLUICE_FLYWAY_USERNAME: sluice
+  SLUICE_FLYWAY_PASSWORD: sluice_password
+  SPRING_RABBITMQ_HOST: rabbitmq
+  AZURE_STORAGE_CONNECTION_STRING: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;
+  AZURE_STORAGE_PUBLIC_BASE_URL: http://localhost:10000/devstoreaccount1
+  AZURE_STORAGE_CONFIGURE_CORS: "false"
+  SLUICE_JWT_SECRET: local-container-jwt-secret-must-never-be-used-in-production
+  SLUICE_AUTH_AUDIT_PEPPER: local-container-audit-pepper-must-never-be-used-in-production
+  SLUICE_CORS_ALLOWED_ORIGINS: http://localhost:3000
+  SLUICE_AUTH_FRONTEND_BASE_URL: http://localhost:3000
+
 services:
   postgres:
     image: postgres:16
@@ -25,6 +42,11 @@ services:
       - "10002:10002"
     volumes:
       - azurite_data:/workspace
+    healthcheck:
+      test: ["CMD", "node", "-e", "const http=require('http');const request=http.get('http://127.0.0.1:10000/devstoreaccount1?comp=list',response=>{response.resume();process.exit(response.statusCode===403?0:1)});request.on('error',()=>process.exit(1));request.setTimeout(2000,()=>{request.destroy();process.exit(1)})"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -34,6 +56,63 @@ services:
       - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: api
+    image: sluice-api:local
+    environment:
+      <<: *backend-environment
+      AZURE_STORAGE_CONFIGURE_CORS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      azurite:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  worker:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: worker
+    image: sluice-worker:local
+    environment:
+      <<: *backend-environment
+    depends_on:
+      api:
+        condition: service_healthy
+
+  frontend:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    image: sluice-frontend:local
+    environment:
+      API_BASE_URL: http://api:8080/api/v1
+      SLUICE_PUBLIC_API_BASE_URL: http://localhost:8080/api/v1
+      SLUICE_DASHBOARD_URL: http://localhost:3000
+      SLUICE_SECURE_COOKIES: "false"
+      SLUICE_STORAGE_PUBLIC_BASE_URL: http://localhost:10000/devstoreaccount1
+      SLUICE_STORAGE_INTERNAL_BASE_URL: http://azurite:10000/devstoreaccount1
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
 
   prometheus:
     image: prom/prometheus:v3.5.0

@@ -13,6 +13,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -47,7 +48,7 @@ class ContentSafetyProcessorTest {
     private ContentSafetyProcessor processor(int score) {
         ContentSafetyProvider provider = (content, mime) -> new ContentSafetyProvider.ContentSafetyResult(
                 "test", "v1", "request", Map.of("violence", score), List.of("fixture"));
-        return new ContentSafetyProcessor(provider);
+        return new ContentSafetyProcessor(Optional.of(provider));
     }
 
     private static class BytesResource implements MediaResource {

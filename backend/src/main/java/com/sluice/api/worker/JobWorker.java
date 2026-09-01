@@ -6,6 +6,7 @@ import com.sluice.api.job.domain.Job;
 import com.sluice.api.job.domain.JobStatus;
 import com.sluice.api.job.service.JobService;
 import com.sluice.api.messaging.RabbitMqConfig;
+import com.sluice.api.runtime.ConditionalOnWorkerRuntime;
 import com.sluice.api.messaging.dto.JobMessage;
 import com.sluice.api.pipeline.Pipeline;
 import com.sluice.api.pipeline.PipelineEngine;
@@ -29,6 +30,7 @@ import org.slf4j.MDC;
 import com.sluice.api.observability.SluiceMetrics;
 
 @Service
+@ConditionalOnWorkerRuntime
 public class JobWorker {
     private static final Logger log = LoggerFactory.getLogger(JobWorker.class);
 

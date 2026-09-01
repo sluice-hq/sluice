@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -97,12 +98,36 @@ class ProcessorCatalogServiceTest {
         ProcessorDefinition definition = new ProcessorDefinition(UUID.randomUUID(), manifest, "Sluice", "PUBLIC");
         ProcessorVersion persisted = new ProcessorVersion(UUID.randomUUID(), definition, "1.0.0", "PUBLISHED",
                 manifest.key(), "1", objectMapper.valueToTree(manifest), Instant.now());
-        when(registry.getAllManifests()).thenReturn(List.of());
         when(versions.findByLifecycleStatusOrderByDefinitionSlugAscSemanticVersionDesc("PUBLISHED"))
                 .thenReturn(List.of(persisted));
         when(registry.find("checksum", "1.0.0")).thenReturn(Optional.empty());
 
-        assertThrows(ProcessorCatalogMismatchException.class, service::synchronizeAndAudit);
+        assertThrows(ProcessorCatalogMismatchException.class, service::auditPublishedImplementations);
+
+        verify(registry, never()).getAllManifests();
+        verify(definitions, never()).save(any());
+        verify(versions, never()).save(any());
+        verify(versions, never()).flush();
+    }
+
+    @Test
+    void readOnlyAuditRejectsAMismatchedPublishedImplementation() {
+        ProcessorManifest manifest = ProcessorManifestResources.load("checksum-1.0.0.json");
+        ProcessorDefinition definition = new ProcessorDefinition(UUID.randomUUID(), manifest, "Sluice", "PUBLIC");
+        var changed = objectMapper.valueToTree(manifest);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) changed).put("description", "changed after publication");
+        ProcessorVersion persisted = new ProcessorVersion(UUID.randomUUID(), definition, "1.0.0", "PUBLISHED",
+                manifest.key(), "1", changed, Instant.now());
+        when(versions.findByLifecycleStatusOrderByDefinitionSlugAscSemanticVersionDesc("PUBLISHED"))
+                .thenReturn(List.of(persisted));
+        when(registry.find("checksum", "1.0.0")).thenReturn(Optional.of(manifest));
+
+        assertThrows(ProcessorCatalogMismatchException.class, service::auditPublishedImplementations);
+
+        verify(registry, never()).getAllManifests();
+        verify(definitions, never()).save(any());
+        verify(versions, never()).save(any());
+        verify(versions, never()).flush();
     }
 
     @Test

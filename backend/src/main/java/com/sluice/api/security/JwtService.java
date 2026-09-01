@@ -1,5 +1,6 @@
 package com.sluice.api.security;
 
+import com.sluice.api.runtime.ConditionalOnApiRuntime;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -12,6 +13,7 @@ import java.util.UUID;
 import java.util.function.Function;
 
 @Service
+@ConditionalOnApiRuntime
 public class JwtService {
 
     private final SecretKey key;

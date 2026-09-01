@@ -7,6 +7,7 @@ import com.sluice.api.project.domain.ProjectMember;
 import com.sluice.api.project.repository.ProjectMemberRepository;
 import com.sluice.api.project.repository.ProjectRepository;
 import com.sluice.api.security.JwtService;
+import com.sluice.api.runtime.ConditionalOnApiRuntime;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +23,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@ConditionalOnApiRuntime
 public class AuthService {
 
     private final UserRepository userRepository;

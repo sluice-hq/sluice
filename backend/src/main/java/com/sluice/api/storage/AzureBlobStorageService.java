@@ -24,6 +24,7 @@ public class AzureBlobStorageService implements StorageService {
     private final long downloadSasExpiryHours;
     private final boolean configureCors;
     private final String corsAllowedOrigins;
+    private final String publicBaseUrl;
     private final SluiceMetrics metrics;
     private BlobContainerClient containerClient;
 
@@ -34,6 +35,7 @@ public class AzureBlobStorageService implements StorageService {
             @Value("${azure.storage.sas.download-expiry-hours:24}") long downloadSasExpiryHours,
             @Value("${azure.storage.configure-cors:false}") boolean configureCors,
             @Value("${azure.storage.cors.allowed-origins:}") String corsAllowedOrigins,
+            @Value("${azure.storage.public-base-url:}") String publicBaseUrl,
             SluiceMetrics metrics) {
         this.blobServiceClient = blobServiceClient;
         this.containerName = containerName;
@@ -41,6 +43,7 @@ public class AzureBlobStorageService implements StorageService {
         this.downloadSasExpiryHours = downloadSasExpiryHours;
         this.configureCors = configureCors;
         this.corsAllowedOrigins = corsAllowedOrigins;
+        this.publicBaseUrl = stripTrailingSlash(publicBaseUrl);
         this.metrics = metrics;
     }
 
@@ -167,7 +170,7 @@ public class AzureBlobStorageService implements StorageService {
         ).setContentType(contentType);
         
         String sasToken = blobClient.generateSas(values);
-        return blobClient.getBlobUrl() + "?" + sasToken;
+        return expose(blobClient.getBlobUrl()) + "?" + sasToken;
     }
 
     @Override
@@ -188,7 +191,7 @@ public class AzureBlobStorageService implements StorageService {
         );
         
         String sasToken = blobClient.generateSas(values);
-        return blobClient.getBlobUrl() + "?" + sasToken;
+        return expose(blobClient.getBlobUrl()) + "?" + sasToken;
     }
 
     @Override
@@ -227,5 +230,25 @@ public class AzureBlobStorageService implements StorageService {
         } finally {
             metrics.storage(operation, outcome, System.nanoTime() - started);
         }
+    }
+
+    private String expose(String blobUrl) {
+        if (publicBaseUrl.isBlank()) {
+            return blobUrl;
+        }
+        return replaceAccountBase(blobServiceClient.getAccountUrl(), publicBaseUrl, blobUrl);
+    }
+
+    static String replaceAccountBase(String internalBaseUrl, String publicBaseUrl, String blobUrl) {
+        String internalBase = stripTrailingSlash(internalBaseUrl);
+        String publicBase = stripTrailingSlash(publicBaseUrl);
+        if (internalBase.isBlank() || publicBase.isBlank() || !blobUrl.startsWith(internalBase + "/")) {
+            throw new IllegalArgumentException("Blob URL does not belong to the configured storage account endpoint");
+        }
+        return publicBase + blobUrl.substring(internalBase.length());
+    }
+
+    private static String stripTrailingSlash(String value) {
+        return value == null ? "" : value.replaceAll("/+$", "");
     }
 }
