@@ -55,6 +55,11 @@ public class ProcessorCatalogService {
         }
         versionRepository.flush();
 
+        auditPublishedImplementations();
+    }
+
+    @Transactional(readOnly = true)
+    public void auditPublishedImplementations() {
         for (ProcessorVersion persisted : versionRepository
                 .findByLifecycleStatusOrderByDefinitionSlugAscSemanticVersionDesc("PUBLISHED")) {
             ProcessorManifest implementation = registry.find(

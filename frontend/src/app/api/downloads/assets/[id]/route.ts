@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { API_URL, readBackendError, serverAuthHeaders } from '@/lib/server-session';
+import { API_URL, getInternalStorageUrl, readBackendError, serverAuthHeaders } from '@/lib/server-session';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -24,7 +24,7 @@ export async function GET(request: Request, context: RouteContext) {
     return NextResponse.json({ detail: 'The output download response was incomplete.' }, { status: 502 });
   }
 
-  const downloadResponse = await fetch(link.downloadUrl, { cache: 'no-store' });
+  const downloadResponse = await fetch(getInternalStorageUrl(link.downloadUrl), { cache: 'no-store' });
   if (!downloadResponse.ok || !downloadResponse.body) {
     return NextResponse.json({ detail: 'The output could not be downloaded from storage.' }, { status: 502 });
   }

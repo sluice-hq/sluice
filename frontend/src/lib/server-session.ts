@@ -7,6 +7,10 @@ export const PROJECT_COOKIE = 'sluice_project';
 export const CSRF_COOKIE = 'sluice_csrf';
 export const CSRF_HEADER = 'X-Sluice-CSRF';
 const DEFAULT_API_URL = 'http://localhost:8080/api/v1';
+const secureCookieSetting = process.env.SLUICE_SECURE_COOKIES;
+const secureCookies = secureCookieSetting === 'false'
+  ? false
+  : secureCookieSetting === 'true' || process.env.NODE_ENV === 'production';
 export const API_URL = process.env.API_BASE_URL
   || process.env.SLUICE_PUBLIC_API_BASE_URL
   || process.env.NEXT_PUBLIC_API_BASE_URL
@@ -18,9 +22,19 @@ export function getPublicApiUrl(): string {
     || DEFAULT_API_URL).replace(/\/+$/, '');
 }
 
+export function getInternalStorageUrl(publicUrl: string): string {
+  const publicBase = process.env.SLUICE_STORAGE_PUBLIC_BASE_URL?.replace(/\/+$/, '');
+  const internalBase = process.env.SLUICE_STORAGE_INTERNAL_BASE_URL?.replace(/\/+$/, '');
+  if (!publicBase && !internalBase) return publicUrl;
+  if (!publicBase || !internalBase || !publicUrl.startsWith(`${publicBase}/`)) {
+    throw new Error('The storage download URL does not match the configured public endpoint.');
+  }
+  return internalBase + publicUrl.slice(publicBase.length);
+}
+
 export const sessionCookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
+  secure: secureCookies,
   sameSite: 'lax' as const,
   path: '/',
   maxAge: 24 * 60 * 60,
@@ -53,7 +67,11 @@ export function hasTrustedBrowserOrigin(request: NextRequest): boolean {
   const origin = request.headers.get('origin');
   if (!origin) return true;
   try {
-    return new URL(origin).origin === request.nextUrl.origin;
+    const trustedOrigins = new Set([request.nextUrl.origin]);
+    if (process.env.SLUICE_DASHBOARD_URL) {
+      trustedOrigins.add(new URL(process.env.SLUICE_DASHBOARD_URL).origin);
+    }
+    return trustedOrigins.has(new URL(origin).origin);
   } catch {
     return false;
   }

@@ -1,6 +1,7 @@
 package com.sluice.api.auth.service;
 
 import com.sluice.api.auth.email.AuthEmailExecutionConfig;
+import com.sluice.api.runtime.ConditionalOnApiRuntime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -8,6 +9,7 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
 
 @Service
+@ConditionalOnApiRuntime
 public class AuthEmailRequestDispatcher {
     private static final Logger log = LoggerFactory.getLogger(AuthEmailRequestDispatcher.class);
     private final TaskExecutor executor;

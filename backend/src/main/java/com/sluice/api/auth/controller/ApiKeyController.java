@@ -2,6 +2,7 @@ package com.sluice.api.auth.controller;
 
 import com.sluice.api.auth.domain.ProjectContext;
 import com.sluice.api.auth.service.ApiKeyService;
+import com.sluice.api.runtime.ConditionalOnApiRuntime;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -21,6 +22,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/projects/{projectId}/api-keys")
+@ConditionalOnApiRuntime
 public class ApiKeyController {
 
     private final ApiKeyService apiKeyService;

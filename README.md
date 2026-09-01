@@ -43,7 +43,7 @@ The API commits each run and its queue event together in PostgreSQL. The outbox 
 
 | Responsibility | Local implementation | Azure target architecture |
 |---|---|---|
-| API and worker | Spring Boot process and RabbitMQ listener | Separate Azure Container Apps |
+| API and worker | Combined source runtime or separate production-like containers | Separate Azure Container Apps |
 | Dashboard | Next.js | Azure Container App |
 | Durable data | PostgreSQL 16 | Azure Database for PostgreSQL Flexible Server |
 | Media | Azurite | Private Azure Blob Storage |
@@ -118,6 +118,14 @@ npm ci
 npm run dev
 ```
 
+To exercise the release images locally, build and start the separate API, worker, and dashboard containers:
+
+```powershell
+docker compose --profile app up -d --build --wait frontend worker
+```
+
+This path uses local-only credentials and the same PostgreSQL, RabbitMQ, and Azurite dependencies. The API container owns HTTP traffic, outbox dispatch, webhook delivery, dependency probes, database migrations, and processor-catalog synchronization. The worker disables Flyway, has no HTTP server, owns queue consumption and stuck-run recovery, and performs only a read-only audit that every published processor has a matching implementation. Stop the containerized application with `docker compose --profile app down`.
+
 ## API workflow
 
 Use the dashboard to create a project and reveal an API key, then use the API from an application. Machine requests authenticate with:
@@ -169,16 +177,20 @@ Authenticated API clients can request the generated OpenAPI contract at [`/api/v
 |---|---|---|
 | `API_BASE_URL` | API origin used by the Next.js BFF | `http://localhost:8080/api/v1` |
 | `SLUICE_PUBLIC_API_BASE_URL` | Public API origin shown by Quick Start | `http://localhost:8080/api/v1` |
+| `SLUICE_DASHBOARD_URL` | Canonical trusted dashboard origin used by public auth protection | `http://localhost:3000` |
+| `SLUICE_SECURE_COOKIES` | Require HTTPS-only dashboard cookies | `false` only for local HTTP; omit in production |
+| `SLUICE_STORAGE_PUBLIC_BASE_URL`, `SLUICE_STORAGE_INTERNAL_BASE_URL` | Optional dashboard mapping when browser and container Blob endpoints differ | Set only by the local Compose application profile |
+| `SLUICE_RUNTIME_MODE` | Backend capability boundary: `all`, `api`, or `worker` | `all` for source development; images select `api` or `worker` |
 | `SLUICE_DB_URL`, `SLUICE_DB_USERNAME`, `SLUICE_DB_PASSWORD` | PostgreSQL connection | Compose-compatible local defaults |
 | `AZURE_STORAGE_CONNECTION_STRING` | Azure Blob Storage or Azurite connection | Local Azurite default in application config |
 | `AZURE_STORAGE_CONTAINER_NAME` | Blob container | `assets` |
 | `SLUICE_JWT_SECRET` | Dashboard/API JWT signing secret | Replace for any non-local environment |
 | `SLUICE_CORS_ALLOWED_ORIGINS` | Allowed dashboard origin | `http://localhost:3000` |
 | `SLUICE_GOVERNANCE_PROVIDER` | `local` deterministic provider or `azure` adapter | `local` |
-| `AZURE_CONTENT_SAFETY_ENDPOINT`, `AZURE_CONTENT_SAFETY_API_KEY` | Azure provider credentials | Required only for `azure` governance |
+| `AZURE_CONTENT_SAFETY_ENDPOINT`, `AZURE_CONTENT_SAFETY_API_KEY` | Azure provider execution credentials | Required by the worker only for `azure` governance; the API retains processor metadata without them |
 | `SLUICE_MEDIA_*`, `SLUICE_IMAGE_*` | Upload and image-processing safety limits | See `.env.example` |
 
-The production profile requires database, storage, JWT, and CORS configuration from its environment; it intentionally does not provide source-code fallbacks for those values.
+The backend release images select the strict `production` Spring profile by default. Azure must provide database, storage, JWT, CORS, and runtime-owned email or governance settings through the environment or secret references. The worker image disables Flyway so production migrations remain a controlled deployment/API-startup responsibility. Compose explicitly selects a local profile so its non-production credentials cannot be mistaken for hosted configuration.
 
 ## Testing
 
@@ -200,7 +212,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The browser test requires the local application to be running. It covers authentication and session behavior, CSRF rejection, project switching and feedback, API keys, processor discovery and enablement, guided/JSON pipeline authoring, upload/run/output, asset and governance discovery, and responsive navigation. GitHub Actions runs backend and frontend checks in parallel, then runs the integration, browser, and API-smoke paths in a dependent product gate.
+The browser test requires the local application to be running. It covers authentication and session behavior, CSRF rejection, project switching and feedback, API keys, processor discovery and enablement, guided/JSON pipeline authoring, upload/run/output, asset and governance discovery, and responsive navigation. GitHub Actions runs backend (including the real dependency integration test) and frontend verification in parallel, then builds and inspects the three release images and runs the browser and API-smoke paths through the Compose `app` profile in one dependent product gate.
 
 Before committing, check whitespace errors from the repository root:
 
@@ -211,12 +223,12 @@ git diff --check
 ## Repository layout
 
 ```text
-backend/                 Spring Boot API, worker, Flyway migrations, and tests
-frontend/                Next.js dashboard and backend-for-frontend routes
+backend/                 Spring Boot API/worker, production Dockerfile, Flyway migrations, and tests
+frontend/                Next.js dashboard/BFF, standalone Dockerfile, and browser tests
 demo/                    Deterministic pipeline and media fixture for the local demo
 monitoring/              Prometheus and Grafana provisioning
 scripts/                 Local start, stop, and API-smoke scripts
-docker-compose.yml       Local PostgreSQL, RabbitMQ, Azurite, Prometheus, Grafana
+docker-compose.yml       Local dependencies, monitoring, and optional release-image application profile
 .env.example             Safe configuration reference
 ```
 
@@ -233,7 +245,9 @@ docker-compose.yml       Local PostgreSQL, RabbitMQ, Azurite, Prometheus, Grafan
 
 ## Deployment status
 
-Sluice currently runs locally with Docker Compose and a Spring Boot/Next.js development setup. There is no `infra/` directory, Terraform, Azure resource provisioning, container-image publication, or automated deployment in this repository.
+Sluice has multi-stage, non-root release images for the Spring API, Spring worker, and standalone Next.js dashboard. The API and worker use explicit runtime modes, expose separate health checks, and can be exercised together through the optional Compose `app` profile. CI builds all three images and verifies their runtime users and bundled legal files.
+
+There is still no `infra/` directory, Terraform, Azure resource provisioning, image publication to Azure Container Registry, or automated deployment in this repository.
 
 The intended Azure architecture uses Container Apps, API Management, Azure Database for PostgreSQL, Blob Storage, Service Bus, Key Vault, Azure AI Content Safety, Azure Communication Services Email, and Azure Monitor/Application Insights. It remains a target design, not a release claim.
 

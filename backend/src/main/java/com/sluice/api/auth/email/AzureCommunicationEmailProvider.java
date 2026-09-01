@@ -1,6 +1,7 @@
 package com.sluice.api.auth.email;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sluice.api.runtime.ConditionalOnApiRuntime;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Component
+@ConditionalOnApiRuntime
 @ConditionalOnProperty(name = "sluice.auth.email.provider", havingValue = "azure")
 public class AzureCommunicationEmailProvider implements AuthEmailProvider {
     private final URI endpoint;

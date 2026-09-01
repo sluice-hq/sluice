@@ -3,6 +3,7 @@ package com.sluice.api.auth.controller;
 import com.sluice.api.auth.domain.ProjectContext;
 import com.sluice.api.auth.service.AuthService;
 import com.sluice.api.auth.service.AuthAbuseGuard;
+import com.sluice.api.runtime.ConditionalOnApiRuntime;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 
 @RestController
 @RequestMapping("/api/v1/auth")
+@ConditionalOnApiRuntime
 public class AuthController {
 
     private final AuthService authService;
