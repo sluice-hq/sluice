@@ -14,7 +14,6 @@ import java.util.Map;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sluice.api.pipeline.ProcessorMetadata;
 import java.util.List;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.sluice.api.pipeline.ProcessorManifestResources;
 
 @Component
@@ -39,18 +38,21 @@ public class MetadataProcessor implements Processor {
         
         try (InputStream is = context.getCurrentResource().getInputStream()) {
             BufferedImage image = ImageIO.read(is);
-            if (image != null) {
-                metadata.put("width", image.getWidth());
-                metadata.put("height", image.getHeight());
-                log.debug("metadata_extracted jobId={} sizeBytes={} width={} height={}",
-                        context.getJob().getId(), fileSize, image.getWidth(), image.getHeight());
-            } else {
-                log.debug("metadata_extracted jobId={} sizeBytes={} image=false", context.getJob().getId(), fileSize);
+            if (image == null) {
+                throw new IllegalArgumentException("Image metadata could not be read");
             }
+            metadata.put("width", image.getWidth());
+            metadata.put("height", image.getHeight());
+            log.debug("metadata_extracted jobId={} sizeBytes={} width={} height={}",
+                    context.getJob().getId(), fileSize, image.getWidth(), image.getHeight());
+        } catch (IllegalArgumentException exception) {
+            log.warn("metadata_parse_failed jobId={}", context.getJob().getId());
+            throw exception;
         } catch (Exception e) {
             log.warn("metadata_parse_failed jobId={}", context.getJob().getId(), e);
+            throw new IllegalArgumentException("Image metadata could not be read", e);
         }
-        
+
         return new ProcessorResult(null, metadata);
     }
 }

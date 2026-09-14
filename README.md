@@ -60,8 +60,9 @@ Built-in processor releases cover validation, image metadata, checksums, resize,
 
 | Processor | Current behavior |
 |---|---|
-| `mime-validation` | Checks configured allowed types using basic Java content detection. |
-| `metadata` and `checksum` | Read image facts and produce a SHA-256 checksum. |
+| `mime-validation` | Sniffs content with Java's built-in detector, then applies exact MIME or explicit wildcard rules. |
+| `metadata` | Rejects unreadable images and records dimensions and file size as run-step facts. |
+| `checksum` | Streams any resource into a SHA-256 digest recorded as a run-step fact. |
 | `resize` | Performs bounded, aspect-preserving image resize. |
 | `strip-metadata` | Rewrites supported JPEG, PNG, and WebP images without EXIF, GPS, camera, comment, or color-profile data. |
 | `webp` | Produces deterministic WebP output with bounded quality settings and startup codec verification. |
