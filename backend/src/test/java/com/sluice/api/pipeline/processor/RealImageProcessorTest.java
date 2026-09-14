@@ -20,6 +20,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.Base64;
@@ -124,6 +125,76 @@ class RealImageProcessorTest {
             assertEquals(false, result.getMetadata().get("colorProfilePreserved"));
         } finally {
             output.cleanup();
+        }
+    }
+
+    @Test
+    void stripMetadataSupportsPngAndWebpWithoutCarryingExtraPayload() throws Exception {
+        Path png = transparentPng(32, 16);
+        String privateMarker = "SluicePrivateComment";
+        Files.write(png, privateMarker.getBytes(StandardCharsets.ISO_8859_1), StandardOpenOption.APPEND);
+
+        ProcessorResult pngResult = new StripMetadataProcessor(guard()).process(context(png, "image/png"), null);
+        FileMediaResource cleanPng = (FileMediaResource) pngResult.getNewResource().orElseThrow();
+        FileMediaResource webpInput = null;
+        FileMediaResource cleanWebp = null;
+        try {
+            assertFalse(new String(Files.readAllBytes(cleanPng.getFile().toPath()),
+                    StandardCharsets.ISO_8859_1).contains(privateMarker));
+            BufferedImage decodedPng = ImageIO.read(cleanPng.getFile());
+            assertEquals(32, decodedPng.getWidth());
+            assertEquals(16, decodedPng.getHeight());
+            assertEquals("image/png", cleanPng.getContentType());
+
+            ProcessorResult encoded = new WebpProcessor(guard()).process(context(png, "image/png"),
+                    mapper.readTree("{\"quality\":82}"));
+            webpInput = (FileMediaResource) encoded.getNewResource().orElseThrow();
+            Files.write(webpInput.getFile().toPath(), privateMarker.getBytes(StandardCharsets.ISO_8859_1),
+                    StandardOpenOption.APPEND);
+            assertTrue(new String(Files.readAllBytes(webpInput.getFile().toPath()),
+                    StandardCharsets.ISO_8859_1).contains(privateMarker));
+            ProcessorResult webpResult = new StripMetadataProcessor(guard()).process(
+                    context(webpInput.getFile().toPath(), "image/webp"), null);
+            cleanWebp = (FileMediaResource) webpResult.getNewResource().orElseThrow();
+            assertFalse(new String(Files.readAllBytes(cleanWebp.getFile().toPath()),
+                    StandardCharsets.ISO_8859_1).contains(privateMarker));
+            BufferedImage decodedWebp = ImageIO.read(cleanWebp.getFile());
+            assertNotNull(decodedWebp);
+            assertEquals(32, decodedWebp.getWidth());
+            assertEquals(16, decodedWebp.getHeight());
+            assertEquals("image/webp", cleanWebp.getContentType());
+        } finally {
+            cleanPng.cleanup();
+            if (webpInput != null) webpInput.cleanup();
+            if (cleanWebp != null) cleanWebp.cleanup();
+        }
+    }
+
+    @Test
+    void publishedLegacyResizeAndWebpReleasesRemainExecutable() throws Exception {
+        Path input = transparentPng(60, 30);
+        ResizeV1Processor resize = new ResizeV1Processor(guard());
+        WebpV1Processor webp = new WebpV1Processor(guard());
+
+        ProcessorResult resized = resize.process(context(input, "image/png"),
+                mapper.readTree("{\"width\":30,\"height\":30}"));
+        FileMediaResource resizedOutput = (FileMediaResource) resized.getNewResource().orElseThrow();
+        FileMediaResource webpOutput = null;
+        try {
+            BufferedImage decodedResize = ImageIO.read(resizedOutput.getFile());
+            assertEquals(30, decodedResize.getWidth());
+            assertEquals(15, decodedResize.getHeight());
+            assertEquals("image/jpeg", resizedOutput.getContentType());
+            assertEquals("resize@1.0.0", resize.getManifest().key());
+
+            ProcessorResult encoded = webp.process(context(input, "image/png"), mapper.readTree("{\"quality\":82}"));
+            webpOutput = (FileMediaResource) encoded.getNewResource().orElseThrow();
+            assertNotNull(ImageIO.read(webpOutput.getFile()));
+            assertEquals("image/webp", webpOutput.getContentType());
+            assertEquals("webp@1.0.0", webp.getManifest().key());
+        } finally {
+            resizedOutput.cleanup();
+            if (webpOutput != null) webpOutput.cleanup();
         }
     }
 
