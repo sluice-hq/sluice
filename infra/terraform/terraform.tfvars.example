@@ -1,0 +1,29 @@
+# Non-sensitive example only. Copy this file to terraform.tfvars and replace
+# the identifiers after selecting an Azure subscription and globally unique suffix.
+subscription_id      = "00000000-0000-0000-0000-000000000000"
+location             = "centralindia"
+name_prefix          = "sluice"
+environment          = "demo"
+name_suffix          = "repl01"
+budget_amount        = 25
+budget_contact_emails = ["replace-me@example.com"]
+budget_start_date    = "2026-09-01T00:00:00Z"
+budget_end_date      = "2027-09-01T00:00:00Z"
+
+# Never place the PostgreSQL password in this file. Set the sensitive
+# TF_VAR_postgres_administrator_password environment variable instead.
+
+# Keep the apps disabled until ACR images, Key Vault secrets, and the L-08G
+# Service Bus application adapter and worker scaling rule are ready.
+deploy_container_apps = false
+
+# Replace these with ACR digest references before enabling the apps. Digest
+# references are immutable; mutable tags such as latest are intentionally rejected.
+api_image       = "sluicedemorepl01acr.azurecr.io/sluice-api@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+worker_image    = "sluicedemorepl01acr.azurecr.io/sluice-worker@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+dashboard_image = "sluicedemorepl01acr.azurecr.io/sluice-dashboard@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+
+common_tags = {
+  owner      = "replace-me"
+  repository = "sluice-hq/sluice"
+}

@@ -16,6 +16,33 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  verify-infrastructure:
+    name: Verify infrastructure
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: '1.16.2'
+          terraform_wrapper: false
+
+      - name: Check Terraform formatting
+        run: terraform -chdir=infra/terraform fmt -check -recursive
+
+      - name: Initialize Terraform without a state backend
+        run: terraform -chdir=infra/terraform init -backend=false -input=false
+
+      - name: Validate Terraform configuration
+        run: terraform -chdir=infra/terraform validate -no-color
+
+      - name: Run credential-free Terraform plan tests
+        run: terraform -chdir=infra/terraform test -no-color
+
   verify-backend:
     name: Verify backend
     runs-on: ubuntu-latest
