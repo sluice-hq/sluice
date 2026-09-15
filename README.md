@@ -9,7 +9,7 @@
 
 Sluice is an API-first media-processing platform. Applications upload media directly to object storage, start an asynchronous run against an immutable pipeline version, and retrieve durable run and output data. The Next.js dashboard is the control plane for projects, API keys, processors, pipelines, and operational inspection.
 
-The repository provides a verified local product flow. Azure deployment automation and infrastructure are not implemented.
+The repository provides a verified local product flow and a locally validated Terraform foundation for Azure. No hosted deployment has been applied or verified yet.
 
 ## Capabilities
 
@@ -228,6 +228,7 @@ backend/                 Spring Boot API/worker, production Dockerfile, Flyway m
 frontend/                Next.js dashboard/BFF, standalone Dockerfile, and browser tests
 demo/                    Deterministic pipeline and media fixture for the local demo
 monitoring/              Prometheus and Grafana provisioning
+infra/terraform/         Azure foundation, safe examples, and credential-free plan tests
 scripts/                 Local start, stop, and API-smoke scripts
 docker-compose.yml       Local dependencies, monitoring, and optional release-image application profile
 .env.example             Safe configuration reference
@@ -248,11 +249,9 @@ docker-compose.yml       Local dependencies, monitoring, and optional release-im
 
 Sluice has multi-stage, non-root release images for the Spring API, Spring worker, and standalone Next.js dashboard. The API and worker use explicit runtime modes, expose separate health checks, and can be exercised together through the optional Compose `app` profile. CI builds all three images and verifies their runtime users and bundled legal files.
 
-There is still no `infra/` directory, Terraform, Azure resource provisioning, image publication to Azure Container Registry, or automated deployment in this repository.
+The [Azure Terraform foundation](infra/terraform/README.md) defines ACR, Container Apps, private PostgreSQL, Blob Storage, Standard Service Bus, Key Vault and managed identities, Log Analytics/Application Insights, and budget notifications. Its first stage creates infrastructure without application revisions. The app definitions remain disabled until immutable images, out-of-band secrets, and L-08G Service Bus application wiring are ready. No Azure resource has been created yet, and application-level Service Bus, Content Safety, production email, API Management, and the hosted golden path remain explicit follow-up work.
 
-The intended Azure architecture uses Container Apps, API Management, Azure Database for PostgreSQL, Blob Storage, Service Bus, Key Vault, Azure AI Content Safety, Azure Communication Services Email, and Azure Monitor/Application Insights. It remains a target design, not a release claim.
-
-The Content Safety and Email adapters exist in code, but the Azure resources, verified email sender/domain, Key Vault wiring, durable production email delivery, live service smoke tests, monitoring, and cost safeguards are not implemented. These are explicit L-08C and L-08D deployment tickets in the SDD; local adapter tests are not evidence of a working hosted integration.
+The Content Safety and Email adapters exist in code, but their live Azure resources, verified email sender/domain, durable production email delivery, application-level tracing and alerts, and live service smoke tests are not implemented. These are explicit L-08C and L-08D deployment tickets in the SDD; local adapter tests and provisioned telemetry resources are not evidence of a working hosted integration.
 
 ## License
 

@@ -1,0 +1,8 @@
+# Create this backend separately before the first real plan. It stores state
+# outside the application resource group so that destroying the demo does not
+# destroy its own state or expose the PostgreSQL password in a local state file.
+resource_group_name  = "replace-with-terraform-state-resource-group"
+storage_account_name = "replacewithtfstateaccount"
+container_name       = "tfstate"
+key                  = "sluice/demo.tfstate"
+use_azuread_auth     = true
