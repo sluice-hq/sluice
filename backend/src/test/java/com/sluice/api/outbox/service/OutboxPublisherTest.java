@@ -25,7 +25,8 @@ class OutboxPublisherTest {
         OutboxEventRepository events = mock(OutboxEventRepository.class);
         RunQueuePublisher queue = mock(RunQueuePublisher.class);
         when(events.lockNextBatch(10)).thenReturn(List.of(event));
-        doThrow(new IllegalStateException("broker offline")).doNothing().when(queue).publish(any(JobMessage.class));
+        doThrow(new IllegalStateException("broker offline")).doNothing().when(queue)
+                .publish(any(java.util.UUID.class), any(JobMessage.class));
         OutboxPublisher publisher = new OutboxPublisher(events, queue, mock(WebhookDeliveryService.class),
                 new ObjectMapper(), mock(SluiceMetrics.class), 10);
 
@@ -37,6 +38,6 @@ class OutboxPublisherTest {
         assertEquals(1, publisher.publishBatch());
         assertEquals("PUBLISHED", event.getStatus());
         assertEquals(2, event.getAttempts());
-        verify(queue, times(2)).publish(any(JobMessage.class));
+        verify(queue, times(2)).publish(eq(event.getId()), any(JobMessage.class));
     }
 }

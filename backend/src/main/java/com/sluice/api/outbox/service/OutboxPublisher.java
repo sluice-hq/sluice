@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
+@com.sluice.api.runtime.ConditionalOnApiRuntime
 public class OutboxPublisher {
     private final OutboxEventRepository events;
     private final RunQueuePublisher queue;
@@ -39,7 +40,7 @@ public class OutboxPublisher {
         for (OutboxEvent event : batch) {
             try {
                 if ("run.queued".equals(event.getEventType())) {
-                    queue.publish(objectMapper.readValue(event.getPayload(), JobMessage.class));
+                    queue.publish(event.getId(), objectMapper.readValue(event.getPayload(), JobMessage.class));
                 } else if (event.getEventType().startsWith("run.")) {
                     webhooks.enqueue(event);
                 } else {

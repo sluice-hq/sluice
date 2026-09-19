@@ -3,7 +3,7 @@ package com.sluice.api.job.service;
 import com.sluice.api.job.domain.Job;
 import com.sluice.api.job.domain.JobStatus;
 import com.sluice.api.job.repository.JobRepository;
-import com.sluice.api.runtime.ConditionalOnWorkerRuntime;
+import com.sluice.api.runtime.ConditionalOnApiRuntime;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -16,7 +16,7 @@ import java.util.List;
 
 @Service
 @Profile("!test")
-@ConditionalOnWorkerRuntime
+@ConditionalOnApiRuntime
 public class JobRecoveryService {
     private static final Logger log = LoggerFactory.getLogger(JobRecoveryService.class);
 

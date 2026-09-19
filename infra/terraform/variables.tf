@@ -140,7 +140,7 @@ variable "budget_end_date" {
 }
 
 variable "deploy_container_apps" {
-  description = "Create the API, worker, and dashboard apps only after immutable images, Key Vault secrets, and L-08G Service Bus application wiring exist."
+  description = "Create the API, worker, and dashboard apps only after immutable images and required Key Vault secrets exist."
   type        = bool
   default     = false
 }
@@ -198,7 +198,7 @@ variable "dashboard_max_replicas" {
 }
 
 variable "worker_max_replicas" {
-  description = "Reserved worker ceiling. L-08G will add the Service Bus scaling rule before workers process hosted runs."
+  description = "Maximum Service Bus queue-scaled worker replicas for the controlled demo."
   type        = number
   default     = 2
 

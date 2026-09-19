@@ -10,11 +10,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 @Service
+@com.sluice.api.runtime.ConditionalOnApiRuntime
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+        name = "sluice.messaging.provider", havingValue = "rabbit", matchIfMissing = true)
 public class JobPublisher implements RunQueuePublisher {
 
     private final RabbitTemplate rabbitTemplate;
@@ -29,9 +33,9 @@ public class JobPublisher implements RunQueuePublisher {
         this.metrics = metrics;
     }
 
-    public void publishJob(JobMessage message) {
+    public void publishJob(UUID deliveryId, JobMessage message) {
         try {
-            publishAndConfirm(message);
+            publishAndConfirm(deliveryId, message);
             metrics.queuePublish("confirmed");
         } catch (RuntimeException exception) {
             metrics.queuePublish("failed");
@@ -39,8 +43,8 @@ public class JobPublisher implements RunQueuePublisher {
         }
     }
 
-    private void publishAndConfirm(JobMessage message) {
-        CorrelationData correlation = new CorrelationData(message.getJobId().toString());
+    private void publishAndConfirm(UUID deliveryId, JobMessage message) {
+        CorrelationData correlation = new CorrelationData(deliveryId.toString());
         rabbitTemplate.convertAndSend(
                 RabbitMqConfig.EXCHANGE_NAME, RabbitMqConfig.ROUTING_KEY, message, correlation);
 
@@ -63,7 +67,7 @@ public class JobPublisher implements RunQueuePublisher {
     }
 
     @Override
-    public void publish(JobMessage message) {
-        publishJob(message);
+    public void publish(UUID deliveryId, JobMessage message) {
+        publishJob(deliveryId, message);
     }
 }

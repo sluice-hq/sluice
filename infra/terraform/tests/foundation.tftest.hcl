@@ -19,6 +19,7 @@ mock_provider "azurerm" {
       default_domain = "mock.centralindia.azurecontainerapps.io"
     }
   }
+
 }
 
 variables {
@@ -76,6 +77,14 @@ run "foundation_without_apps" {
 run "controlled_demo_apps" {
   command = plan
 
+  override_resource {
+    target          = azurerm_user_assigned_identity.worker
+    override_during = plan
+    values = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock/providers/Microsoft.ManagedIdentity/userAssignedIdentities/worker"
+    }
+  }
+
   variables {
     deploy_container_apps = true
   }
@@ -92,7 +101,17 @@ run "controlled_demo_apps" {
 
   assert {
     condition     = azurerm_container_app.worker[0].template[0].min_replicas == 0 && length(azurerm_container_app.worker[0].ingress) == 0
-    error_message = "The worker must start at zero and expose no ingress before L-08G adds Service Bus scaling."
+    error_message = "The worker must start at zero and expose no ingress."
+  }
+
+  assert {
+    condition     = azurerm_container_app.worker[0].template[0].custom_scale_rule[0].custom_rule_type == "azure-servicebus" && azurerm_container_app.worker[0].template[0].custom_scale_rule[0].identity_id == azurerm_user_assigned_identity.worker.id
+    error_message = "The worker must scale from the run queue using its receiver-only managed identity."
+  }
+
+  assert {
+    condition     = azurerm_container_app.worker[0].template[0].custom_scale_rule[0].metadata["queueName"] == azurerm_servicebus_queue.runs.name && azurerm_container_app.worker[0].template[0].custom_scale_rule[0].metadata["messageCount"] == "1"
+    error_message = "The worker scale rule must target the run queue and wake for one queued message."
   }
 
   assert {

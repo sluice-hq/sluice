@@ -9,6 +9,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+        name = "sluice.messaging.provider", havingValue = "rabbit", matchIfMissing = true)
 public class RabbitMqConfig {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RabbitMqConfig.class);
 

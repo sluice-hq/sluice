@@ -31,9 +31,11 @@ class JobPublisherTest {
         }).when(template).convertAndSend(eq(RabbitMqConfig.EXCHANGE_NAME),
                 eq(RabbitMqConfig.ROUTING_KEY), any(JobMessage.class), any(CorrelationData.class));
         JobMessage message = new JobMessage(UUID.randomUUID(), UUID.randomUUID());
+        UUID deliveryId = UUID.randomUUID();
         SluiceMetrics metrics = mock(SluiceMetrics.class);
 
-        assertDoesNotThrow(() -> new JobPublisher(template, Duration.ofSeconds(1), metrics).publish(message));
+        assertDoesNotThrow(() -> new JobPublisher(template, Duration.ofSeconds(1), metrics)
+                .publish(deliveryId, message));
 
         ArgumentCaptor<CorrelationData> correlation = ArgumentCaptor.forClass(CorrelationData.class);
         verify(template).convertAndSend(eq(RabbitMqConfig.EXCHANGE_NAME),
@@ -53,7 +55,7 @@ class JobPublisherTest {
 
         SluiceMetrics metrics = mock(SluiceMetrics.class);
         assertThrows(AmqpException.class, () -> new JobPublisher(template, Duration.ofSeconds(1), metrics)
-                .publish(new JobMessage(UUID.randomUUID(), UUID.randomUUID())));
+                .publish(UUID.randomUUID(), new JobMessage(UUID.randomUUID(), UUID.randomUUID())));
         verify(metrics).queuePublish("failed");
     }
 }

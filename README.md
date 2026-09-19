@@ -16,7 +16,7 @@ The repository provides a verified local product flow and a locally validated Te
 - Project-scoped JWT and API-key access, one-time API-key reveal, hash-only key storage, revocation, and an HttpOnly dashboard session.
 - Direct Azure Blob Storage or Azurite uploads with completion verification and short-lived download URLs.
 - Versioned processor releases; revision-checked pipeline drafts; immutable published versions and aliases; contract validation before publication and execution.
-- Durable asynchronous runs with PostgreSQL-backed outbox delivery, RabbitMQ workers, retry/recovery handling, step facts, output provenance, Server-Sent Events, and signed terminal webhooks.
+- Durable asynchronous runs with PostgreSQL-backed outbox delivery, RabbitMQ locally and Azure Service Bus in production, idle-safe retry recovery, step facts, output provenance, Server-Sent Events, and signed terminal webhooks.
 - Deterministic local media-governance decisions with persisted allow/review/block evidence, plus an Azure AI Content Safety adapter awaiting live Azure provisioning and verification.
 - Email verification and password recovery with hashed, expiring, single-use link tokens; local email capture and an Azure Communication Services Email adapter are implemented.
 - Processor market, searchable guided and JSON pipeline authoring with descriptive starter flows and enabled-release safeguards, first-run checklist, API Quick Start, pipeline test console, and asset/run/governance inspection.
@@ -31,7 +31,7 @@ flowchart LR
     BFF -->|Server-side JWT and project context| API
     API -->|Run and outbox transaction| DB[(PostgreSQL)]
     DB --> Dispatcher[Outbox dispatcher]
-    Dispatcher --> Queue[RabbitMQ]
+    Dispatcher --> Queue[Broker: RabbitMQ locally / Service Bus on Azure]
     Queue --> Worker[Processing worker]
     API -->|Scoped URLs and verification| Blob[Azure Blob Storage / Azurite]
     App -->|Direct upload with scoped URL| Blob
@@ -52,7 +52,7 @@ The API commits each run and its queue event together in PostgreSQL. The outbox 
 | Authentication email | Bounded in-memory capture | Azure Communication Services Email |
 | Observability | Actuator, Prometheus, Grafana | Azure Monitor and Application Insights |
 
-RabbitMQ is the current local broker. Azure Service Bus is a planned adapter, not a deployed component.
+RabbitMQ remains the local broker. The production profile selects Azure Service Bus with Managed Identity, explicit peek-lock settlement, duplicate detection keyed by durable outbox event, dead-letter handling, and queue-driven worker scaling. Neither adapter changes the durable run state machine.
 
 ## Processors
 
@@ -125,7 +125,7 @@ To exercise the release images locally, build and start the separate API, worker
 docker compose --profile app up -d --build --wait frontend worker
 ```
 
-This path uses local-only credentials and the same PostgreSQL, RabbitMQ, and Azurite dependencies. The API container owns HTTP traffic, outbox dispatch, webhook delivery, dependency probes, database migrations, and processor-catalog synchronization. The worker disables Flyway, has no HTTP server, owns queue consumption and stuck-run recovery, and performs only a read-only audit that every published processor has a matching implementation. Stop the containerized application with `docker compose --profile app down`.
+This path uses local-only credentials and the same PostgreSQL, RabbitMQ, and Azurite dependencies. The API container owns HTTP traffic, outbox dispatch, webhook delivery, dependency probes, database migrations, processor-catalog synchronization, and durable retry/stuck-run recovery. The worker disables Flyway, has no HTTP server, owns queue consumption and pipeline execution, and performs only a read-only audit that every published processor has a matching implementation. Keeping recovery on the controlled-demo API allows an Azure worker at zero replicas to be woken by a newly published retry. Stop the containerized application with `docker compose --profile app down`.
 
 ## API workflow
 
@@ -182,6 +182,10 @@ Authenticated API clients can request the generated OpenAPI contract at [`/api/v
 | `SLUICE_SECURE_COOKIES` | Require HTTPS-only dashboard cookies | `false` only for local HTTP; omit in production |
 | `SLUICE_STORAGE_PUBLIC_BASE_URL`, `SLUICE_STORAGE_INTERNAL_BASE_URL` | Optional dashboard mapping when browser and container Blob endpoints differ | Set only by the local Compose application profile |
 | `SLUICE_RUNTIME_MODE` | Backend capability boundary: `all`, `api`, or `worker` | `all` for source development; images select `api` or `worker` |
+| `SLUICE_MESSAGING_PROVIDER` | Queue adapter: `rabbit` or `servicebus` | `rabbit` locally; production defaults to `servicebus` |
+| `AZURE_SERVICE_BUS_FULLY_QUALIFIED_NAMESPACE`, `AZURE_SERVICE_BUS_QUEUE_NAME` | Hosted queue address and entity | Injected by Terraform into API and worker |
+| `AZURE_SERVICE_BUS_MAX_AUTO_LOCK_RENEW_DURATION` | Maximum automatic queue-message lock renewal as an ISO-8601 duration | `PT15M`, long enough for a bounded multi-step run |
+| `AZURE_CLIENT_ID` | User-assigned Managed Identity used by the Azure SDK | Separate sender-only API and receiver-only worker identities |
 | `SLUICE_DB_URL`, `SLUICE_DB_USERNAME`, `SLUICE_DB_PASSWORD` | PostgreSQL connection | Compose-compatible local defaults |
 | `AZURE_STORAGE_CONNECTION_STRING` | Azure Blob Storage or Azurite connection | Local Azurite default in application config |
 | `AZURE_STORAGE_CONTAINER_NAME` | Blob container | `assets` |
@@ -249,7 +253,7 @@ docker-compose.yml       Local dependencies, monitoring, and optional release-im
 
 Sluice has multi-stage, non-root release images for the Spring API, Spring worker, and standalone Next.js dashboard. The API and worker use explicit runtime modes, expose separate health checks, and can be exercised together through the optional Compose `app` profile. CI builds all three images and verifies their runtime users and bundled legal files.
 
-The [Azure Terraform foundation](infra/terraform/README.md) defines ACR, Container Apps, private PostgreSQL, Blob Storage, Standard Service Bus, Key Vault and managed identities, Log Analytics/Application Insights, and budget notifications. Its first stage creates infrastructure without application revisions. The app definitions remain disabled until immutable images, out-of-band secrets, and L-08G Service Bus application wiring are ready. No Azure resource has been created yet, and application-level Service Bus, Content Safety, production email, API Management, and the hosted golden path remain explicit follow-up work.
+The [Azure Terraform foundation](infra/terraform/README.md) defines ACR, Container Apps, private PostgreSQL, Blob Storage, Standard Service Bus, Key Vault and managed identities, Log Analytics/Application Insights, and budget notifications. The Java production runtime now has sender and consumer Service Bus adapters, durable API-owned retry recovery, explicit dead-letter settlement, a dead-letter alert, and a Managed Identity KEDA worker rule. The first Terraform stage still creates infrastructure without application revisions; applications remain disabled until immutable images and out-of-band secrets exist. No Azure resource has been created yet, so the hosted queue path remains unverified. Content Safety, production email, API Management, and the hosted golden path remain follow-up work.
 
 The Content Safety and Email adapters exist in code, but their live Azure resources, verified email sender/domain, durable production email delivery, application-level tracing and alerts, and live service smoke tests are not implemented. These are explicit L-08C and L-08D deployment tickets in the SDD; local adapter tests and provisioned telemetry resources are not evidence of a working hosted integration.
 

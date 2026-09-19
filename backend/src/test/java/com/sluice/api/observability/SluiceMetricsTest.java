@@ -13,12 +13,14 @@ class SluiceMetricsTest {
         SluiceMetrics metrics = new SluiceMetrics(registry);
 
         metrics.queuePublish("confirmed");
+        metrics.queueConsume("completed");
         metrics.outboxDispatch("run.queued", "published");
         metrics.webhookDelivery("delivered", 204, 1_000_000);
         metrics.storage("upload", "success", 2_000_000);
         metrics.dependencyHealth("rabbit", true);
 
         assertEquals(1, registry.get("sluice.queue.publishes").tag("outcome", "confirmed").counter().count());
+        assertEquals(1, registry.get("sluice.queue.consumes").tag("outcome", "completed").counter().count());
         assertEquals(1, registry.get("sluice.outbox.dispatches").tag("event_type", "run.queued")
                 .tag("outcome", "published").counter().count());
         assertEquals(1, registry.get("sluice.webhook.delivery").tag("outcome", "delivered")
