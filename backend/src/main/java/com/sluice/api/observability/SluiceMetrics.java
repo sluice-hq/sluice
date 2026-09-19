@@ -34,6 +34,10 @@ public class SluiceMetrics {
         registry.counter("sluice.queue.publishes", "outcome", outcome).increment();
     }
 
+    public void queueConsume(String outcome) {
+        registry.counter("sluice.queue.consumes", "outcome", outcome).increment();
+    }
+
     public void outboxDispatch(String eventType, String outcome) {
         registry.counter("sluice.outbox.dispatches", "event_type", eventType, "outcome", outcome).increment();
     }

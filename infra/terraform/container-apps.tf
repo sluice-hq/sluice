@@ -93,6 +93,26 @@ resource "azurerm_container_app" "api" {
         value = "api"
       }
       env {
+        name  = "SLUICE_MESSAGING_PROVIDER"
+        value = "servicebus"
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_FULLY_QUALIFIED_NAMESPACE"
+        value = "${azurerm_servicebus_namespace.main.name}.servicebus.windows.net"
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_QUEUE_NAME"
+        value = azurerm_servicebus_queue.runs.name
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_MAX_DELIVERY_COUNT"
+        value = tostring(azurerm_servicebus_queue.runs.max_delivery_count)
+      }
+      env {
+        name  = "AZURE_CLIENT_ID"
+        value = azurerm_user_assigned_identity.api.client_id
+      }
+      env {
         name  = "SLUICE_DB_URL"
         value = "jdbc:postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${var.postgres_database_name}?sslmode=require&options=-c%20TimeZone=UTC"
       }
@@ -193,6 +213,7 @@ resource "azurerm_container_app" "api" {
   depends_on = [
     azurerm_role_assignment.api_acr_pull,
     azurerm_role_assignment.api_key_vault_secrets,
+    azurerm_role_assignment.api_service_bus_sender,
   ]
 }
 
@@ -229,8 +250,21 @@ resource "azurerm_container_app" "worker" {
   }
 
   template {
-    min_replicas = 0
-    max_replicas = var.worker_max_replicas
+    min_replicas                = 0
+    max_replicas                = var.worker_max_replicas
+    polling_interval_in_seconds = 15
+    cooldown_period_in_seconds  = 60
+
+    custom_scale_rule {
+      name             = "service-bus-runs"
+      custom_rule_type = "azure-servicebus"
+      identity_id      = azurerm_user_assigned_identity.worker.id
+      metadata = {
+        namespace    = azurerm_servicebus_namespace.main.name
+        queueName    = azurerm_servicebus_queue.runs.name
+        messageCount = "1"
+      }
+    }
 
     container {
       name   = "worker"
@@ -245,6 +279,26 @@ resource "azurerm_container_app" "worker" {
       env {
         name  = "SLUICE_RUNTIME_MODE"
         value = "worker"
+      }
+      env {
+        name  = "SLUICE_MESSAGING_PROVIDER"
+        value = "servicebus"
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_FULLY_QUALIFIED_NAMESPACE"
+        value = "${azurerm_servicebus_namespace.main.name}.servicebus.windows.net"
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_QUEUE_NAME"
+        value = azurerm_servicebus_queue.runs.name
+      }
+      env {
+        name  = "AZURE_SERVICE_BUS_MAX_DELIVERY_COUNT"
+        value = tostring(azurerm_servicebus_queue.runs.max_delivery_count)
+      }
+      env {
+        name  = "AZURE_CLIENT_ID"
+        value = azurerm_user_assigned_identity.worker.client_id
       }
       env {
         name  = "SPRING_FLYWAY_ENABLED"
@@ -295,6 +349,7 @@ resource "azurerm_container_app" "worker" {
   depends_on = [
     azurerm_role_assignment.worker_acr_pull,
     azurerm_role_assignment.worker_key_vault_secrets,
+    azurerm_role_assignment.worker_service_bus_receiver,
   ]
 }
 

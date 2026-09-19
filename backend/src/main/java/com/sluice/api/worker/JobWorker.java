@@ -5,7 +5,6 @@ import com.sluice.api.asset.repository.AssetRepository;
 import com.sluice.api.job.domain.Job;
 import com.sluice.api.job.domain.JobStatus;
 import com.sluice.api.job.service.JobService;
-import com.sluice.api.messaging.RabbitMqConfig;
 import com.sluice.api.runtime.ConditionalOnWorkerRuntime;
 import com.sluice.api.messaging.dto.JobMessage;
 import com.sluice.api.pipeline.Pipeline;
@@ -15,7 +14,6 @@ import com.sluice.api.pipeline.ProcessingContext;
 import com.sluice.api.pipeline.domain.PipelineVersion;
 import com.sluice.api.pipeline.repository.PipelineVersionRepository;
 import com.sluice.api.storage.StorageService;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
 import java.util.UUID;
 import java.time.Instant;
@@ -91,7 +89,6 @@ public class JobWorker {
                 pipelineResolver, null, null, null);
     }
 
-    @RabbitListener(queues = RabbitMqConfig.QUEUE_NAME)
     public void processJob(JobMessage message) throws Exception {
         if (message.getRequestId() != null) MDC.put("requestId", message.getRequestId());
         com.sluice.api.pipeline.MediaResource finalResource = null;
