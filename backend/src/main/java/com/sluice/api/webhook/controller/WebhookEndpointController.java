@@ -1,6 +1,7 @@
 package com.sluice.api.webhook.controller;
 
 import com.sluice.api.auth.domain.ProjectContext;
+import com.sluice.api.runtime.ConditionalOnApiRuntime;
 import com.sluice.api.webhook.dto.*;
 import com.sluice.api.webhook.service.WebhookDeliveryService;
 import com.sluice.api.webhook.service.WebhookEndpointService;
@@ -13,6 +14,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/webhook-endpoints")
+@ConditionalOnApiRuntime
 public class WebhookEndpointController {
     private final WebhookEndpointService endpoints;
     private final WebhookDeliveryService deliveries;

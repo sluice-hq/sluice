@@ -1,17 +1,17 @@
 package com.sluice.api.webhook.service;
 
 import org.junit.jupiter.api.Test;
+
 import java.net.InetAddress;
-import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class WebhookSecurityTest {
     @Test
     void signsTimestampAndExactPayloadWithHmacSha256() {
-        String secret = Base64.getEncoder().encodeToString("secret".getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        assertEquals("v1=8d15fa2032258ce5f8578bbcbbccbe65a95371dee98900e94f345b7d5f5a4510",
-                new WebhookSigner().sign(secret, 1_700_000_000L, "{\"ok\":true"));
+        assertEquals("v1=c1afc7c2df3db0690d7d75954610ed1a1d959ce96355ccb8c0a8bc09fd0cfc27",
+                new WebhookSigner().sign("secret".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        1_700_000_000L, "{\"ok\":true}"));
     }
 
     @Test

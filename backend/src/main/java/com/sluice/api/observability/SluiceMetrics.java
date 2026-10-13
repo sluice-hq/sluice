@@ -50,6 +50,10 @@ public class SluiceMetrics {
                 .record(Duration.ofNanos(elapsedNanos));
     }
 
+    public void webhookSecretMigration(String outcome, int count) {
+        registry.counter("sluice.webhook.secret.migrations", "outcome", outcome).increment(count);
+    }
+
     public void storage(String operation, String outcome, long elapsedNanos) {
         Timer.builder("sluice.storage.operation")
                 .tags("operation", operation, "outcome", outcome)

@@ -20,7 +20,7 @@ import com.sluice.api.step.repository.StepRunRepository;
 import com.sluice.api.run.dto.CreateRunRequest;
 import com.sluice.api.run.dto.RunResponse;
 import com.sluice.api.job.repository.RunAttemptRepository;
-import com.sluice.api.webhook.service.WebhookEndpointService;
+import com.sluice.api.webhook.repository.WebhookEndpointRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -54,7 +54,7 @@ public class RunService {
     private final IdempotencyService idempotency;
     private final OutboxService outbox;
     private final RunAttemptRepository attempts;
-    private final WebhookEndpointService webhookEndpoints;
+    private final WebhookEndpointRepository webhookEndpoints;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final com.sluice.api.governance.GovernanceDecisionService governanceDecisions;
 
@@ -62,7 +62,7 @@ public class RunService {
     public RunService(JobService jobs, JobRepository jobRepository, AssetRepository assets,
                       PipelineService pipelines, PipelineVersionRepository versions,
                       StepRunRepository steps, IdempotencyService idempotency, OutboxService outbox,
-                      RunAttemptRepository attempts, WebhookEndpointService webhookEndpoints,
+                      RunAttemptRepository attempts, WebhookEndpointRepository webhookEndpoints,
                       com.fasterxml.jackson.databind.ObjectMapper objectMapper,
                       com.sluice.api.governance.GovernanceDecisionService governanceDecisions) {
         this.jobs = jobs;
@@ -102,7 +102,8 @@ public class RunService {
                 request.pipeline(), request.alias(), request.version(), context);
         UUID webhookEndpointId = request.callback() == null ? null : request.callback().webhookEndpointId();
         if (webhookEndpointId != null && webhookEndpoints != null) {
-            webhookEndpoints.require(webhookEndpointId, context.getProjectId());
+            webhookEndpoints.findByIdAndProjectId(webhookEndpointId, context.getProjectId())
+                    .orElseThrow(() -> new IllegalArgumentException("Webhook endpoint not found"));
         }
         Job job = webhookEndpointId == null
                 ? jobs.createJobForVersion(requestedRunId, request.inputAssetId(), version, context)

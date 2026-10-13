@@ -4,6 +4,7 @@ import com.sluice.api.auth.controller.AuthController;
 import com.sluice.api.security.JwtService;
 import com.sluice.api.support.TestInfrastructureConfiguration;
 import com.sluice.api.worker.JobWorker;
+import com.sluice.api.webhook.crypto.WebhookSecretCipher;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,5 +29,6 @@ class WorkerRuntimeApplicationTest {
         assertThat(applicationContext.getBeansOfType(AuthController.class)).isEmpty();
         assertThat(applicationContext.getBeansOfType(JwtService.class)).isEmpty();
         assertThat(applicationContext.getBeansOfType(SecurityFilterChain.class)).isEmpty();
+        assertThat(applicationContext.getBeansOfType(WebhookSecretCipher.class)).isEmpty();
     }
 }

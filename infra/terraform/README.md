@@ -11,14 +11,14 @@ This Terraform root defines the L-08F Azure foundation for Sluice. It is intenti
 - Private-networked PostgreSQL Flexible Server and the `sluice` database.
 - Standard locally redundant Blob Storage with a private `assets` container.
 - Standard Service Bus with a `media-runs` queue, duplicate detection, bounded delivery attempts, dead-lettering, and an operator email alert when the dead-letter count rises above zero.
-- RBAC-enabled Key Vault, Log Analytics, and workspace-based Application Insights.
-- Least-privilege ACR, Blob, Service Bus, and Key Vault role assignments for each runtime.
+- RBAC-enabled Key Vault with a versioned RSA wrapping key, Log Analytics, and workspace-based Application Insights.
+- Least-privilege ACR, Blob, Service Bus, Key Vault secret, and API-only Key Vault cryptography role assignments.
 
 The Container App definitions are present for plan-time review and include the L-08G application configuration and Managed Identity KEDA rule. When enabled, the API has a fixed minimum of one replica because it owns outbox, webhook, and durable recovery timers; the dashboard can scale to zero; and the private worker wakes when the Service Bus run queue contains work.
 
 ## What it does not complete
 
-The configuration does not enable real Azure Content Safety, configure Azure Communication Services Email, add API Management, publish or deploy images, or prove the hosted golden path. The foundation temporarily configures local email and governance providers when the apps are enabled so those later integrations are not falsely represented as complete. Service Bus application wiring is implemented and locally tested, but still requires a live Azure deployment to verify Managed Identity, KEDA, network, and broker behavior.
+The configuration does not enable real Azure Content Safety, configure Azure Communication Services Email, add API Management, publish or deploy images, or prove the hosted golden path. The foundation temporarily configures local email and governance providers when the apps are enabled so those later integrations are not falsely represented as complete. Service Bus application wiring and webhook-secret envelope encryption are implemented and locally tested, but still require a live Azure deployment to verify Managed Identity, Key Vault wrap/unwrap, KEDA, network, and broker behavior.
 
 This configuration is not permanently free. PostgreSQL Flexible Server, Standard Service Bus, the always-on API replica, registry storage, telemetry ingestion, and network traffic can consume Azure credit. Budget notifications report spend but do not stop resources automatically.
 
@@ -65,8 +65,10 @@ Do not run `terraform apply` until an Azure subscription, supported region, quot
    - `jwt-signing-secret`
    - `auth-audit-pepper`
 
-8. Confirm the saved plan contains the Service Bus environment contract, sender/receiver role assignments, dead-letter alert, and Managed Identity worker scale rule.
+8. Confirm the saved plan contains the Service Bus environment contract, sender/receiver role assignments, dead-letter alert, Managed Identity worker scale rule, webhook wrapping key, and API-only `Key Vault Crypto User` assignment.
 9. Set `deploy_container_apps = true`, create a new saved plan, review it, and apply it. Never apply an old plan after changing images or secrets.
+
+For a database that has served an older Sluice revision, first deploy the compatibility revision with `SLUICE_WEBHOOK_ENCRYPTION_MIGRATION_MODE=dual-write`. It encrypts existing and new webhook secrets while retaining the old column so an old API revision can drain safely. After every API instance runs the compatible code and the backfill is verified, deploy a reviewed revision with `protected`; startup decrypts and compares each migrated envelope before removing its compatibility plaintext, and refuses traffic if verification fails or any unencrypted row remains. After that cutover, rollback must use a revision that understands encrypted secrets; the older plaintext-only revision is no longer compatible. A new controlled-demo database starts directly in `protected` mode, which is what this Terraform root configures.
 
 The PostgreSQL password is necessarily sent to the AzureRM provider and retained in Terraform state. Use the encrypted remote backend, restrict access to it, and never apply this root with local state.
 
@@ -75,6 +77,7 @@ The PostgreSQL password is necessarily sent to the AzureRM provider and retained
 - `terraform.tfvars`, backend configuration, state, plan files, and `.terraform` directories are ignored.
 - Checked-in examples contain no usable credential.
 - Container Apps reference Key Vault secret URLs through managed identities; Terraform does not read the secret values.
+- Terraform creates only the non-exportable webhook wrapping key and its RBAC policy. In protected mode, per-endpoint data keys and signing secrets exist only as authenticated ciphertext in PostgreSQL. The explicitly temporary dual-write rollout mode retains compatibility plaintext until the protected cutover.
 - Outputs contain identifiers and endpoints only. The Application Insights connection string is marked sensitive.
 - Image variables require digest references and the app resources require the registry created by this root.
 - Blob and Key Vault endpoints remain public for the controlled demo, but the Blob container is private, Key Vault requires RBAC, ACR administration is disabled, and Service Bus shared-key authentication is disabled. The application still uses a Key Vault-backed Storage connection string until token-based Blob access is implemented.
