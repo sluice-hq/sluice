@@ -28,6 +28,7 @@ materials and license review in ticket L-08B.
 | `org.flywaydb:flyway-database-postgresql` | 12.4.0 | Apache-2.0 | [flyway/flyway](https://github.com/flyway/flyway) |
 | `com.azure:azure-storage-blob` | 12.25.1 | MIT | [Azure/azure-sdk-for-java](https://github.com/Azure/azure-sdk-for-java) |
 | `com.azure:azure-identity` | 1.18.6 | MIT | [Azure/azure-sdk-for-java](https://github.com/Azure/azure-sdk-for-java) |
+| `com.azure:azure-security-keyvault-keys` | 4.11.0 | MIT | [Azure/azure-sdk-for-java](https://github.com/Azure/azure-sdk-for-java) |
 | `com.azure:azure-messaging-servicebus` | 7.17.20 | MIT | [Azure/azure-sdk-for-java](https://github.com/Azure/azure-sdk-for-java) |
 | `com.networknt:json-schema-validator` | 1.5.9 | Apache-2.0 | [networknt/json-schema-validator](https://github.com/networknt/json-schema-validator) |
 | `com.github.usefulness:webp-imageio` | 0.11.0 | Apache-2.0 | [usefulness/webp-imageio](https://github.com/usefulness/webp-imageio) |

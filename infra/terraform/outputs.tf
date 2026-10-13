@@ -13,6 +13,11 @@ output "key_vault_name" {
   value       = azurerm_key_vault.main.name
 }
 
+output "webhook_wrapping_key_name" {
+  description = "Versioned Key Vault key used to wrap webhook-secret data keys."
+  value       = azurerm_key_vault_key.webhook_secret_kek.name
+}
+
 output "storage_account_name" {
   description = "Private Blob Storage account used for media assets."
   value       = azurerm_storage_account.main.name

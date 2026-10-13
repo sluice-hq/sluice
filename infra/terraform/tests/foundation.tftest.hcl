@@ -72,6 +72,11 @@ run "foundation_without_apps" {
     condition     = azurerm_role_assignment.api_service_bus_sender.role_definition_name == "Azure Service Bus Data Sender" && azurerm_role_assignment.worker_service_bus_receiver.role_definition_name == "Azure Service Bus Data Receiver"
     error_message = "The API and worker must receive separate send-only and receive-only Service Bus roles."
   }
+
+  assert {
+    condition     = contains(azurerm_key_vault_key.webhook_secret_kek.key_opts, "wrapKey") && contains(azurerm_key_vault_key.webhook_secret_kek.key_opts, "unwrapKey") && azurerm_key_vault_key.webhook_secret_kek.rotation_policy[0].expire_after == "P90D" && azurerm_role_assignment.api_webhook_key_crypto.role_definition_name == "Key Vault Crypto User"
+    error_message = "Webhook envelope encryption must use a Key Vault wrapping key available only to the API identity."
+  }
 }
 
 run "controlled_demo_apps" {
@@ -117,6 +122,11 @@ run "controlled_demo_apps" {
   assert {
     condition     = azurerm_container_app.dashboard[0].template[0].min_replicas == 0
     error_message = "The dashboard should scale to zero when idle."
+  }
+
+  assert {
+    condition     = one([for setting in azurerm_container_app.api[0].template[0].container[0].env : setting.value if setting.name == "SLUICE_WEBHOOK_ENCRYPTION_PROVIDER"]) == "azure" && one([for setting in azurerm_container_app.api[0].template[0].container[0].env : setting.value if setting.name == "SLUICE_WEBHOOK_ENCRYPTION_MIGRATION_MODE"]) == "protected" && contains([for setting in azurerm_container_app.api[0].template[0].container[0].env : setting.name], "AZURE_KEY_VAULT_URL") && contains([for setting in azurerm_container_app.api[0].template[0].container[0].env : setting.name], "AZURE_WEBHOOK_KEK_NAME")
+    error_message = "The API app must select Azure Key Vault webhook-secret protection."
   }
 }
 

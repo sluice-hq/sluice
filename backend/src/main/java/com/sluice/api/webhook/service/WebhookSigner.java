@@ -4,15 +4,14 @@ import org.springframework.stereotype.Service;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.HexFormat;
 
 @Service
 public class WebhookSigner {
-    public String sign(String base64Secret, long timestamp, String payload) {
+    public String sign(byte[] secret, long timestamp, String payload) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(Base64.getDecoder().decode(base64Secret), "HmacSHA256"));
+            mac.init(new SecretKeySpec(secret, "HmacSHA256"));
             return "v1=" + HexFormat.of().formatHex(
                     mac.doFinal((timestamp + "." + payload).getBytes(StandardCharsets.UTF_8)));
         } catch (Exception exception) {

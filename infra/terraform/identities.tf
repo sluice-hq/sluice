@@ -67,6 +67,12 @@ resource "azurerm_role_assignment" "api_key_vault_secrets" {
   principal_id         = azurerm_user_assigned_identity.api.principal_id
 }
 
+resource "azurerm_role_assignment" "api_webhook_key_crypto" {
+  scope                = azurerm_key_vault_key.webhook_secret_kek.resource_id
+  role_definition_name = "Key Vault Crypto User"
+  principal_id         = azurerm_user_assigned_identity.api.principal_id
+}
+
 resource "azurerm_role_assignment" "worker_key_vault_secrets" {
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets User"

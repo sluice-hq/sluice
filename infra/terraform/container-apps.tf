@@ -113,6 +113,22 @@ resource "azurerm_container_app" "api" {
         value = azurerm_user_assigned_identity.api.client_id
       }
       env {
+        name  = "SLUICE_WEBHOOK_ENCRYPTION_PROVIDER"
+        value = "azure"
+      }
+      env {
+        name  = "SLUICE_WEBHOOK_ENCRYPTION_MIGRATION_MODE"
+        value = "protected"
+      }
+      env {
+        name  = "AZURE_KEY_VAULT_URL"
+        value = azurerm_key_vault.main.vault_uri
+      }
+      env {
+        name  = "AZURE_WEBHOOK_KEK_NAME"
+        value = azurerm_key_vault_key.webhook_secret_kek.name
+      }
+      env {
         name  = "SLUICE_DB_URL"
         value = "jdbc:postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${var.postgres_database_name}?sslmode=require&options=-c%20TimeZone=UTC"
       }
@@ -213,6 +229,7 @@ resource "azurerm_container_app" "api" {
   depends_on = [
     azurerm_role_assignment.api_acr_pull,
     azurerm_role_assignment.api_key_vault_secrets,
+    azurerm_role_assignment.api_webhook_key_crypto,
     azurerm_role_assignment.api_service_bus_sender,
   ]
 }
