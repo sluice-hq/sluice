@@ -20,6 +20,7 @@ public class AzureServiceBusRunQueuePublisher implements RunQueuePublisher {
     private final ServiceBusSenderClient sender;
     private final ObjectMapper objectMapper;
     private final SluiceMetrics metrics;
+    private volatile Boolean lastPublishSucceeded;
 
     public AzureServiceBusRunQueuePublisher(ServiceBusSenderClient sender, ObjectMapper objectMapper,
                                              SluiceMetrics metrics) {
@@ -40,13 +41,17 @@ public class AzureServiceBusRunQueuePublisher implements RunQueuePublisher {
                 serviceBusMessage.setCorrelationId(message.getRequestId());
             }
             sender.sendMessage(serviceBusMessage);
+            lastPublishSucceeded = true;
             metrics.queuePublish("confirmed");
         } catch (JsonProcessingException exception) {
             metrics.queuePublish("failed");
             throw new IllegalArgumentException("Could not serialize the run queue message", exception);
         } catch (RuntimeException exception) {
+            lastPublishSucceeded = false;
             metrics.queuePublish("failed");
             throw exception;
         }
     }
+
+    public Boolean lastPublishSucceeded() { return lastPublishSucceeded; }
 }

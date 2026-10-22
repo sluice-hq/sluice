@@ -14,11 +14,14 @@ FROM eclipse-temurin:17-jre-jammy AS runtime
 RUN groupadd --system --gid 10001 sluice \
     && useradd --system --uid 10001 --gid sluice --home-dir /app --shell /usr/sbin/nologin sluice
 WORKDIR /app
+ADD --checksum=sha256:93a70c8f5d364c7e777f6c4d1b235dba91aef8448bd3fa94359f1d7f3e2eb0ec https://repo.maven.apache.org/maven2/com/microsoft/azure/applicationinsights-agent/3.7.10/applicationinsights-agent-3.7.10.jar /app/applicationinsights-agent.jar
+COPY backend/docker-entrypoint.sh /app/entrypoint.sh
+RUN chmod 644 /app/applicationinsights-agent.jar && chmod 755 /app/entrypoint.sh && sh -n /app/entrypoint.sh
 COPY --from=build --chown=10001:10001 /workspace/backend/build/libs/*.jar /app/sluice.jar
 COPY --from=build --chown=10001:10001 /workspace/LICENSE /workspace/THIRD_PARTY_NOTICES.md /licenses/
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -Duser.timezone=UTC"
 USER 10001:10001
-ENTRYPOINT ["java", "-jar", "/app/sluice.jar"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 FROM runtime AS worker
 ENV SPRING_PROFILES_ACTIVE=production \

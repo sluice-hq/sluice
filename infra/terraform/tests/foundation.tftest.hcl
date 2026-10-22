@@ -38,9 +38,23 @@ variables {
 run "foundation_without_apps" {
   command = plan
 
+  override_resource {
+    target          = azurerm_key_vault_key.webhook_secret_kek
+    override_during = plan
+    values = {
+      resource_versionless_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock/providers/Microsoft.KeyVault/vaults/mock/keys/webhook-secret-kek"
+      resource_id             = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/mock/providers/Microsoft.KeyVault/vaults/mock/keys/webhook-secret-kek/version1"
+    }
+  }
+
   assert {
     condition     = length(azurerm_container_app.api) == 0 && length(azurerm_container_app.worker) == 0 && length(azurerm_container_app.dashboard) == 0
     error_message = "The first foundation plan must not deploy apps before images and secrets are prepared."
+  }
+
+  assert {
+    condition     = length(azurerm_cognitive_account.content_safety) == 0 && length(azurerm_communication_service.email) == 0
+    error_message = "Foundation must not silently provision external AI or email resources."
   }
 
   assert {
@@ -77,6 +91,11 @@ run "foundation_without_apps" {
     condition     = contains(azurerm_key_vault_key.webhook_secret_kek.key_opts, "wrapKey") && contains(azurerm_key_vault_key.webhook_secret_kek.key_opts, "unwrapKey") && azurerm_key_vault_key.webhook_secret_kek.rotation_policy[0].expire_after == "P90D" && azurerm_role_assignment.api_webhook_key_crypto.role_definition_name == "Key Vault Crypto User"
     error_message = "Webhook envelope encryption must use a Key Vault wrapping key available only to the API identity."
   }
+
+  assert {
+    condition     = azurerm_role_assignment.api_webhook_key_crypto.scope == azurerm_key_vault_key.webhook_secret_kek.resource_versionless_id
+    error_message = "API key permissions must cover the key across versions so automatic rotation does not revoke wrap/unwrap access."
+  }
 }
 
 run "controlled_demo_apps" {
@@ -91,7 +110,9 @@ run "controlled_demo_apps" {
   }
 
   variables {
-    deploy_container_apps = true
+    deploy_container_apps   = true
+    enable_hosted_providers = true
+    email_sender_address    = "DoNotReply@test.azurecomm.net"
   }
 
   assert {
@@ -128,16 +149,71 @@ run "controlled_demo_apps" {
     condition     = one([for setting in azurerm_container_app.api[0].template[0].container[0].env : setting.value if setting.name == "SLUICE_WEBHOOK_ENCRYPTION_PROVIDER"]) == "azure" && one([for setting in azurerm_container_app.api[0].template[0].container[0].env : setting.value if setting.name == "SLUICE_WEBHOOK_ENCRYPTION_MIGRATION_MODE"]) == "protected" && contains([for setting in azurerm_container_app.api[0].template[0].container[0].env : setting.name], "AZURE_KEY_VAULT_URL") && contains([for setting in azurerm_container_app.api[0].template[0].container[0].env : setting.name], "AZURE_WEBHOOK_KEK_NAME")
     error_message = "The API app must select Azure Key Vault webhook-secret protection."
   }
+
+  assert {
+    condition     = one([for setting in azurerm_container_app.api[0].template[0].container[0].env : setting.value if setting.name == "SLUICE_AUTH_EMAIL_PROVIDER"]) == "azure" && one([for setting in azurerm_container_app.worker[0].template[0].container[0].env : setting.value if setting.name == "SLUICE_GOVERNANCE_PROVIDER"]) == "azure"
+    error_message = "Hosted apps must never silently use simulated email or content moderation."
+  }
+
+  assert {
+    condition     = azurerm_cognitive_account.content_safety[0].network_acls[0].default_action == "Deny" && azurerm_cognitive_account.content_safety[0].network_acls[0].bypass == "None"
+    error_message = "Content Safety must restrict access to the application subnet."
+  }
+
+  assert {
+    condition     = !contains(keys(azurerm_role_assignment.worker_key_vault_secrets), var.email_key_secret_name) && !contains(keys(azurerm_role_assignment.api_key_vault_secrets), var.content_safety_key_secret_name)
+    error_message = "Worker and API must not share provider secret permissions."
+  }
+
+  assert {
+    condition     = one([for setting in azurerm_container_app.api[0].template[0].container[0].env : setting.secret_name if setting.name == "AZURE_COMMUNICATION_EMAIL_ACCESS_KEY"]) == "email-access-key" && one([for setting in azurerm_container_app.worker[0].template[0].container[0].env : setting.secret_name if setting.name == "AZURE_CONTENT_SAFETY_API_KEY"]) == "content-safety-key"
+    error_message = "Provider credentials must enter application settings through Key Vault-backed secrets, never plaintext values."
+  }
+
+  assert {
+    condition     = one([for setting in azurerm_container_app.api[0].template[0].container[0].env : setting.value if setting.name == "SLUICE_AUTH_REGISTRATION_MODE"]) == "allowlist" && length(var.demo_registration_allowed_emails) == 0
+    error_message = "Hosted registration must default to a closed allowlist."
+  }
+}
+
+run "reject_apps_without_real_providers" {
+  command = plan
+  variables {
+    deploy_container_apps = true
+  }
+  expect_failures = [terraform_data.configuration_contract]
+}
+
+run "reject_apps_without_sender" {
+  command = plan
+  variables {
+    deploy_container_apps   = true
+    enable_hosted_providers = true
+  }
+  expect_failures = [terraform_data.configuration_contract]
+}
+
+run "separate_plan_and_apply_identities" {
+  command = plan
+  variables {
+    terraform_key_manager_object_id = "00000000-0000-0000-0000-000000000099"
+  }
+  assert {
+    condition     = azurerm_role_assignment.terraform_key_vault_crypto_officer.principal_id == var.terraform_key_manager_object_id
+    error_message = "Key-management permission must follow the explicit apply identity rather than the caller that creates the plan."
+  }
 }
 
 run "reject_mutable_images" {
   command = plan
 
   variables {
-    deploy_container_apps = true
-    api_image             = "sluicedemotst001acr.azurecr.io/sluice-api:latest"
-    worker_image          = "sluicedemotst001acr.azurecr.io/sluice-worker:latest"
-    dashboard_image       = "sluicedemotst001acr.azurecr.io/sluice-dashboard:latest"
+    deploy_container_apps   = true
+    enable_hosted_providers = true
+    email_sender_address    = "DoNotReply@test.azurecomm.net"
+    api_image               = "sluicedemotst001acr.azurecr.io/sluice-api:latest"
+    worker_image            = "sluicedemotst001acr.azurecr.io/sluice-worker:latest"
+    dashboard_image         = "sluicedemotst001acr.azurecr.io/sluice-dashboard:latest"
   }
 
   expect_failures = [

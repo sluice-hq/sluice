@@ -25,6 +25,8 @@ locals {
     storage           = "${azurerm_key_vault.main.vault_uri}secrets/${var.storage_connection_string_secret_name}"
     jwt               = "${azurerm_key_vault.main.vault_uri}secrets/${var.jwt_secret_name}"
     audit_pepper      = "${azurerm_key_vault.main.vault_uri}secrets/${var.auth_audit_pepper_secret_name}"
+    content_safety    = "${azurerm_key_vault.main.vault_uri}secrets/${var.content_safety_key_secret_name}"
+    email             = "${azurerm_key_vault.main.vault_uri}secrets/${var.email_key_secret_name}"
   }
 
   tags = merge(var.common_tags, {

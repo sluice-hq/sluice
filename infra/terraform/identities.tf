@@ -62,19 +62,27 @@ resource "azurerm_role_assignment" "worker_service_bus_receiver" {
 }
 
 resource "azurerm_role_assignment" "api_key_vault_secrets" {
-  scope                = azurerm_key_vault.main.id
+  for_each = toset([
+    var.postgres_password_secret_name, var.storage_connection_string_secret_name,
+    var.jwt_secret_name, var.auth_audit_pepper_secret_name, var.email_key_secret_name,
+  ])
+  scope                = "${azurerm_key_vault.main.id}/secrets/${each.value}"
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.api.principal_id
 }
 
 resource "azurerm_role_assignment" "api_webhook_key_crypto" {
-  scope                = azurerm_key_vault_key.webhook_secret_kek.resource_id
+  scope                = azurerm_key_vault_key.webhook_secret_kek.resource_versionless_id
   role_definition_name = "Key Vault Crypto User"
   principal_id         = azurerm_user_assigned_identity.api.principal_id
 }
 
 resource "azurerm_role_assignment" "worker_key_vault_secrets" {
-  scope                = azurerm_key_vault.main.id
+  for_each = toset([
+    var.postgres_password_secret_name, var.storage_connection_string_secret_name,
+    var.content_safety_key_secret_name,
+  ])
+  scope                = "${azurerm_key_vault.main.id}/secrets/${each.value}"
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.worker.principal_id
 }

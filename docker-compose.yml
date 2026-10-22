@@ -72,6 +72,9 @@ services:
     environment:
       <<: *backend-environment
       AZURE_STORAGE_CONFIGURE_CORS: "true"
+      SLUICE_WEBHOOK_LOCAL_DEMO_CALLBACK_ENABLED: "true"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy

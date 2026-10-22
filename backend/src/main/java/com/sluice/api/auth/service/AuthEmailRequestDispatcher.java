@@ -1,46 +1,33 @@
 package com.sluice.api.auth.service;
 
-import com.sluice.api.auth.email.AuthEmailExecutionConfig;
 import com.sluice.api.runtime.ConditionalOnApiRuntime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.core.task.TaskExecutor;
+import com.sluice.api.auth.email.AuthEmailOutbox;
+import com.sluice.api.auth.domain.AuthTokenPurpose;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @ConditionalOnApiRuntime
 public class AuthEmailRequestDispatcher {
-    private static final Logger log = LoggerFactory.getLogger(AuthEmailRequestDispatcher.class);
-    private final TaskExecutor executor;
-    private final AuthTokenService tokenService;
+    private final AuthEmailOutbox outbox;
+    private final int ttlSeconds;
 
-    public AuthEmailRequestDispatcher(@Qualifier(AuthEmailExecutionConfig.EXECUTOR) TaskExecutor executor,
-                                      AuthTokenService tokenService) {
-        this.executor = executor;
-        this.tokenService = tokenService;
+    public AuthEmailRequestDispatcher(AuthEmailOutbox outbox,
+            @Value("${sluice.auth.email.outbox.request-ttl-seconds:1800}") int ttlSeconds) {
+        if (ttlSeconds < 60 || ttlSeconds > 86400) throw new IllegalArgumentException("Invalid email request TTL");
+        this.outbox = outbox;
+        this.ttlSeconds = ttlSeconds;
     }
 
+    @Transactional
     public void requestVerification(String normalizedEmail) {
-        submit("verification", () -> tokenService.sendVerificationIfRequired(normalizedEmail));
+        outbox.request(normalizedEmail, AuthTokenPurpose.EMAIL_VERIFICATION, ttlSeconds);
     }
 
+    @Transactional
     public void requestRecovery(String normalizedEmail) {
-        submit("recovery", () -> tokenService.sendPasswordResetIfPresent(normalizedEmail));
+        outbox.request(normalizedEmail, AuthTokenPurpose.PASSWORD_RESET, ttlSeconds);
     }
 
-    private void submit(String kind, Runnable task) {
-        try {
-            executor.execute(() -> {
-                try {
-                    task.run();
-                } catch (RuntimeException exception) {
-                    log.error("Asynchronous authentication email request failed: kind={}", kind, exception);
-                }
-            });
-        } catch (RuntimeException exception) {
-            // The public response remains generic and account-independent when the bounded queue is full.
-            log.warn("Authentication email request could not be queued: kind={}", kind);
-        }
-    }
 }

@@ -105,6 +105,12 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.FORBIDDEN, "You do not have permission for this operation.", "forbidden");
     }
 
+    @ExceptionHandler(com.sluice.api.auth.service.RegistrationPolicy.RegistrationRestrictedException.class)
+    public ProblemDetail handleRegistrationRestricted(
+            com.sluice.api.auth.service.RegistrationPolicy.RegistrationRestrictedException exception) {
+        return problem(HttpStatus.FORBIDDEN, exception.getMessage(), "registration_restricted");
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException exc) {
         return problem(HttpStatus.CONFLICT, "The request conflicts with an existing resource.", "resource_conflict");

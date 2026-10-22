@@ -30,6 +30,8 @@ try {
 }
 
 if (-not (Wait-Http 'http://localhost:8080/actuator/health' 2)) {
+    $env:SPRING_PROFILES_ACTIVE = 'local'
+    $env:SLUICE_WEBHOOK_LOCAL_DEMO_CALLBACK_ENABLED = 'true'
     $backendDir = Join-Path $repoRoot 'backend'
     $backend = Start-Process -FilePath (Join-Path $backendDir 'gradlew.bat') `
         -ArgumentList 'bootRun', '--console=plain' -WorkingDirectory $backendDir -WindowStyle Hidden -PassThru `

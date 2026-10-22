@@ -15,6 +15,8 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
@@ -54,6 +56,16 @@ public class AzureCommunicationEmailProvider implements AuthEmailProvider {
 
     @Override
     public void send(AuthEmail email) {
+        send(UUID.randomUUID(), email);
+    }
+
+    @Override
+    public void send(UUID deliveryId, AuthEmail email) {
+        send(deliveryId, Instant.now(), email);
+    }
+
+    @Override
+    public void send(UUID deliveryId, Instant firstSentAt, AuthEmail email) {
         try {
             URI uri = endpoint.resolve("/emails:send?api-version=" + apiVersion);
             String body = mapper.writeValueAsString(Map.of(
@@ -74,8 +86,10 @@ public class AzureCommunicationEmailProvider implements AuthEmailProvider {
                     .header("x-ms-date", date)
                     .header("x-ms-content-sha256", contentHash)
                     .header("Authorization", "HMAC-SHA256 SignedHeaders=x-ms-date;host;x-ms-content-sha256&Signature=" + signature)
-                    .header("Operation-Id", UUID.randomUUID().toString())
-                    .header("x-ms-client-request-id", UUID.randomUUID().toString())
+                    .header("Operation-Id", deliveryId.toString())
+                    .header("x-ms-client-request-id", deliveryId.toString())
+                    .header("Repeatability-Request-ID", deliveryId.toString())
+                    .header("Repeatability-First-Sent", DateTimeFormatter.RFC_1123_DATE_TIME.format(firstSentAt.atZone(ZoneOffset.UTC)))
                     .POST(HttpRequest.BodyPublishers.ofString(body)).build();
             HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
             if (response.statusCode() / 100 != 2) {

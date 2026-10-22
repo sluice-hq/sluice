@@ -26,16 +26,20 @@ public class AuthController {
 
     private final AuthService authService;
     private final AuthAbuseGuard abuseGuard;
+    private final com.sluice.api.auth.service.RegistrationPolicy registration;
 
-    public AuthController(AuthService authService, AuthAbuseGuard abuseGuard) {
+    public AuthController(AuthService authService, AuthAbuseGuard abuseGuard,
+                          com.sluice.api.auth.service.RegistrationPolicy registration) {
         this.authService = authService;
         this.abuseGuard = abuseGuard;
+        this.registration = registration;
     }
 
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
     public AuthService.AuthResult signup(@Valid @RequestBody SignupRequest request,
                                          HttpServletRequest servletRequest) {
+        registration.check(request.email());
         String client = clientAddress(servletRequest);
         abuseGuard.check(AuthAbuseGuard.Operation.SIGNUP, client, request.email());
         return authService.signup(request.email(), request.password(), request.projectName(), client);

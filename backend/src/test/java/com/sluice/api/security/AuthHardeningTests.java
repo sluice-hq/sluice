@@ -8,7 +8,8 @@ import com.sluice.api.auth.repository.AuthAuditEventRepository;
 import com.sluice.api.auth.repository.AuthTokenRepository;
 import com.sluice.api.auth.repository.UserRepository;
 import com.sluice.api.auth.service.AuthAuditService;
-import com.sluice.api.auth.email.AuthEmailExecutionConfig;
+import com.sluice.api.auth.email.AuthEmailOutboxDispatcher;
+import com.sluice.api.auth.email.AuthEmailRequestProcessor;
 import com.sluice.api.project.repository.ProjectMemberRepository;
 import com.sluice.api.project.repository.ProjectRepository;
 import com.sluice.api.support.SluiceIntegrationTest;
@@ -18,8 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -44,6 +43,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SluiceIntegrationTest
+@org.springframework.test.context.TestPropertySource(properties = "sluice.auth.email.outbox.initial-delay-millis=3600000")
 class AuthHardeningTests {
     @Autowired private WebApplicationContext context;
     @Autowired private UserRepository userRepository;
@@ -54,8 +54,8 @@ class AuthHardeningTests {
     @Autowired private LocalCapturedEmailProvider capturedEmail;
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private AuthAuditService auditService;
-    @Autowired @Qualifier(AuthEmailExecutionConfig.EXECUTOR)
-    private ThreadPoolTaskExecutor emailExecutor;
+    @Autowired private AuthEmailOutboxDispatcher emailDispatcher;
+    @Autowired private AuthEmailRequestProcessor emailRequests;
     private MockMvc mockMvc;
     private final ObjectMapper mapper = new ObjectMapper();
     private final String clientAddress = "test-client-" + UUID.randomUUID();
@@ -68,7 +68,6 @@ class AuthHardeningTests {
 
     @AfterEach
     void cleanup() {
-        awaitEmailExecutor();
         capturedEmail.clear();
         auditRepository.deleteAll();
         tokenRepository.deleteAll();
@@ -177,7 +176,11 @@ class AuthHardeningTests {
         String email = uniqueEmail("bounded");
         signup(email);
         capturedEmail.clear();
-        for (int attempt = 0; attempt < 5; attempt++) recovery(email);
+        for (int attempt = 0; attempt < 5; attempt++) {
+            recovery(email);
+            emailRequests.process();
+            emailDispatcher.dispatch();
+        }
 
         mockMvc.perform(post("/api/v1/auth/recovery")
                         .with(remoteClient())
@@ -229,27 +232,14 @@ class AuthHardeningTests {
         long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
         List<AuthEmailProvider.AuthEmail> messages;
         do {
+            emailRequests.process();
+            emailDispatcher.dispatch();
             messages = capturedEmail.messages().stream()
                     .filter(message -> message.kind() == kind).toList();
             if (messages.size() >= count) return messages;
             Thread.sleep(20);
         } while (System.nanoTime() < deadline);
         return messages;
-    }
-
-    private void awaitEmailExecutor() {
-        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
-        while (System.nanoTime() < deadline) {
-            if (emailExecutor.getActiveCount() == 0 && emailExecutor.getThreadPoolExecutor().getQueue().isEmpty()) {
-                return;
-            }
-            try {
-                Thread.sleep(20);
-            } catch (InterruptedException exception) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-        }
     }
 
     private String uniqueEmail(String prefix) { return prefix + '-' + UUID.randomUUID() + "@example.com"; }

@@ -18,7 +18,7 @@ The repository provides a verified local product flow and a locally validated Te
 - Versioned processor releases; revision-checked pipeline drafts; immutable published versions and aliases; contract validation before publication and execution.
 - Durable asynchronous runs with PostgreSQL-backed outbox delivery, RabbitMQ locally and Azure Service Bus in production, idle-safe retry recovery, step facts, output provenance, Server-Sent Events, and signed terminal webhooks.
 - Deterministic local media-governance decisions with persisted allow/review/block evidence, plus an Azure AI Content Safety adapter awaiting live Azure provisioning and verification.
-- Email verification and password recovery with hashed, expiring, single-use link tokens; local email capture and an Azure Communication Services Email adapter are implemented.
+- Email verification and password recovery with hashed, expiring, single-use link tokens, an encrypted PostgreSQL email outbox, bounded retries, local email capture and an Azure Communication Services Email adapter.
 - Processor market, searchable guided and JSON pipeline authoring with descriptive starter flows and enabled-release safeguards, first-run checklist, API Quick Start, pipeline test console, and asset/run/governance inspection.
 - Local Prometheus and Grafana monitoring, plus backend, integration, API-smoke, and Playwright browser verification.
 
@@ -68,14 +68,14 @@ Built-in processor releases cover validation, image metadata, checksums, resize,
 | `webp` | Produces deterministic WebP output with bounded quality settings and startup codec verification. |
 | `governance.content-safety` | Persists `ALLOW`, `REVIEW`, or `BLOCK` decisions from the configured provider. |
 
-Local governance uses a deterministic provider so tests can exercise all decision paths without network access. It is a test double, not AI moderation or a real harmful-content classifier. The Azure AI Content Safety adapter is configured only when explicitly enabled and has no live Azure smoke coverage in this repository.
+Local governance uses a deterministic provider so tests can exercise all decision paths without network access. It is a test double, not AI moderation or a real harmful-content classifier. The Azure adapter rejects incomplete category evidence rather than allowing the image. It accepts static JPEG, PNG and WebP images up to 4,000,000 bytes with each dimension between 50 and 2048 pixels, using the conservative REST contract limit. An opt-in live smoke test exists but has not been run against Azure.
 
 ## Quick start
 
 Prerequisites:
 
 - Java 17
-- Node.js 20.9 or later with npm
+- Node.js 24 LTS with npm
 - Docker Desktop with the Docker engine running
 
 Start the full local stack from the repository root:
@@ -92,7 +92,9 @@ Run the deterministic API-first demonstration after the stack is ready:
 .\scripts\demo-local.ps1
 ```
 
-It creates a demo account and API key, publishes the included `demo-webp` pipeline, transfers a PNG to Azurite, waits for the RabbitMQ-backed run, verifies the governance result and WebP output, then downloads that output.
+It creates a local demo account and API key, publishes a listing-image pipeline, transfers an original synthetic 1400 by 900 PNG to Azurite, and verifies the processed WebP, metadata removal, application references, policy result and a real signed terminal webhook. The generated input is deliberately unoptimized; its byte savings are demonstration evidence rather than a production benchmark. The receiver uses host port 8787, which must be reachable from the API container.
+
+The [marketplace reference client](examples/marketplace/README.md) exposes a typed `uploadAndRun` helper for applications. It uses the public API, keeps storage credentials separate from API credentials, and supports the same integration against a configured hosted deployment.
 
 Stop local processes and services while retaining Compose volumes:
 
@@ -217,6 +219,17 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
+Test the public API reference helper from the repository root:
+
+```powershell
+frontend/node_modules/.bin/tsc.cmd --project examples/marketplace/tsconfig.json
+node --test examples/marketplace/client.test.ts
+```
+
+Azure provider checks are separate and opt-in. After configuring an approved Content Safety resource, set `SLUICE_RUN_LIVE_AZURE_TESTS=true` and run `./gradlew.bat liveAzureTest --console=plain` from `backend`. This contacts Azure and may consume credit; ordinary tests never run it.
+
+With a verified email sender and an explicit `SLUICE_EMAIL_SMOKE_RECIPIENT`, `./gradlew.bat liveAzureEmailTest --console=plain` checks ACS Email submission under the same opt-in flag. Confirm inbox arrival and real account verification/recovery separately; a successful provider submission is not a delivery receipt.
+
 The browser test requires the local application to be running. It covers authentication and session behavior, CSRF rejection, project switching and feedback, API keys, processor discovery and enablement, guided/JSON pipeline authoring, upload/run/output, asset and governance discovery, and responsive navigation. GitHub Actions runs backend (including the real dependency integration test) and frontend verification in parallel, then builds and inspects the three release images and runs the browser and API-smoke paths through the Compose `app` profile in one dependent product gate.
 
 Before committing, check whitespace errors from the repository root:
@@ -231,6 +244,7 @@ git diff --check
 backend/                 Spring Boot API/worker, production Dockerfile, Flyway migrations, and tests
 frontend/                Next.js dashboard/BFF, standalone Dockerfile, and browser tests
 demo/                    Deterministic pipeline and media fixture for the local demo
+examples/marketplace/    Typed API helper, synthetic listing fixture and verified webhook integration
 monitoring/              Prometheus and Grafana provisioning
 infra/terraform/         Azure foundation, safe examples, and credential-free plan tests
 scripts/                 Local start, stop, and API-smoke scripts
@@ -242,20 +256,27 @@ docker-compose.yml       Local dependencies, monitoring, and optional release-im
 
 - Tenant data is project-scoped in the authentication context and application queries.
 - The dashboard stores its JWT in an HttpOnly, SameSite cookie; the BFF forwards it server-side.
-- Email verification and password recovery use expiring, single-use tokens stored only as SHA-256 hashes. Password resets invalidate earlier dashboard JWTs through a credential-session version check.
-- Authentication requests have generic recovery/verification responses, bounded per-client and per-subject controls, and redacted audit records. Account lookup and email submission run behind a bounded asynchronous queue so public responses do not wait on provider latency. Local development captures email safely in memory; production is configured for Azure Communication Services Email.
+- Email verification and password recovery use expiring, single-use tokens with SHA-256 lookup hashes. Email retry payloads containing links are authenticated-encrypted separately. Password resets invalidate earlier dashboard JWTs through a credential-session version check.
+- Authentication requests have generic recovery/verification responses, bounded per-client and per-subject controls, and redacted audit records. Recovery and resend requests use a durable inbox; link emails use an authenticated-encrypted PostgreSQL outbox with leased claims, bounded retries and expiry suppression. Local delivery captures email in memory; production uses Azure Communication Services Email. Provider acceptance is distinct from arrival in a recipient's inbox.
+- Production signup defaults to an exact email allowlist; an empty allowlist disables new accounts. Public production registration is blocked until shared abuse controls and capacity quotas are implemented. Local source development remains open.
+- Public-beta webhook registration also requires protection against DNS rebinding. Current validation checks resolved addresses, while the HTTP connection resolves the hostname separately; use trusted demo accounts until pinned resolution or an enforced outbound proxy/network policy closes that boundary.
 - State-changing authenticated dashboard proxy requests require a matching `X-Sluice-CSRF` header and SameSite CSRF cookie. Public authentication proxies separately reject browser requests that do not originate from Sluice.
 - API keys use 256 bits of randomness, are shown once, stored only as SHA-256 hashes, project-scoped, and revocable.
 - Blob containers are private. Upload and download access uses short-lived SAS URLs.
 - Pipeline contracts and media limits constrain supported content; arbitrary custom processor code, remote-URL processing, unrestricted graphs, quotas, request-cost enforcement, and custom marketplace submissions are not implemented V1 capabilities.
+- Processor manifest time and memory values are budgets. Built-in processors share a worker process, image time checks are cooperative, and container memory limits do not provide per-processor isolation.
 
 ## Deployment status
 
 Sluice has multi-stage, non-root release images for the Spring API, Spring worker, and standalone Next.js dashboard. The API and worker use explicit runtime modes, expose separate health checks, and can be exercised together through the optional Compose `app` profile. CI builds all three images and verifies their runtime users and bundled legal files.
 
-The [Azure Terraform foundation](infra/terraform/README.md) defines ACR, Container Apps, private PostgreSQL, Blob Storage, Standard Service Bus, Key Vault and managed identities, Log Analytics/Application Insights, and budget notifications. The Java production runtime has sender and consumer Service Bus adapters, durable API-owned retry recovery, explicit dead-letter settlement, a dead-letter alert, and a Managed Identity KEDA worker rule. Webhook signing secrets use per-endpoint AES-GCM data keys wrapped by a versioned Key Vault RSA key; only the API identity receives wrap/unwrap access. The first Terraform stage still creates infrastructure without application revisions; applications remain disabled until immutable images and out-of-band secrets exist. No Azure resource has been created yet, so Managed Identity, Key Vault, and the hosted queue path remain unverified. Content Safety, production email, API Management, and the hosted golden path remain follow-up work.
+The [Azure Terraform configuration](infra/terraform/README.md) defines ACR, Container Apps, private PostgreSQL, Blob Storage, Standard Service Bus, Key Vault and managed identities, monitoring, and budget notifications. Optional hosted-provider resources define Content Safety and Communication Services Email with an Azure-managed sender domain, diagnostics and scoped secret references. Enabling application revisions requires real hosted-provider configuration; production does not fall back to simulated delivery.
 
-The Content Safety and Email adapters exist in code, but their live Azure resources, verified email sender/domain, durable production email delivery, application-level tracing and alerts, and live service smoke tests are not implemented. These are explicit L-08C and L-08D deployment tickets in the SDD; local adapter tests and provisioned telemetry resources are not evidence of a working hosted integration.
+Manual GitHub Actions workflows prepare OIDC image publication and a reviewed Terraform plan/apply flow. Release images use digest references, plans remain in private encrypted Azure storage, and apply requires a protected environment. These workflows are inactive until the account, identities, environment protections, secrets and remote state are configured. The [deployment runbook](infra/terraform/DEPLOYMENT.md) describes setup, provider verification, rollback and teardown. The [shipping checklist](SHIP_CHECKLIST.md) separates completed code from live release gates.
+
+No Azure resource has been created or deployed. Managed Identity, Key Vault, Service Bus scaling, actual moderation, recipient email delivery, telemetry and hosted rollback still require live verification. Public self-service protection remains separate work. This architecture is not permanently free, and budget notifications do not stop spending.
+
+API and worker images bundle a checksum-pinned Application Insights Java agent. Their entrypoint attaches it only when `APPLICATIONINSIGHTS_CONNECTION_STRING` is configured; local images run without the exporter. Hosted roles distinguish API and worker telemetry. Container logs cover the dashboard; it does not have a browser or Node telemetry SDK. The Service Bus health signal reflects the last publish operation and remains unknown before the first operation, rather than claiming continuous connectivity.
 
 ## License
 

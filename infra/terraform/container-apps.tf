@@ -7,6 +7,10 @@ resource "terraform_data" "configuration_contract" {
 
   lifecycle {
     precondition {
+      condition     = !var.deploy_container_apps || (var.enable_hosted_providers && can(regex("^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$", var.email_sender_address)))
+      error_message = "Application deployment requires real hosted providers and the provisioned verified email sender; simulated production delivery is not supported."
+    }
+    precondition {
       condition     = timecmp(var.budget_end_date, var.budget_start_date) > 0
       error_message = "budget_end_date must be later than budget_start_date."
     }
@@ -55,6 +59,12 @@ resource "azurerm_container_app" "api" {
     name                = "auth-audit-pepper"
     identity            = azurerm_user_assigned_identity.api.id
     key_vault_secret_id = local.key_vault_secret_ids.audit_pepper
+  }
+
+  secret {
+    name                = "email-access-key"
+    identity            = azurerm_user_assigned_identity.api.id
+    key_vault_secret_id = local.key_vault_secret_ids.email
   }
 
   ingress {
@@ -181,12 +191,32 @@ resource "azurerm_container_app" "api" {
         value = local.dashboard_origin
       }
       env {
+        name  = "SLUICE_AUTH_REGISTRATION_MODE"
+        value = "allowlist"
+      }
+      env {
+        name  = "SLUICE_AUTH_REGISTRATION_ALLOWED_EMAILS"
+        value = join(",", var.demo_registration_allowed_emails)
+      }
+      env {
         name  = "SLUICE_AUTH_EMAIL_PROVIDER"
-        value = "local"
+        value = "azure"
+      }
+      env {
+        name  = "AZURE_COMMUNICATION_EMAIL_ENDPOINT"
+        value = try("https://${azurerm_communication_service.email[0].hostname}", "")
+      }
+      env {
+        name        = "AZURE_COMMUNICATION_EMAIL_ACCESS_KEY"
+        secret_name = "email-access-key"
+      }
+      env {
+        name  = "AZURE_COMMUNICATION_EMAIL_SENDER"
+        value = var.email_sender_address
       }
       env {
         name  = "SLUICE_GOVERNANCE_PROVIDER"
-        value = "local"
+        value = "azure"
       }
       env {
         name  = "MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED"
@@ -195,6 +225,10 @@ resource "azurerm_container_app" "api" {
       env {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         value = azurerm_application_insights.main.connection_string
+      }
+      env {
+        name  = "APPLICATIONINSIGHTS_ROLE_NAME"
+        value = "sluice-api"
       }
 
       liveness_probe {
@@ -227,6 +261,8 @@ resource "azurerm_container_app" "api" {
   }
 
   depends_on = [
+    terraform_data.configuration_contract,
+    azurerm_communication_service_email_domain_association.email,
     azurerm_role_assignment.api_acr_pull,
     azurerm_role_assignment.api_key_vault_secrets,
     azurerm_role_assignment.api_webhook_key_crypto,
@@ -264,6 +300,12 @@ resource "azurerm_container_app" "worker" {
     name                = "storage-connection"
     identity            = azurerm_user_assigned_identity.worker.id
     key_vault_secret_id = local.key_vault_secret_ids.storage
+  }
+
+  secret {
+    name                = "content-safety-key"
+    identity            = azurerm_user_assigned_identity.worker.id
+    key_vault_secret_id = local.key_vault_secret_ids.content_safety
   }
 
   template {
@@ -347,11 +389,23 @@ resource "azurerm_container_app" "worker" {
       }
       env {
         name  = "SLUICE_GOVERNANCE_PROVIDER"
-        value = "local"
+        value = "azure"
+      }
+      env {
+        name  = "AZURE_CONTENT_SAFETY_ENDPOINT"
+        value = try(azurerm_cognitive_account.content_safety[0].endpoint, "")
+      }
+      env {
+        name        = "AZURE_CONTENT_SAFETY_API_KEY"
+        secret_name = "content-safety-key"
       }
       env {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         value = azurerm_application_insights.main.connection_string
+      }
+      env {
+        name  = "APPLICATIONINSIGHTS_ROLE_NAME"
+        value = "sluice-worker"
       }
     }
   }
@@ -364,6 +418,7 @@ resource "azurerm_container_app" "worker" {
   }
 
   depends_on = [
+    terraform_data.configuration_contract,
     azurerm_role_assignment.worker_acr_pull,
     azurerm_role_assignment.worker_key_vault_secrets,
     azurerm_role_assignment.worker_service_bus_receiver,

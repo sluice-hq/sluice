@@ -30,6 +30,12 @@ public class SluiceMetrics {
         registry.counter("sluice.governance.decisions", "decision", decision).increment();
     }
 
+    public void governanceProvider(String outcome, long elapsedNanos) {
+        Timer.builder("sluice.governance.provider")
+                .tags("provider", "azure-content-safety", "outcome", outcome)
+                .register(registry).record(Duration.ofNanos(elapsedNanos));
+    }
+
     public void queuePublish(String outcome) {
         registry.counter("sluice.queue.publishes", "outcome", outcome).increment();
     }

@@ -14,6 +14,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface AuthTokenRepository extends JpaRepository<AuthToken, UUID> {
+    @Query("select token.userId from AuthToken token where token.tokenHash = :hash and token.purpose = :purpose")
+    Optional<UUID> findUserIdForConsumption(@Param("hash") String hash, @Param("purpose") AuthTokenPurpose purpose);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<AuthToken> findByTokenHashAndPurpose(String tokenHash, AuthTokenPurpose purpose);
 

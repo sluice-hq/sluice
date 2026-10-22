@@ -1,0 +1,151 @@
+name: Deploy Azure demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply the saved plan after independent environment approval
+        type: boolean
+        default: false
+      cost_approval:
+        description: Enter REVIEWED after approving all SKUs, quotas, credit and teardown
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-demo-deployment
+  cancel-in-progress: false
+
+env:
+  TF_IN_AUTOMATION: 'true'
+  ARM_USE_OIDC: 'true'
+  ARM_USE_AZUREAD: 'true'
+
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/main'
+    name: Save Azure plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: azure-demo-plan
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    outputs:
+      plan_blob: ${{ steps.plan.outputs.blob }}
+      plan_sha: ${{ steps.plan.outputs.sha }}
+      planned_at: ${{ steps.plan.outputs.time }}
+      preflight_until: ${{ steps.preflight.outputs.until }}
+    env:
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_postgres_administrator_password: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+      TF_VAR_terraform_key_manager_object_id: ${{ vars.AZURE_APPLY_PRINCIPAL_ID }}
+      STATE_ACCOUNT: ${{ vars.AZURE_STATE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - name: Verify explicit preflight and enforced approval gate
+        id: preflight
+        env:
+          COST_APPROVAL: ${{ inputs.cost_approval }}
+          PREFLIGHT_UNTIL: ${{ vars.AZURE_PREFLIGHT_VALID_UNTIL }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$COST_APPROVAL" = REVIEWED
+          test -n "$PREFLIGHT_UNTIL"
+          test "$(date -u -d "$PREFLIGHT_UNTIL" +%s)" -gt "$(date -u +%s)"
+          printf 'until=%s\n' "$(date -u -d "$PREFLIGHT_UNTIL" +%s)" >> "$GITHUB_OUTPUT"
+          gh api "repos/$GITHUB_REPOSITORY/environments/azure-demo-apply" |
+            jq -e 'any(.protection_rules[]; .type == "required_reviewers" and (.reviewers | length) > 0)' >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&event=push&status=success" |
+            jq -e 'any(.workflow_runs[]; .head_branch == "main" and .conclusion == "success")' >/dev/null
+      - uses: ./.github/actions/azure-terraform
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          state-account: ${{ vars.AZURE_STATE_ACCOUNT }}
+          state-group: ${{ vars.AZURE_STATE_GROUP }}
+      - name: Create and retain the exact plan in private encrypted Azure storage
+        id: plan
+        env:
+          TFVARS_JSON: ${{ vars.AZURE_TFVARS_JSON }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$TF_VAR_postgres_administrator_password"
+          test -n "$TF_VAR_terraform_key_manager_object_id"
+          printf '%s' "$TFVARS_JSON" | jq -e --arg subscription "$ARM_SUBSCRIPTION_ID" --arg principal "$TF_VAR_terraform_key_manager_object_id" '
+            select(type == "object"
+              and (has("postgres_administrator_password") | not)
+              and ((has("subscription_id") | not) or .subscription_id == $subscription)
+              and ((has("terraform_key_manager_object_id") | not) or .terraform_key_manager_object_id == $principal))
+          ' > "$RUNNER_TEMP/demo.tfvars.json"
+          terraform -chdir=infra/terraform plan -input=false -no-color -lock-timeout=5m \
+            -var-file="$RUNNER_TEMP/demo.tfvars.json" -out="$RUNNER_TEMP/release.tfplan" > "$RUNNER_TEMP/plan.log"
+          terraform -chdir=infra/terraform show -json "$RUNNER_TEMP/release.tfplan" > "$RUNNER_TEMP/plan.json"
+          # Only resource addresses/actions enter GitHub logs; plans contain secrets.
+          jq -r '.resource_changes[] | select(.change.actions != ["no-op"]) | [.address, (.change.actions | join(","))] | @tsv' "$RUNNER_TEMP/plan.json" >> "$GITHUB_STEP_SUMMARY"
+          blob="$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT/$GITHUB_SHA.tfplan"
+          az storage blob upload --account-name "$STATE_ACCOUNT" --container-name plans --auth-mode login \
+            --name "$blob" --file "$RUNNER_TEMP/release.tfplan" --overwrite false --output none
+          printf 'blob=%s\nsha=%s\ntime=%s\n' "$blob" "$(sha256sum "$RUNNER_TEMP/release.tfplan" | cut -d' ' -f1)" "$(date -u +%s)" >> "$GITHUB_OUTPUT"
+          printf '\nReview the private saved plan before approving apply. Blob: `%s`\n' "$blob" >> "$GITHUB_STEP_SUMMARY"
+          printf '\nSHA-256: `%s`\n' "$(sha256sum "$RUNNER_TEMP/release.tfplan" | cut -d' ' -f1)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Clean sensitive runner files
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.tfplan" "$RUNNER_TEMP/plan.json" "$RUNNER_TEMP/plan.log" "$RUNNER_TEMP/demo.tfvars.json"
+
+  apply:
+    name: Apply reviewed Azure plan
+    if: inputs.apply
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: azure-demo-apply
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      STATE_ACCOUNT: ${{ vars.AZURE_STATE_ACCOUNT }}
+      PLAN_BLOB: ${{ needs.plan.outputs.plan_blob }}
+      PLAN_SHA: ${{ needs.plan.outputs.plan_sha }}
+      PLANNED_AT: ${{ needs.plan.outputs.planned_at }}
+      PREFLIGHT_UNTIL_EPOCH: ${{ needs.plan.outputs.preflight_until }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - uses: ./.github/actions/azure-terraform
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          state-account: ${{ vars.AZURE_STATE_ACCOUNT }}
+          state-group: ${{ vars.AZURE_STATE_GROUP }}
+      - name: Verify reviewed plan and apply without replanning
+        run: |
+          set -euo pipefail
+          umask 077
+          age=$(( $(date -u +%s) - PLANNED_AT ))
+          test "$age" -ge 0 && test "$age" -lt 86400
+          test "$(date -u +%s)" -lt "$PREFLIGHT_UNTIL_EPOCH"
+          az storage blob download --account-name "$STATE_ACCOUNT" --container-name plans --auth-mode login \
+            --name "$PLAN_BLOB" --file "$RUNNER_TEMP/release.tfplan" --output none
+          printf '%s  %s\n' "$PLAN_SHA" "$RUNNER_TEMP/release.tfplan" | sha256sum --check --status
+          terraform -chdir=infra/terraform apply -input=false -no-color -lock-timeout=5m "$RUNNER_TEMP/release.tfplan"
+      - name: Clean sensitive runner files
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.tfplan"

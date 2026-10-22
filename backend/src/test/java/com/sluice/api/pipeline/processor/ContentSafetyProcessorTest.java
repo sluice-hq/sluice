@@ -16,8 +16,27 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ContentSafetyProcessorTest {
+    @Test
+    void incompleteProviderEvidenceFailsClosed() {
+        ContentSafetyProvider provider = (content, mime) -> new ContentSafetyProvider.ContentSafetyResult(
+                "test", "v1", null, Map.of(), List.of());
+        var processor = new ContentSafetyProcessor(Optional.of(provider));
+        assertThrows(IllegalStateException.class, () -> processor.process(
+                new ProcessingContext(null, null, new BytesResource()), null));
+    }
+
+    @Test
+    void invalidPolicyIsRejectedBeforeExternalRequest() throws Exception {
+        var called = new java.util.concurrent.atomic.AtomicBoolean();
+        ContentSafetyProvider provider = (content, mime) -> { called.set(true); return null; };
+        var config = new com.fasterxml.jackson.databind.ObjectMapper().readTree("{\"reviewThreshold\":4,\"blockThreshold\":4}");
+        assertThrows(IllegalArgumentException.class, () -> new ContentSafetyProcessor(Optional.of(provider)).process(
+                new ProcessingContext(null, null, new BytesResource()), config));
+        assertEquals(false, called.get());
+    }
     @Test
     void normalizesAllowReviewAndBlockAndStopsPipelineForNonAllow() throws Exception {
         assertEquals("ALLOW", decision(2));

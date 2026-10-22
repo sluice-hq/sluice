@@ -13,6 +13,8 @@ class ContentSafetyRuntimeConfigurationTest {
             .withUserConfiguration(RuntimeModeConfiguration.class, AzureContentSafetyProvider.class,
                     ContentSafetyProcessor.class)
             .withBean(ObjectMapper.class)
+            .withBean(com.sluice.api.observability.SluiceMetrics.class, () ->
+                    new com.sluice.api.observability.SluiceMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()))
             .withPropertyValues("sluice.governance.provider=azure");
 
     @Test

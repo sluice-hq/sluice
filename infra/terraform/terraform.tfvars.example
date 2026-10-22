@@ -16,6 +16,13 @@ budget_end_date      = "2027-09-01T00:00:00Z"
 # Keep the apps disabled until ACR images, Key Vault secrets, and the L-08G
 # Service Bus application adapter and worker scaling rule are ready.
 deploy_container_apps = false
+enable_hosted_providers = false
+# Verify availability and costs before enabling. First provision providers with
+# apps disabled, copy the Azure-managed sender address, and populate KV keys.
+content_safety_location = "eastus"
+content_safety_sku      = "F0"
+email_data_location    = "United States"
+email_sender_address   = ""
 
 # Replace these with ACR digest references before enabling the apps. Digest
 # references are immutable; mutable tags such as latest are intentionally rejected.

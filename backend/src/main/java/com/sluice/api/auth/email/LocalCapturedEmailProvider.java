@@ -25,6 +25,16 @@ public class LocalCapturedEmailProvider implements AuthEmailProvider {
         messages.addLast(email);
     }
 
+    private final java.util.Set<java.util.UUID> deliveredIds = new java.util.LinkedHashSet<>();
+
+    @Override
+    public synchronized void send(java.util.UUID deliveryId, AuthEmail email) {
+        if (deliveredIds.contains(deliveryId)) return;
+        send(email);
+        while (deliveredIds.size() >= capacity) deliveredIds.remove(deliveredIds.iterator().next());
+        deliveredIds.add(deliveryId);
+    }
+
     public synchronized List<AuthEmail> messages() { return List.copyOf(messages); }
-    public synchronized void clear() { messages.clear(); }
+    public synchronized void clear() { messages.clear(); deliveredIds.clear(); }
 }

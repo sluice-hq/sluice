@@ -50,15 +50,6 @@ public class AuthService {
         this.emailRequestDispatcher = emailRequestDispatcher;
     }
 
-    AuthService(UserRepository userRepository, ProjectRepository projectRepository,
-                ProjectMemberRepository memberRepository, PasswordEncoder passwordEncoder,
-                JwtService jwtService, AuthTokenService authTokenService,
-                AuthAuditService auditService) {
-        this(userRepository, projectRepository, memberRepository, passwordEncoder, jwtService,
-                authTokenService, auditService,
-                new AuthEmailRequestDispatcher(Runnable::run, authTokenService));
-    }
-
     @Transactional
     public AuthResult signup(String email, String password, String projectName) {
         return signup(email, password, projectName, null);

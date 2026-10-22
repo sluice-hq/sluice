@@ -1,0 +1,53 @@
+name: Initialize protected Azure Terraform
+description: OIDC login and remote state setup without storage keys or local state
+inputs:
+  client-id:
+    required: true
+    description: Environment-scoped federated identity
+  tenant-id:
+    required: true
+    description: Azure tenant
+  subscription-id:
+    required: true
+    description: Reviewed subscription
+  state-account:
+    required: true
+    description: Dedicated state storage account
+  state-group:
+    required: true
+    description: State resource group
+runs:
+  using: composite
+  steps:
+    - uses: azure/login@v3
+      with:
+        client-id: ${{ inputs.client-id }}
+        tenant-id: ${{ inputs.tenant-id }}
+        subscription-id: ${{ inputs.subscription-id }}
+    - uses: hashicorp/setup-terraform@v4
+      with:
+        terraform_version: '1.16.2'
+        terraform_wrapper: false
+    - name: Require encrypted, keyless remote state
+      shell: bash
+      env:
+        STATE_ACCOUNT: ${{ inputs.state-account }}
+        STATE_GROUP: ${{ inputs.state-group }}
+        ARM_CLIENT_ID: ${{ inputs.client-id }}
+        ARM_TENANT_ID: ${{ inputs.tenant-id }}
+        ARM_SUBSCRIPTION_ID: ${{ inputs.subscription-id }}
+      run: |
+        set -euo pipefail
+        az storage account show --name "$STATE_ACCOUNT" --resource-group "$STATE_GROUP" --output json |
+          jq -e '.allowBlobPublicAccess == false and .allowSharedKeyAccess == false and .enableHttpsTrafficOnly == true and .minimumTlsVersion == "TLS1_2" and .encryption.services.blob.enabled == true' >/dev/null
+        for container in tfstate plans; do
+          az storage container show --account-name "$STATE_ACCOUNT" --name "$container" --auth-mode login -o json |
+            jq -e '.properties.publicAccess == null or .properties.publicAccess == "None"' >/dev/null
+        done
+        terraform -chdir=infra/terraform init -input=false -lockfile=readonly \
+          -backend-config="resource_group_name=$STATE_GROUP" \
+          -backend-config="storage_account_name=$STATE_ACCOUNT" \
+          -backend-config="container_name=tfstate" \
+          -backend-config="key=sluice/demo.tfstate" \
+          -backend-config="use_oidc=true" \
+          -backend-config="use_azuread_auth=true"
