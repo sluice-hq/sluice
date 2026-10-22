@@ -1,6 +1,6 @@
 # Azure infrastructure
 
-This Terraform root defines the L-08F Azure foundation for Sluice. It is intentionally safe to validate without an Azure account and intentionally staged for a real deployment.
+This Terraform root defines Sluice's Azure foundation and optional hosted provider resources. It is safe to validate without an Azure account and staged for a real deployment. Follow [DEPLOYMENT.md](DEPLOYMENT.md) for the account, cost, remote-state, OIDC delivery, hosted acceptance, rollback, and teardown gates.
 
 ## What it creates
 
@@ -13,12 +13,13 @@ This Terraform root defines the L-08F Azure foundation for Sluice. It is intenti
 - Standard Service Bus with a `media-runs` queue, duplicate detection, bounded delivery attempts, dead-lettering, and an operator email alert when the dead-letter count rises above zero.
 - RBAC-enabled Key Vault with a versioned RSA wrapping key, Log Analytics, and workspace-based Application Insights.
 - Least-privilege ACR, Blob, Service Bus, Key Vault secret, and API-only Key Vault cryptography role assignments.
+- Optional real Content Safety with a subnet-only network rule, ACS Email with an Azure-managed sender domain, provider diagnostics, and moderation/email failure alerts.
 
 The Container App definitions are present for plan-time review and include the L-08G application configuration and Managed Identity KEDA rule. When enabled, the API has a fixed minimum of one replica because it owns outbox, webhook, and durable recovery timers; the dashboard can scale to zero; and the private worker wakes when the Service Bus run queue contains work.
 
 ## What it does not complete
 
-The configuration does not enable real Azure Content Safety, configure Azure Communication Services Email, add API Management, publish or deploy images, or prove the hosted golden path. The foundation temporarily configures local email and governance providers when the apps are enabled so those later integrations are not falsely represented as complete. Service Bus application wiring and webhook-secret envelope encryption are implemented and locally tested, but still require a live Azure deployment to verify Managed Identity, Key Vault wrap/unwrap, KEDA, network, and broker behavior.
+No resource, live provider call, sender delivery, or hosted golden path has been verified in an Azure subscription. Hosted providers are disabled by default; enabling application revisions requires real providers and a configured sender. The configuration never selects simulated email or governance for hosted applications. Provider keys are populated in Key Vault out of band and exposed only to the corresponding API or worker identity through secret references. Manual GitHub workflows prepare immutable release images and a protected saved-plan apply, but their first hosted execution remains pending.
 
 This configuration is not permanently free. PostgreSQL Flexible Server, Standard Service Bus, the always-on API replica, registry storage, telemetry ingestion, and network traffic can consume Azure credit. Budget notifications report spend but do not stop resources automatically.
 
@@ -56,7 +57,7 @@ Do not run `terraform apply` until an Azure subscription, supported region, quot
    terraform -chdir=infra/terraform plan -out=foundation.tfplan
    ```
 
-5. Review and apply the first plan with `deploy_container_apps = false`. This creates the platform foundation but no application revisions.
+5. Review and apply the first plan with `deploy_container_apps = false` and `enable_hosted_providers = false`. This creates the platform foundation but no application revisions. The protected OIDC workflow in [DEPLOYMENT.md](DEPLOYMENT.md) is the delivery path; the commands here explain local operator inspection.
 6. Publish the API, worker, and dashboard images to the created ACR. Resolve each image digest and replace the example image references with `registry/repository@sha256:digest` values.
 7. Populate these Key Vault secrets out of band so their plaintext does not enter source control or Terraform configuration:
 
@@ -64,13 +65,15 @@ Do not run `terraform apply` until an Azure subscription, supported region, quot
    - `storage-connection-string`
    - `jwt-signing-secret`
    - `auth-audit-pepper`
+   - `communication-email-access-key` (after provisioning ACS Email)
+   - `content-safety-api-key` (after provisioning Content Safety)
 
 8. Confirm the saved plan contains the Service Bus environment contract, sender/receiver role assignments, dead-letter alert, Managed Identity worker scale rule, webhook wrapping key, and API-only `Key Vault Crypto User` assignment.
-9. Set `deploy_container_apps = true`, create a new saved plan, review it, and apply it. Never apply an old plan after changing images or secrets.
+9. Provision hosted providers with `enable_hosted_providers = true` and apps still disabled. Populate their Key Vault keys, set the verified `email_sender_address`, and configure invited registration addresses. Set `deploy_container_apps = true`, create a new saved plan, review it, and apply it. Never apply an old plan after changing images or secrets.
 
 For a database that has served an older Sluice revision, first deploy the compatibility revision with `SLUICE_WEBHOOK_ENCRYPTION_MIGRATION_MODE=dual-write`. It encrypts existing and new webhook secrets while retaining the old column so an old API revision can drain safely. After every API instance runs the compatible code and the backfill is verified, deploy a reviewed revision with `protected`; startup decrypts and compares each migrated envelope before removing its compatibility plaintext, and refuses traffic if verification fails or any unencrypted row remains. After that cutover, rollback must use a revision that understands encrypted secrets; the older plaintext-only revision is no longer compatible. A new controlled-demo database starts directly in `protected` mode, which is what this Terraform root configures.
 
-The PostgreSQL password is necessarily sent to the AzureRM provider and retained in Terraform state. Use the encrypted remote backend, restrict access to it, and never apply this root with local state.
+The PostgreSQL password and provider-computed service keys are retained in Terraform state. Use the encrypted remote backend, restrict access to it, and never apply this root with local state. Binary plans and full JSON plans are also sensitive; the delivery workflow stores them only in a private Azure container rather than GitHub artifacts.
 
 ## State and secret safety
 

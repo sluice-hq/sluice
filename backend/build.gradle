@@ -51,6 +51,8 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform {
 		excludeTags 'external-integration'
+		excludeTags 'live-azure'
+		excludeTags 'live-azure-email'
 	}
 	systemProperty 'user.timezone', 'UTC'
 }
@@ -70,6 +72,34 @@ tasks.register('externalIntegrationTest', Test) {
 
 tasks.named('bootRun') {
 	systemProperty 'user.timezone', 'UTC'
+}
+
+tasks.register('liveAzureTest', Test) {
+	description = 'Opt-in Azure provider smoke test; contacts the configured paid service.'
+	group = 'verification'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	dependsOn tasks.named('testClasses')
+	useJUnitPlatform { includeTags 'live-azure' }
+	doFirst {
+		if (System.getenv('SLUICE_RUN_LIVE_AZURE_TESTS') != 'true') {
+			throw new GradleException('Set SLUICE_RUN_LIVE_AZURE_TESTS=true only after configuring an approved Azure resource.')
+		}
+	}
+}
+
+tasks.register('liveAzureEmailTest', Test) {
+	description = 'Opt-in ACS Email submission smoke; recipient arrival must be checked separately.'
+	group = 'verification'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	dependsOn tasks.named('testClasses')
+	useJUnitPlatform { includeTags 'live-azure-email' }
+	doFirst {
+		if (System.getenv('SLUICE_RUN_LIVE_AZURE_TESTS') != 'true') {
+			throw new GradleException('Set SLUICE_RUN_LIVE_AZURE_TESTS=true only for approved provider smoke tests.')
+		}
+	}
 }
 
 tasks.named('bootJar') {

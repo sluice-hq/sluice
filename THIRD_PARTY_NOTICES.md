@@ -12,6 +12,12 @@ materials and license review in ticket L-08B.
 
 ## Backend runtime dependencies
 
+Release containers additionally bundle Microsoft Application Insights Java Agent
+3.7.10, [Microsoft/ApplicationInsights-Java](https://github.com/microsoft/ApplicationInsights-Java),
+under the MIT license. The Maven artifact is pinned by SHA-256 in `backend/Dockerfile`;
+its upstream license and bundled third-party notices are retained inside the agent JAR.
+The entrypoint attaches it only when an Application Insights connection string is supplied.
+
 | Component | Resolved version | License | Upstream source |
 |---|---:|---|---|
 | `org.springframework.boot:spring-boot-starter-actuator` | 4.1.0 | Apache-2.0 | [spring-projects/spring-boot](https://github.com/spring-projects/spring-boot) |

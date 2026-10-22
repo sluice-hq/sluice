@@ -1,6 +1,10 @@
 package com.sluice.api.webhook.service;
 
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 
 import java.net.InetAddress;
 import java.net.URI;
@@ -12,12 +16,24 @@ public class WebhookTargetValidator {
     public interface HostResolver { InetAddress[] resolve(String host) throws Exception; }
 
     private final HostResolver resolver;
+    private final boolean localDemoCallback;
 
-    public WebhookTargetValidator() {
-        this(InetAddress::getAllByName);
+    @Autowired
+    public WebhookTargetValidator(Environment environment,
+            @Value("${SLUICE_WEBHOOK_LOCAL_DEMO_CALLBACK_ENABLED:false}") boolean enabled) {
+        this(InetAddress::getAllByName, enabled);
+        if (enabled && (!environment.acceptsProfiles(Profiles.of("local"))
+                || environment.acceptsProfiles(Profiles.of("production")))) {
+            throw new IllegalStateException("The local webhook demo callback is permitted only in the local profile");
+        }
     }
 
-    WebhookTargetValidator(HostResolver resolver) { this.resolver = resolver; }
+    WebhookTargetValidator(HostResolver resolver) { this(resolver, false); }
+
+    WebhookTargetValidator(HostResolver resolver, boolean localDemoCallback) {
+        this.resolver = resolver;
+        this.localDemoCallback = localDemoCallback;
+    }
 
     public URI validate(String value) {
         try {
@@ -27,6 +43,9 @@ public class WebhookTargetValidator {
                     || uri.getUserInfo() != null || uri.getFragment() != null) {
                 throw new IllegalArgumentException("Webhook URL must be an absolute HTTP or HTTPS URL without credentials or fragments");
             }
+            // A fixed local fixture endpoint, never an arbitrary private-network allowlist.
+            if (localDemoCallback && (value.equals("http://host.docker.internal:8787/webhooks")
+                    || value.equals("http://localhost:8787/webhooks"))) return uri;
             InetAddress[] addresses = resolver.resolve(uri.getHost());
             if (addresses.length == 0) throw new IllegalArgumentException("Webhook host did not resolve");
             for (InetAddress address : addresses) {

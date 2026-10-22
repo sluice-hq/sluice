@@ -26,5 +26,5 @@ resource "azurerm_key_vault_key" "webhook_secret_kek" {
 resource "azurerm_role_assignment" "terraform_key_vault_crypto_officer" {
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Crypto Officer"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id         = coalesce(var.terraform_key_manager_object_id, data.azurerm_client_config.current.object_id)
 }

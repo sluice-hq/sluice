@@ -237,3 +237,66 @@ variable "auth_audit_pepper_secret_name" {
   type        = string
   default     = "auth-audit-pepper"
 }
+
+variable "enable_hosted_providers" {
+  description = "Provision real Content Safety and ACS Email. Required before enabling application revisions; never substitutes simulated providers."
+  type        = bool
+  default     = false
+}
+
+variable "content_safety_location" {
+  description = "Content Safety supported region, separately verified during account/cost preflight."
+  type        = string
+  default     = "eastus"
+}
+
+variable "content_safety_sku" {
+  description = "Reviewed Content Safety tier; F0 is quota-limited and subject to subscription availability."
+  type        = string
+  default     = "F0"
+  validation {
+    condition     = contains(["F0", "S0"], var.content_safety_sku)
+    error_message = "Content Safety must use an explicitly reviewed F0 or S0 tier."
+  }
+}
+
+variable "email_data_location" {
+  description = "Reviewed ACS Email data geography, independent of the resource-group region."
+  type        = string
+  default     = "United States"
+}
+
+variable "content_safety_key_secret_name" {
+  description = "Existing Key Vault secret containing the Content Safety API key, populated out of band."
+  type        = string
+  default     = "content-safety-api-key"
+}
+
+variable "email_key_secret_name" {
+  description = "Existing Key Vault secret containing the ACS access key, populated out of band."
+  type        = string
+  default     = "communication-email-access-key"
+}
+
+variable "email_sender_address" {
+  description = "Exact sender from the provisioned Azure-managed domain, copied after foundation apply. Required for apps."
+  type        = string
+  default     = ""
+}
+
+variable "demo_registration_allowed_emails" {
+  description = "Invited demo accounts permitted to register. Empty keeps hosted registration closed."
+  type        = list(string)
+  default     = []
+}
+
+variable "terraform_key_manager_object_id" {
+  description = "Object ID of the apply identity that creates/rotates Key Vault keys. Set explicitly when plan and apply use different federated identities."
+  type        = string
+  default     = null
+  nullable    = true
+  validation {
+    condition     = var.terraform_key_manager_object_id == null || can(regex("^[0-9a-fA-F-]{36}$", var.terraform_key_manager_object_id))
+    error_message = "terraform_key_manager_object_id must be a principal object UUID."
+  }
+}

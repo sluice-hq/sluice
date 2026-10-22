@@ -9,6 +9,9 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -61,6 +64,48 @@ class AuthEmailProviderTest {
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    void retriesUseTheSameAzureRepeatabilityIdentityAndFirstSendTime() throws Exception {
+        List<String> operations = new ArrayList<>();
+        List<String> requestIds = new ArrayList<>();
+        List<String> firstSent = new ArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/emails:send", exchange -> {
+            operations.add(exchange.getRequestHeaders().getFirst("Operation-Id"));
+            requestIds.add(exchange.getRequestHeaders().getFirst("Repeatability-Request-ID"));
+            firstSent.add(exchange.getRequestHeaders().getFirst("Repeatability-First-Sent"));
+            exchange.getRequestBody().readAllBytes();
+            exchange.sendResponseHeaders(operations.size() == 1 ? 503 : 202, -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var provider = new AzureCommunicationEmailProvider("http://127.0.0.1:" + server.getAddress().getPort(),
+                    Base64.getEncoder().encodeToString("test-secret".getBytes(StandardCharsets.UTF_8)),
+                    "sender@example.com", "2025-09-01", 2000, mapper);
+            UUID id = UUID.randomUUID();
+            Instant original = Instant.parse("2026-10-22T07:00:00Z");
+            var email = email("recipient@example.com");
+            assertThrows(IllegalStateException.class, () -> provider.send(id, original, email));
+            provider.send(id, original, email);
+            assertEquals(List.of(id.toString(), id.toString()), operations);
+            assertEquals(operations, requestIds);
+            assertEquals(List.of("Thu, 22 Oct 2026 07:00:00 GMT", "Thu, 22 Oct 2026 07:00:00 GMT"), firstSent);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void localProviderDeduplicatesRetriedDeliveryIds() {
+        var provider = new LocalCapturedEmailProvider(10);
+        var id = UUID.randomUUID();
+        var email = email("recipient@example.com");
+        provider.send(id, email);
+        provider.send(id, email);
+        assertEquals(1, provider.messages().size());
     }
 
     @Test

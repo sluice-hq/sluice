@@ -34,4 +34,24 @@ class WebhookSecurityTest {
                 ignored -> new InetAddress[]{InetAddress.getByName(address)});
         assertThrows(IllegalArgumentException.class, () -> validator.validate("https://" + host + "/callback"));
     }
+
+    @Test
+    void localDemoExceptionMatchesOnlyTheFixedCallback() {
+        WebhookTargetValidator validator = new WebhookTargetValidator(
+                host -> new InetAddress[]{InetAddress.getLoopbackAddress()}, true);
+        assertEquals("http://localhost:8787/webhooks", validator.validate("http://localhost:8787/webhooks").toString());
+        assertThrows(IllegalArgumentException.class, () -> validator.validate("http://localhost:8080/admin"));
+        assertThrows(IllegalArgumentException.class, () -> validator.validate("http://localhost:8787/webhooks?url=secret"));
+        assertThrows(IllegalArgumentException.class, () -> validator.validate("http://host.docker.internal:8787/other"));
+    }
+
+    @Test
+    void productionAndDefaultProfilesRefuseLocalDemoException() {
+        var environment = new org.springframework.mock.env.MockEnvironment();
+        assertThrows(IllegalStateException.class, () -> new WebhookTargetValidator(environment, true));
+        environment.setActiveProfiles("local");
+        assertDoesNotThrow(() -> new WebhookTargetValidator(environment, true));
+        environment.setActiveProfiles("local", "production");
+        assertThrows(IllegalStateException.class, () -> new WebhookTargetValidator(environment, true));
+    }
 }

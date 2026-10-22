@@ -43,7 +43,8 @@ class AuthServiceTest {
         when(members.save(any(ProjectMember.class))).thenAnswer(call -> call.getArgument(0));
         when(jwt.generateToken(any(UUID.class), org.mockito.ArgumentMatchers.anyLong())).thenReturn("jwt");
 
-        AuthService.AuthResult result = new AuthService(users, projects, members, passwords, jwt, tokens, audit)
+        AuthService.AuthResult result = new AuthService(users, projects, members, passwords, jwt, tokens, audit,
+                mock(AuthEmailRequestDispatcher.class))
                 .signup(" Dev@Example.com ", "a-secure-password", "Storefront");
 
         assertEquals("jwt", result.token());
@@ -67,7 +68,8 @@ class AuthServiceTest {
         when(passwords.matches("wrong-password", "hash")).thenReturn(false);
 
         assertThrows(BadCredentialsException.class, () ->
-                new AuthService(users, projects, members, passwords, jwt, tokens, audit)
+                new AuthService(users, projects, members, passwords, jwt, tokens, audit,
+                        mock(AuthEmailRequestDispatcher.class))
                         .login("dev@example.com", "wrong-password"));
     }
 

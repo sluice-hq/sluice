@@ -66,3 +66,12 @@ output "managed_identity_client_ids" {
     dashboard = azurerm_user_assigned_identity.dashboard.client_id
   }
 }
+
+output "hosted_provider_contract" {
+  description = "Non-secret hosted endpoints/domain. Keys are populated directly into Key Vault outside Terraform."
+  value = var.enable_hosted_providers ? {
+    content_safety_endpoint = azurerm_cognitive_account.content_safety[0].endpoint
+    email_endpoint          = "https://${azurerm_communication_service.email[0].hostname}"
+    email_domain_id         = azurerm_email_communication_service_domain.email[0].id
+  } : null
+}

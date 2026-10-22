@@ -12,6 +12,25 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class DependencyHealthServiceTest {
+    @Test
+    void azureDeploymentNamesAndProbesTheActualBroker() {
+        var endpoint = mock(HealthEndpoint.class);
+        var service = new DependencyHealthService(endpoint, mock(SluiceMetrics.class), "servicebus");
+        assertEquals("Service Bus", service.current().get(1).name());
+        service.refresh();
+        verify(endpoint).healthForPath("serviceBus");
+        verify(endpoint, never()).healthForPath("rabbit");
+    }
+
+    @Test
+    void serviceBusHealthUsesObservedOperationsWithoutInventingConnectivity() {
+        var publisher = mock(com.sluice.api.messaging.AzureServiceBusRunQueuePublisher.class);
+        var health = new ServiceBusHealthIndicator(publisher);
+        when(publisher.lastPublishSucceeded()).thenReturn(null, true, false);
+        assertEquals("UNKNOWN", health.health().getStatus().getCode());
+        assertEquals("UP", health.health().getStatus().getCode());
+        assertEquals("DOWN", health.health().getStatus().getCode());
+    }
 
     @Test
     void dashboardReadsCachedSnapshotWithoutRunningRemoteProbes() {

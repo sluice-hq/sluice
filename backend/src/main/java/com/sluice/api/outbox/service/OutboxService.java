@@ -39,7 +39,7 @@ public class OutboxService {
         try {
             java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
             body.put("eventId", eventId);
-            body.put("timestamp", java.time.Instant.now());
+            body.put("timestamp", java.time.Instant.now().toString());
             body.put("projectId", job.getProjectId());
             body.put("runId", job.getId());
             body.put("status", job.getStatus().name());

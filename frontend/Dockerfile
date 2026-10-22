@@ -1,17 +1,17 @@
 # syntax=docker/dockerfile:1.7
-FROM node:20-bookworm-slim AS dependencies
+FROM node:24-bookworm-slim AS dependencies
 WORKDIR /workspace/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 
-FROM node:20-bookworm-slim AS build
+FROM node:24-bookworm-slim AS build
 WORKDIR /workspace/frontend
 COPY --from=dependencies /workspace/frontend/node_modules ./node_modules
 COPY frontend ./
 COPY LICENSE THIRD_PARTY_NOTICES.md /workspace/
 RUN npm run build
 
-FROM node:20-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \

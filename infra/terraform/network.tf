@@ -11,6 +11,9 @@ resource "azurerm_subnet" "container_apps" {
   resource_group_name  = azurerm_resource_group.main.name
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes     = ["10.20.0.0/23"]
+  service_endpoint {
+    service = "Microsoft.CognitiveServices"
+  }
 
   delegation {
     name = "container-apps-environment"

@@ -4,6 +4,7 @@ import com.sluice.api.auth.domain.AuthToken;
 import com.sluice.api.auth.domain.AuthTokenPurpose;
 import com.sluice.api.auth.domain.User;
 import com.sluice.api.auth.email.AuthEmailProvider;
+import com.sluice.api.auth.email.AuthEmailOutbox;
 import com.sluice.api.auth.repository.AuthTokenRepository;
 import com.sluice.api.auth.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,8 @@ class AuthTokenServiceTest {
     void issuedTokenIsRandomWhileOnlyItsHashIsPersisted() {
         AuthTokenRepository tokens = mock(AuthTokenRepository.class);
         UserRepository users = mock(UserRepository.class);
-        AuthEmailProvider email = mock(AuthEmailProvider.class);
+        AuthEmailOutbox email = mock(AuthEmailOutbox.class);
+        when(tokens.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
         User user = user();
         AuthTokenService service = new AuthTokenService(tokens, users, email, 3600, 600, "http://localhost");
 
@@ -35,8 +37,8 @@ class AuthTokenServiceTest {
 
         ArgumentCaptor<AuthToken> persisted = ArgumentCaptor.forClass(AuthToken.class);
         ArgumentCaptor<AuthEmailProvider.AuthEmail> sent = ArgumentCaptor.forClass(AuthEmailProvider.AuthEmail.class);
-        verify(tokens).save(persisted.capture());
-        verify(email).send(sent.capture());
+        verify(tokens).saveAndFlush(persisted.capture());
+        verify(email).enqueue(any(), sent.capture());
         assertEquals(64, persisted.getValue().getTokenHash().length());
         assertNotEquals(sent.getValue().token(), persisted.getValue().getTokenHash());
         assertTrue(persisted.getValue().getExpiresAt().isAfter(Instant.now()));
@@ -47,10 +49,12 @@ class AuthTokenServiceTest {
     void expiredOrConsumedTokenCannotBeUsed() {
         AuthTokenRepository tokens = mock(AuthTokenRepository.class);
         UserRepository users = mock(UserRepository.class);
-        AuthEmailProvider email = mock(AuthEmailProvider.class);
+        AuthEmailOutbox email = mock(AuthEmailOutbox.class);
         AuthTokenService service = new AuthTokenService(tokens, users, email, 3600, 600, "http://localhost");
         AuthToken expired = new AuthToken(UUID.randomUUID(), UUID.randomUUID(), AuthTokenPurpose.PASSWORD_RESET,
                 "hash", Instant.now().minusSeconds(1), Instant.now().minusSeconds(10));
+        when(tokens.findUserIdForConsumption(any(), any())).thenReturn(Optional.of(expired.getUserId()));
+        when(users.findForEmailPreparation(any())).thenReturn(Optional.of(user()));
         when(tokens.findByTokenHashAndPurpose(any(), any())).thenReturn(Optional.of(expired));
 
         assertThrows(InvalidAuthTokenException.class,
@@ -68,11 +72,13 @@ class AuthTokenServiceTest {
     void passwordResetRotatesTheUsersSessionVersion() {
         AuthTokenRepository tokens = mock(AuthTokenRepository.class);
         UserRepository users = mock(UserRepository.class);
-        AuthEmailProvider email = mock(AuthEmailProvider.class);
+        AuthEmailOutbox email = mock(AuthEmailOutbox.class);
         AuthTokenService service = new AuthTokenService(tokens, users, email, 3600, 600, "http://localhost");
         User user = user();
         AuthToken token = new AuthToken(UUID.randomUUID(), user.getId(), AuthTokenPurpose.PASSWORD_RESET,
                 "hash", Instant.now().plusSeconds(60), Instant.now());
+        when(tokens.findUserIdForConsumption(any(), any())).thenReturn(Optional.of(user.getId()));
+        when(users.findForEmailPreparation(user.getId())).thenReturn(Optional.of(user));
         when(tokens.findByTokenHashAndPurpose(any(), any())).thenReturn(Optional.of(token));
         when(users.findById(user.getId())).thenReturn(Optional.of(user));
 
@@ -80,6 +86,10 @@ class AuthTokenServiceTest {
 
         assertEquals("new-hash", user.getPasswordHash());
         assertEquals(1, user.getSessionVersion());
+        var order = org.mockito.Mockito.inOrder(tokens, users);
+        order.verify(tokens).findUserIdForConsumption(any(), any());
+        order.verify(users).findForEmailPreparation(user.getId());
+        order.verify(tokens).findByTokenHashAndPurpose(any(), any());
     }
 
     private User user() {

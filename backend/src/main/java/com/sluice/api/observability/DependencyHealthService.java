@@ -12,15 +12,24 @@ import java.util.concurrent.atomic.AtomicReference;
 public class DependencyHealthService {
     private final HealthEndpoint healthEndpoint;
     private final SluiceMetrics metrics;
+    private final boolean serviceBus;
     private final AtomicReference<List<DependencyHealth>> snapshot = new AtomicReference<>(List.of(
             new DependencyHealth("PostgreSQL", 0, "DEGRADED"),
             new DependencyHealth("RabbitMQ", 0, "DEGRADED"),
             new DependencyHealth("Blob Storage", 0, "DEGRADED")));
 
-    public DependencyHealthService(HealthEndpoint healthEndpoint, SluiceMetrics metrics) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public DependencyHealthService(HealthEndpoint healthEndpoint, SluiceMetrics metrics,
+            @org.springframework.beans.factory.annotation.Value("${sluice.messaging.provider:rabbit}") String provider) {
         this.healthEndpoint = healthEndpoint;
         this.metrics = metrics;
+        this.serviceBus = provider.equals("servicebus");
+        snapshot.set(List.of(new DependencyHealth("PostgreSQL", 0, "DEGRADED"),
+                new DependencyHealth(serviceBus ? "Service Bus" : "RabbitMQ", 0, "DEGRADED"),
+                new DependencyHealth("Blob Storage", 0, "DEGRADED")));
     }
+
+    DependencyHealthService(HealthEndpoint healthEndpoint, SluiceMetrics metrics) { this(healthEndpoint, metrics, "rabbit"); }
 
     public List<DependencyHealth> current() {
         return snapshot.get();
@@ -29,7 +38,7 @@ public class DependencyHealthService {
     public void refresh() {
         snapshot.set(List.of(
                 probe("PostgreSQL", "db"),
-                probe("RabbitMQ", "rabbit"),
+                serviceBus ? probe("Service Bus", "serviceBus") : probe("RabbitMQ", "rabbit"),
                 probe("Blob Storage", "azureBlob")));
     }
 

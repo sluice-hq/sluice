@@ -34,6 +34,11 @@ public class ContentSafetyProcessor implements Processor {
 
     @Override
     public ProcessorResult process(ProcessingContext context, JsonNode config) throws Exception {
+        int reviewThreshold = threshold(config, "reviewThreshold", 4);
+        int blockThreshold = threshold(config, "blockThreshold", 6);
+        if (reviewThreshold < 0 || reviewThreshold > 6 || blockThreshold > 7 || blockThreshold <= reviewThreshold) {
+            throw new IllegalArgumentException("Governance thresholds are invalid");
+        }
         long size = context.getCurrentResource().getSize();
         if (size < 1 || size > 50_000_000) throw new IllegalArgumentException("Governance input exceeds byte limits");
         byte[] content;
@@ -49,14 +54,15 @@ public class ContentSafetyProcessor implements Processor {
         ContentSafetyProvider.ContentSafetyResult result = provider.orElseThrow(() ->
                 new IllegalStateException("Content Safety execution provider is unavailable in this runtime"))
                 .analyze(content, mime);
-        int reviewThreshold = config != null && config.has("reviewThreshold")
-                ? config.path("reviewThreshold").asInt() : 4;
-        int blockThreshold = config != null && config.has("blockThreshold")
-                ? config.path("blockThreshold").asInt() : 6;
-        if (reviewThreshold < 0 || blockThreshold > 7 || blockThreshold <= reviewThreshold) {
-            throw new IllegalArgumentException("Governance thresholds are invalid");
+        if (result == null || result.provider() == null || result.provider().isBlank()
+                || result.modelVersion() == null || result.modelVersion().isBlank()
+                || result.categoryScores() == null || result.categoryScores().isEmpty()
+                || result.reasonCodes() == null
+                || result.categoryScores().entrySet().stream().anyMatch(entry -> entry.getKey() == null
+                || entry.getKey().isBlank() || entry.getValue() == null || entry.getValue() < 0 || entry.getValue() > 7)) {
+            throw new IllegalStateException("Content Safety provider returned incomplete or invalid evidence");
         }
-        int maximum = result.categoryScores().values().stream().mapToInt(Integer::intValue).max().orElse(0);
+        int maximum = result.categoryScores().values().stream().mapToInt(Integer::intValue).max().orElseThrow();
         GovernanceDecisionValue decision = maximum >= blockThreshold ? GovernanceDecisionValue.BLOCK
                 : maximum >= reviewThreshold ? GovernanceDecisionValue.REVIEW : GovernanceDecisionValue.ALLOW;
         Map<String, Object> facts = new LinkedHashMap<>();
@@ -68,5 +74,14 @@ public class ContentSafetyProcessor implements Processor {
         facts.put("categoryScores", result.categoryScores());
         facts.put("reasonCodes", result.reasonCodes());
         return new ProcessorResult(null, facts);
+    }
+
+    private int threshold(JsonNode config, String name, int fallback) {
+        if (config == null || !config.has(name)) return fallback;
+        JsonNode value = config.get(name);
+        if (!value.isIntegralNumber() || !value.canConvertToInt()) {
+            throw new IllegalArgumentException("Governance thresholds must be integers");
+        }
+        return value.intValue();
     }
 }
